@@ -1,0 +1,32 @@
+{
+  "roots": ["<rootDir>/test"],
+  "transform": {
+    "^.+\\.ts?$": "ts-jest"
+  },
+  "testRegex": "(/test/.*|(\\.|/)(test|spec))\\.test.ts?$",
+  "moduleFileExtensions": ["ts", "js", "json", "node"],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^@api/(.*)$": "<rootDir>/src/api/$1",
+    "^@services/(.*)$": "<rootDir>/src/api/services/$1",
+    "^@controllers/(.*)$": "<rootDir>/src/api/controllers/$1",
+    "^@middlewares/(.*)$": "<rootDir>/src/api/middlewares/$1",
+    "^@models/(.*)$": "<rootDir>/src/api/models/$1",
+    "^@interfaces/(.*)$": "<rootDir>/src/api/Interface/$1",
+    "^@errors/(.*)$": "<rootDir>/src/api/errors/$1",
+    "^@responses/(.*)$": "<rootDir>/src/api/responses/$1",
+    "^@decorators/(.*)$": "<rootDir>/src/api/decorators/$1",
+    "^@loaders/(.*)$": "<rootDir>/src/loaders/$1",
+    "^@lib/(.*)$": "<rootDir>/src/lib/$1",
+    "^@env$": "<rootDir>/src/env",
+    "^@env/(.*)$": "<rootDir>/src/env/$1",
+    "^@examples/(.*)$": "<rootDir>/src/examples/$1"
+  },
+  "collectCoverage": true,
+  "collectCoverageFrom": ["src/**/*.{ts,js}", "!src/**/*.d.ts", "!src/api/Interface/*", "!src/api/models/enums/*"],
+  "coverageReporters": ["json", "lcov", "text", "clover"],
+  "maxWorkers": 1,
+  "testTimeout": 3000,
+  "clearMocks": true,
+  "resetMocks": true
+}

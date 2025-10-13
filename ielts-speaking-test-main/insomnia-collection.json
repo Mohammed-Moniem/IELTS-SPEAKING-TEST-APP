@@ -1,0 +1,727 @@
+{
+	"_type": "export",
+	"__export_format": 4,
+	"__export_date": "2024-01-15T10:30:00.000Z",
+	"__export_source": "insomnia.desktop.app:v2023.5.8",
+	"resources": [
+		{
+			"_id": "req_auth_register",
+			"parentId": "fld_auth",
+			"modified": 1705314600000,
+			"created": 1705314600000,
+			"url": "{{ _.base_url }}/api/auth/register",
+			"name": "Register User",
+			"description": "Register a new user account with email, phone, and personal details",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"phone\": \"+1234567890\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"password\": \"{{ _.test_password }}\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1705314600000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_auth_login",
+			"parentId": "fld_auth",
+			"modified": 1705314700000,
+			"created": 1705314700000,
+			"url": "{{ _.base_url }}/api/auth/login",
+			"name": "Login User",
+			"description": "Authenticate user and retrieve access and refresh tokens",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1705314700000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_auth_refresh",
+			"parentId": "fld_auth",
+			"modified": 1705314800000,
+			"created": 1705314800000,
+			"url": "{{ _.base_url }}/api/auth/refresh",
+			"name": "Refresh Token",
+			"description": "Refresh access token using refresh token",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"refreshToken\": \"{{ _.refresh_token }}\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {},
+			"metaSortKey": -1705314800000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_auth_logout",
+			"parentId": "fld_auth",
+			"modified": 1705314900000,
+			"created": 1705314900000,
+			"url": "{{ _.base_url }}/api/auth/logout",
+			"name": "Logout User",
+			"description": "Invalidate user tokens and logout",
+			"method": "POST",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705314900000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_user_profile_get",
+			"parentId": "fld_users",
+			"modified": 1705315000000,
+			"created": 1705315000000,
+			"url": "{{ _.base_url }}/api/users/profile",
+			"name": "Get User Profile",
+			"description": "Retrieve current user's profile information",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_user_profile_update",
+			"parentId": "fld_users",
+			"modified": 1705315100000,
+			"created": 1705315100000,
+			"url": "{{ _.base_url }}/api/users/profile",
+			"name": "Update User Profile",
+			"description": "Update user profile information",
+			"method": "PUT",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Smith\",\n  \"phone\": \"+1987654321\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315100000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_preferences_get",
+			"parentId": "fld_preferences",
+			"modified": 1705315200000,
+			"created": 1705315200000,
+			"url": "{{ _.base_url }}/api/users/preferences",
+			"name": "Get Test Preferences",
+			"description": "Retrieve user's IELTS test preferences",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315200000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_preferences_create",
+			"parentId": "fld_preferences",
+			"modified": 1705315300000,
+			"created": 1705315300000,
+			"url": "{{ _.base_url }}/api/users/preferences",
+			"name": "Create/Update Test Preferences",
+			"description": "Set or update user's test preferences including target date and band score",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"testDate\": \"2024-06-15T00:00:00.000Z\",\n  \"targetBand\": \"7.5\",\n  \"timeFrame\": \"3-months\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315300000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_topics_get",
+			"parentId": "fld_topics",
+			"modified": 1705315400000,
+			"created": 1705315400000,
+			"url": "{{ _.base_url }}/api/topics",
+			"name": "Get All Topics",
+			"description": "Retrieve all available practice topics with questions and metadata",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315400000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_practice_start",
+			"parentId": "fld_practice",
+			"modified": 1705315500000,
+			"created": 1705315500000,
+			"url": "{{ _.base_url }}/api/practice/sessions",
+			"name": "Start Practice Session",
+			"description": "Initialize a new practice session for a specific topic",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"topicId\": \"hometown\",\n  \"question\": \"Let's talk about your hometown. Can you describe where you're from and what makes it special?\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315500000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_practice_complete",
+			"parentId": "fld_practice",
+			"modified": 1705315600000,
+			"created": 1705315600000,
+			"url": "{{ _.base_url }}/api/practice/sessions/{{ _.practice_session_id }}",
+			"name": "Complete Practice Session",
+			"description": "Submit user response and receive AI-generated feedback",
+			"method": "PUT",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"userResponse\": \"I come from a small town in northern Italy called Verona. It's famous for being the setting of Romeo and Juliet, which attracts many tourists throughout the year. What makes it special is the beautiful Roman architecture, including an ancient amphitheater that's still used for opera performances. The city has a perfect blend of historical significance and modern amenities. I particularly love the local markets and the friendly community atmosphere.\",\n  \"timeSpent\": 105\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315600000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_practice_history",
+			"parentId": "fld_practice",
+			"modified": 1705315700000,
+			"created": 1705315700000,
+			"url": "{{ _.base_url }}/api/practice/sessions?limit=10&offset=0",
+			"name": "Get Practice History",
+			"description": "Retrieve user's practice session history with pagination",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "limit",
+					"value": "10"
+				},
+				{
+					"name": "offset",
+					"value": "0"
+				}
+			],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315700000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_test_start",
+			"parentId": "fld_tests",
+			"modified": 1705315800000,
+			"created": 1705315800000,
+			"url": "{{ _.base_url }}/api/tests/simulations",
+			"name": "Start Test Simulation",
+			"description": "Initialize a full IELTS Speaking test simulation with all three parts",
+			"method": "POST",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315800000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_test_complete",
+			"parentId": "fld_tests",
+			"modified": 1705315900000,
+			"created": 1705315900000,
+			"url": "{{ _.base_url }}/api/tests/simulations/{{ _.test_simulation_id }}",
+			"name": "Complete Test Simulation",
+			"description": "Submit responses for all test parts and receive comprehensive feedback",
+			"method": "PUT",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"parts\": [\n    {\n      \"partNumber\": 1,\n      \"userResponse\": \"I come from Verona, Italy. It's a beautiful historic city famous for Romeo and Juliet. I've lived there my whole life and love the architecture and cultural events.\",\n      \"timeSpent\": 120\n    },\n    {\n      \"partNumber\": 2,\n      \"userResponse\": \"One memorable event in my life was graduating from university last year. It happened in June at our campus auditorium. My whole family was there to support me. This event was so memorable because it represented years of hard work paying off. I felt incredibly proud and relieved when I walked across that stage. It marked the beginning of my professional career and made my parents extremely happy.\",\n      \"timeSpent\": 180\n    },\n    {\n      \"partNumber\": 3,\n      \"userResponse\": \"Technology has significantly changed communication compared to the past. In the past, people relied on letters and face-to-face meetings, which were slower but perhaps more meaningful. Today, we have instant messaging, video calls, and social media that allow immediate global communication. While this has made us more connected globally, I think it has also made communication more superficial in some ways. People often prefer texting over phone calls, which can lead to misunderstandings. However, the benefits are enormous - we can maintain relationships across distances and access information instantly.\",\n      \"timeSpent\": 200\n    }\n  ]\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705315900000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_test_history",
+			"parentId": "fld_tests",
+			"modified": 1705316000000,
+			"created": 1705316000000,
+			"url": "{{ _.base_url }}/api/tests/simulations?limit=10&offset=0",
+			"name": "Get Test History",
+			"description": "Retrieve user's test simulation history",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "limit",
+					"value": "10"
+				},
+				{
+					"name": "offset",
+					"value": "0"
+				}
+			],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705316000000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_subscription_current",
+			"parentId": "fld_subscriptions",
+			"modified": 1705316100000,
+			"created": 1705316100000,
+			"url": "{{ _.base_url }}/api/subscriptions/current",
+			"name": "Get Current Subscription",
+			"description": "Retrieve user's current subscription status and details",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705316100000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_subscription_checkout",
+			"parentId": "fld_subscriptions",
+			"modified": 1705316200000,
+			"created": 1705316200000,
+			"url": "{{ _.base_url }}/api/subscriptions/checkout",
+			"name": "Create Checkout Session",
+			"description": "Create Stripe checkout session for subscription upgrade",
+			"method": "POST",
+			"body": {
+				"mimeType": "application/json",
+				"text": "{\n  \"planType\": \"premium\"\n}"
+			},
+			"parameters": [],
+			"headers": [
+				{
+					"name": "Content-Type",
+					"value": "application/json"
+				}
+			],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705316200000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_usage_current",
+			"parentId": "fld_usage",
+			"modified": 1705316300000,
+			"created": 1705316300000,
+			"url": "{{ _.base_url }}/api/usage/current",
+			"name": "Get Current Usage",
+			"description": "Retrieve current month's usage statistics with limits",
+			"method": "GET",
+			"body": {},
+			"parameters": [],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705316300000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "req_usage_history",
+			"parentId": "fld_usage",
+			"modified": 1705316400000,
+			"created": 1705316400000,
+			"url": "{{ _.base_url }}/api/usage/history?months=6",
+			"name": "Get Usage History",
+			"description": "Retrieve historical usage data for specified number of months",
+			"method": "GET",
+			"body": {},
+			"parameters": [
+				{
+					"name": "months",
+					"value": "6"
+				}
+			],
+			"headers": [],
+			"authentication": {
+				"type": "bearer",
+				"token": "{{ _.access_token }}"
+			},
+			"metaSortKey": -1705316400000,
+			"isPrivate": false,
+			"settingStoreCookies": true,
+			"settingSendCookies": true,
+			"settingDisableRenderRequestBody": false,
+			"settingEncodeUrl": true,
+			"settingRebuildPath": true,
+			"settingFollowRedirects": "global",
+			"_type": "request"
+		},
+		{
+			"_id": "fld_auth",
+			"parentId": "wrk_main",
+			"modified": 1705314500000,
+			"created": 1705314500000,
+			"name": "Authentication",
+			"description": "User authentication and token management endpoints",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705314500000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_users",
+			"parentId": "wrk_main",
+			"modified": 1705314900000,
+			"created": 1705314900000,
+			"name": "User Management",
+			"description": "User profile and account management endpoints",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705314900000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_preferences",
+			"parentId": "wrk_main",
+			"modified": 1705315100000,
+			"created": 1705315100000,
+			"name": "Test Preferences",
+			"description": "IELTS test preferences and goals management",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705315100000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_topics",
+			"parentId": "wrk_main",
+			"modified": 1705315300000,
+			"created": 1705315300000,
+			"name": "Topics",
+			"description": "Practice topics and questions management",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705315300000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_practice",
+			"parentId": "wrk_main",
+			"modified": 1705315400000,
+			"created": 1705315400000,
+			"name": "Practice Sessions",
+			"description": "Individual practice session management and feedback",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705315400000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_tests",
+			"parentId": "wrk_main",
+			"modified": 1705315700000,
+			"created": 1705315700000,
+			"name": "Test Simulations",
+			"description": "Full IELTS Speaking test simulations with comprehensive feedback",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705315700000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_subscriptions",
+			"parentId": "wrk_main",
+			"modified": 1705316000000,
+			"created": 1705316000000,
+			"name": "Subscription Management",
+			"description": "Subscription plans and payment processing",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705316000000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "fld_usage",
+			"parentId": "wrk_main",
+			"modified": 1705316200000,
+			"created": 1705316200000,
+			"name": "Usage Tracking",
+			"description": "Usage statistics and limits management",
+			"environment": {},
+			"environmentPropertyOrder": null,
+			"metaSortKey": -1705316200000,
+			"_type": "request_group"
+		},
+		{
+			"_id": "wrk_main",
+			"parentId": null,
+			"modified": 1705314400000,
+			"created": 1705314400000,
+			"name": "IELTS Speaking Practice API",
+			"description": "Complete API collection for IELTS Speaking Practice application backend integration testing",
+			"scope": "collection",
+			"_type": "workspace"
+		},
+		{
+			"_id": "env_main",
+			"parentId": "wrk_main",
+			"modified": 1705314400000,
+			"created": 1705314400000,
+			"name": "Base Environment",
+			"data": {
+				"base_url": "http://localhost:3000",
+				"test_email": "test@example.com",
+				"test_password": "TestPassword123!",
+				"access_token": "",
+				"refresh_token": "",
+				"user_id": "",
+				"practice_session_id": "",
+				"test_simulation_id": ""
+			},
+			"dataPropertyOrder": {
+				"&": [
+					"base_url",
+					"test_email",
+					"test_password",
+					"access_token",
+					"refresh_token",
+					"user_id",
+					"practice_session_id",
+					"test_simulation_id"
+				]
+			},
+			"color": null,
+			"isPrivate": false,
+			"metaSortKey": 1705314400000,
+			"_type": "environment"
+		}
+	]
+}
