@@ -219,7 +219,38 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${YELLOW}Make sure your mobile device is on the same WiFi network!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}\n"
 
-npx expo start --clear
+# Choose a free Expo port to avoid interactive prompts.
+EXPO_PORT=8081
+if lsof -Pi :$EXPO_PORT -sTCP:LISTEN -t >/dev/null ; then
+    EXPO_PORT=8083
+fi
+if lsof -Pi :$EXPO_PORT -sTCP:LISTEN -t >/dev/null ; then
+    EXPO_PORT=$(python3 - <<'PY'
+import socket
+
+for port in range(8084, 8101):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("0.0.0.0", port))
+        except OSError:
+            continue
+        print(port)
+        break
+else:
+    print(0)
+PY
+)
+    if [ "$EXPO_PORT" -eq 0 ]; then
+        echo -e "${RED}Error: Could not find a free Expo port (8081, 8083, 8084-8100).${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "Expo URL: ${GREEN}exp://${LOCAL_IP}:${EXPO_PORT}${NC}"
+echo "exp://${LOCAL_IP}:${EXPO_PORT}" > ../docs/CURRENT-EXPO-URL.txt
+
+npx expo start --clear --port "$EXPO_PORT"
 
 # Keep script running
 wait $BACKEND_PID
