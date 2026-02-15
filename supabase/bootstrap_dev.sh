@@ -57,19 +57,16 @@ ${SUPABASE_ADMIN} platform-request \
   --method PATCH \
   --path "/v1/projects/${REF}/config/auth" \
   --body-json '{"external_anonymous_users_enabled":true,"security_manual_linking_enabled":true,"uri_allow_list":"spokio://auth/callback,spokio://auth/reset"}' \
-  --yes
+  --yes \
+  >/dev/null
 
 echo "Checking schema..."
-HAS_PROFILES="$(${SUPABASE_ADMIN} platform-db-query --ref "${REF}" --read-only --sql \"select to_regclass('public.profiles') as profiles;\" | python3 - <<'PY'
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    row = data[0] if isinstance(data, list) and data else {}
-    val = row.get("profiles")
-    print("1" if val else "0")
-except Exception:
-    print("0")
-PY
+HAS_PROFILES="$(
+  ${SUPABASE_ADMIN} platform-db-query \
+    --ref "${REF}" \
+    --read-only \
+    --sql "select to_regclass('public.profiles') as profiles;" \
+  | python3 -c 'import json,sys; data=json.load(sys.stdin); row=data[0] if isinstance(data,list) and data else {}; print("1" if row.get("profiles") else "0")'
 )"
 
 if [ "${HAS_PROFILES}" = "0" ]; then
@@ -86,4 +83,3 @@ echo "Seeding dev data..."
 ${SUPABASE_ADMIN} repo-apply-seed --repo "${REPO_ROOT}" --ref "${REF}" --seed-file supabase/seed.sql --mode mgmt --yes
 
 echo "Done."
-
