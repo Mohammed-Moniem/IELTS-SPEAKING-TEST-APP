@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const RESULTS_KEY = "@ielts_practice_results";
+const FULL_TEST_RESULTS_KEY = "@ielts_full_test_results";
 const USED_QUESTIONS_KEY = "@ielts_used_questions";
 
 export interface PracticeResult {
@@ -36,6 +37,48 @@ export interface PracticeResult {
   duration: number; // in seconds
 }
 
+export interface FullTestEvaluationDetails {
+  overallBand?: number;
+  criteria?: any;
+  corrections?: Array<{
+    original: string;
+    corrected: string;
+    explanation: string;
+    category?: string;
+  }>;
+  suggestions?: string[];
+  bandComparison?: any;
+  partScores?: {
+    part1?: number;
+    part2?: number;
+    part3?: number;
+  };
+}
+
+export interface FullTestResult {
+  id: string;
+  timestamp: number;
+  durationSeconds: number;
+  overallBand?: number;
+  partScores?: {
+    part1?: number;
+    part2?: number;
+    part3?: number;
+  };
+  spokenSummary?: string;
+  fullTranscript?: string;
+  evaluation?: FullTestEvaluationDetails;
+  questions?: Array<{
+    questionId?: string;
+    question: string;
+    category: string;
+    difficulty?: string;
+    topic?: string;
+  }>;
+  source?: string;
+  testSessionId?: string;
+}
+
 class ResultsStorageService {
   private normalizeResult(raw: any): PracticeResult {
     const evaluation = raw?.evaluation || {};
@@ -61,8 +104,7 @@ class ResultsStorageService {
     const corrections = Array.isArray(correctionsRaw)
       ? correctionsRaw
           .map((entry: any) => ({
-            original:
-              typeof entry?.original === "string" ? entry.original : "",
+            original: typeof entry?.original === "string" ? entry.original : "",
             corrected:
               typeof entry?.corrected === "string" ? entry.corrected : "",
             explanation:
@@ -126,7 +168,7 @@ class ResultsStorageService {
     return {
       ...raw,
       evaluation: {
-        overallBand: evaluation.overallBand || 0,
+        overallBand: Number(evaluation.overallBand) || 0,
         criteria: normalizedCriteria,
         detailed,
         corrections,
@@ -134,6 +176,131 @@ class ResultsStorageService {
         bandComparison: evaluation.bandComparison,
       },
     } as PracticeResult;
+  }
+
+  private normalizeFullTestResult(raw: any): FullTestResult {
+    const evaluation = raw?.evaluation || raw?.fullEvaluation || {};
+
+    const normalizeSuggestions = (value: unknown): string[] => {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+      return value
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return entry.trim();
+          }
+          if (
+            entry &&
+            typeof entry === "object" &&
+            typeof (entry as any).suggestion === "string"
+          ) {
+            const base = (entry as any).suggestion.trim();
+            return (entry as any).category
+              ? `${(entry as any).category}: ${base}`
+              : base;
+          }
+          return "";
+        })
+        .filter((entry) => entry.length > 0);
+    };
+
+    const normalizeCorrections = (
+      value: unknown
+    ): FullTestEvaluationDetails["corrections"] => {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+
+      return value
+        .map((entry) => {
+          const original =
+            typeof (entry as any)?.original === "string"
+              ? (entry as any).original
+              : "";
+          const corrected =
+            typeof (entry as any)?.corrected === "string"
+              ? (entry as any).corrected
+              : "";
+          const explanation =
+            typeof (entry as any)?.explanation === "string"
+              ? (entry as any).explanation
+              : "";
+          const category =
+            typeof (entry as any)?.category === "string"
+              ? (entry as any).category
+              : undefined;
+
+          return {
+            original,
+            corrected,
+            explanation,
+            category,
+          };
+        })
+        .filter(
+          (entry) => entry.original.length > 0 || entry.corrected.length > 0
+        );
+    };
+
+    const suggestions = normalizeSuggestions(
+      evaluation.suggestions || raw?.suggestions
+    );
+    const corrections = normalizeCorrections(
+      evaluation.corrections || raw?.corrections
+    );
+
+    const overallBand = Number(
+      evaluation.overallBand ?? raw?.overallBand ?? raw?.band
+    );
+
+    const partScores = evaluation.partScores || raw?.partScores || undefined;
+
+    const toPlainQuestion = (value: any) => ({
+      questionId:
+        typeof value?.questionId === "string" ? value.questionId : undefined,
+      question:
+        typeof value?.question === "string" ? value.question : "Unknown",
+      category: typeof value?.category === "string" ? value.category : "",
+      difficulty:
+        typeof value?.difficulty === "string" ? value.difficulty : undefined,
+      topic: typeof value?.topic === "string" ? value.topic : undefined,
+    });
+
+    const questionsArray = Array.isArray(raw?.questions)
+      ? raw.questions.map(toPlainQuestion)
+      : undefined;
+
+    return {
+      id:
+        typeof raw?.id === "string"
+          ? raw.id
+          : `fulltest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Number(raw?.timestamp) || Date.now(),
+      durationSeconds: Number(raw?.durationSeconds || raw?.duration) || 0,
+      overallBand: Number.isFinite(overallBand) ? overallBand : undefined,
+      partScores,
+      spokenSummary:
+        typeof (raw?.spokenSummary || evaluation.spokenSummary) === "string"
+          ? raw?.spokenSummary || evaluation.spokenSummary
+          : undefined,
+      fullTranscript:
+        typeof raw?.fullTranscript === "string"
+          ? raw.fullTranscript
+          : undefined,
+      evaluation: {
+        overallBand: Number.isFinite(overallBand) ? overallBand : undefined,
+        criteria: evaluation.criteria || raw?.criteria,
+        corrections,
+        suggestions,
+        bandComparison: evaluation.bandComparison || raw?.bandComparison,
+        partScores,
+      },
+      questions: questionsArray,
+      source: typeof raw?.source === "string" ? raw.source : undefined,
+      testSessionId:
+        typeof raw?.testSessionId === "string" ? raw.testSessionId : undefined,
+    };
   }
 
   /**
@@ -156,6 +323,23 @@ class ResultsStorageService {
     }
   }
 
+  async saveFullTestResult(result: FullTestResult | any): Promise<void> {
+    try {
+      const normalized = this.normalizeFullTestResult(result);
+      const existing = await this.getFullTestResults();
+      const updated = [normalized, ...existing];
+      const trimmed = updated.slice(0, 50);
+
+      await AsyncStorage.setItem(
+        FULL_TEST_RESULTS_KEY,
+        JSON.stringify(trimmed)
+      );
+      console.log("✅ Full test result saved:", normalized.id);
+    } catch (error) {
+      console.error("❌ Failed to save full test result:", error);
+    }
+  }
+
   /**
    * Get all practice results from AsyncStorage
    */
@@ -172,6 +356,23 @@ class ResultsStorageService {
       return parsed.map((item) => this.normalizeResult(item));
     } catch (error) {
       console.error("❌ Failed to load practice results:", error);
+      return [];
+    }
+  }
+
+  async getFullTestResults(): Promise<FullTestResult[]> {
+    try {
+      const data = await AsyncStorage.getItem(FULL_TEST_RESULTS_KEY);
+      if (!data) {
+        return [];
+      }
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.map((item) => this.normalizeFullTestResult(item));
+    } catch (error) {
+      console.error("❌ Failed to load full test results:", error);
       return [];
     }
   }
@@ -240,6 +441,15 @@ class ResultsStorageService {
     } catch (error) {
       console.error("❌ Failed to clear results:", error);
       throw error;
+    }
+  }
+
+  async clearFullTestResults(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(FULL_TEST_RESULTS_KEY);
+      console.log("✅ Full test results cleared");
+    } catch (error) {
+      console.error("❌ Failed to clear full test results:", error);
     }
   }
 

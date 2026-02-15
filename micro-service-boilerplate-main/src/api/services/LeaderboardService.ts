@@ -1,126 +1,216 @@
-import { Types } from 'mongoose';
-import { Logger } from '../../lib/logger';
-import { UserStats } from '../models/AchievementModel';
-import { UserProfile } from '../models/UserProfileModel';
+/**
+ * Leaderboard Service (Supabase/Postgres)
+ *
+ * Leaderboard uses `public.user_stats` for scores/counts and joins
+ * `public.user_profiles` + `public.profiles` for display information.
+ */
+
+import { getSupabaseAdmin } from '@lib/supabaseClient';
+import { Logger } from '@lib/logger';
 
 const log = new Logger(__filename);
 
 export type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all-time';
 export type LeaderboardMetric = 'score' | 'practices' | 'achievements' | 'streak';
 
+type CacheEntry = { data: any; timestamp: number };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const leaderboardCache = new Map<string, CacheEntry>();
+
+type UserStatsRow = {
+  user_id: string;
+  leaderboard_opt_in: boolean;
+  average_score: number;
+  total_practice_sessions: number;
+  achievement_points: number;
+  current_streak: number;
+  weekly_score: number;
+  weekly_practices: number;
+  monthly_score: number;
+  monthly_practices: number;
+};
+
 export class LeaderboardService {
-  /**
-   * Get leaderboard for a specific period
-   */
+  private getFromCache(key: string): any | null {
+    const cached = leaderboardCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+    if (cached) {
+      leaderboardCache.delete(key);
+    }
+    return null;
+  }
+
+  private setCache(key: string, data: any): void {
+    leaderboardCache.set(key, { data, timestamp: Date.now() });
+  }
+
+  clearCache(): void {
+    leaderboardCache.clear();
+  }
+
+  private getMetricField(metric: LeaderboardMetric, period: LeaderboardPeriod): keyof UserStatsRow {
+    if (period === 'daily' || period === 'weekly') {
+      return metric === 'score' ? 'weekly_score' : 'weekly_practices';
+    }
+    if (period === 'monthly') {
+      return metric === 'score' ? 'monthly_score' : 'monthly_practices';
+    }
+
+    switch (metric) {
+      case 'score':
+        return 'average_score';
+      case 'practices':
+        return 'total_practice_sessions';
+      case 'achievements':
+        return 'achievement_points';
+      case 'streak':
+        return 'current_streak';
+      default:
+        return 'average_score';
+    }
+  }
+
+  private getMetricValue(stats: UserStatsRow, metric: LeaderboardMetric, period: LeaderboardPeriod): number {
+    const field = this.getMetricField(metric, period);
+    return Number((stats as any)[field] || 0);
+  }
+
+  private async enrichUsers(userIds: string[]) {
+    const supabase = getSupabaseAdmin();
+    const unique = Array.from(new Set(userIds.filter(Boolean)));
+    const byId = new Map<string, { _id: string; email?: string; username?: string; avatar?: string }>();
+    unique.forEach(id => byId.set(id, { _id: id }));
+
+    if (!unique.length) return byId;
+
+    const [{ data: profiles }, { data: userProfiles }] = await Promise.all([
+      supabase.from('profiles').select('id, email').in('id', unique),
+      supabase.from('user_profiles').select('user_id, username, avatar').in('user_id', unique)
+    ]);
+
+    (profiles || []).forEach((row: any) => {
+      const entry = byId.get(row.id) || { _id: row.id };
+      entry.email = row.email;
+      byId.set(row.id, entry);
+    });
+
+    (userProfiles || []).forEach((row: any) => {
+      const userId = row.user_id;
+      const entry = byId.get(userId) || { _id: userId };
+      entry.username = row.username;
+      entry.avatar = row.avatar || undefined;
+      byId.set(userId, entry);
+    });
+
+    return byId;
+  }
+
   async getLeaderboard(
     period: LeaderboardPeriod,
     metric: LeaderboardMetric = 'score',
     limit: number = 100,
-    userId?: string
+    _userId?: string
   ): Promise<any[]> {
-    // Build query based on filters
-    const query: any = {
-      leaderboardOptIn: true // Only users who opted in
-    };
-
-    // Determine sort field based on period and metric
-    let sortField: string;
-
-    if (period === 'daily' || period === 'weekly') {
-      sortField = period === 'daily' ? 'weeklyScore' : 'weeklyScore'; // Both use weekly for now
-    } else if (period === 'monthly') {
-      sortField = 'monthlyScore';
-    } else {
-      sortField = this.getMetricField(metric);
+    const safeLimit = Math.max(1, Math.min(limit || 100, 200));
+    const cacheKey = `leaderboard:${period}:${metric}:${safeLimit}`;
+    const cached = this.getFromCache(cacheKey);
+    if (cached) {
+      return cached;
     }
 
-    // Get leaderboard data
-    const leaderboard = await UserStats.find(query)
-      .sort({ [sortField]: -1 })
-      .limit(limit)
-      .populate('userId', 'name email')
-      .lean();
+    const supabase = getSupabaseAdmin();
+    const sortField = this.getMetricField(metric, period);
 
-    // Add user profiles
-    const enrichedLeaderboard = [];
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select(
+        'user_id, leaderboard_opt_in, average_score, total_practice_sessions, achievement_points, current_streak, weekly_score, weekly_practices, monthly_score, monthly_practices'
+      )
+      .eq('leaderboard_opt_in', true)
+      .order(sortField as string, { ascending: false })
+      .limit(safeLimit);
 
-    for (let i = 0; i < leaderboard.length; i++) {
-      const stats = leaderboard[i];
+    if (error) {
+      log.error('Failed to fetch leaderboard', { error: error.message });
+      throw new Error('Failed to load leaderboard');
+    }
 
-      const profile = await UserProfile.findOne({ userId: stats.userId }).select('username avatar');
+    const rows = (data || []) as UserStatsRow[];
+    const userMap = await this.enrichUsers(rows.map(r => r.user_id));
 
-      enrichedLeaderboard.push({
-        rank: i + 1,
-        userId: stats.userId,
-        username: profile?.username || 'Anonymous',
-        avatar: profile?.avatar,
+    const leaderboard = rows.map((stats, idx) => {
+      const user = userMap.get(stats.user_id) || { _id: stats.user_id };
+      return {
+        userId: user,
+        rank: idx + 1,
         score: this.getMetricValue(stats, metric, period),
-        totalSessions: stats.totalPracticeSessions + stats.totalSimulations,
-        achievements: stats.totalAchievements,
-        streak: stats.currentStreak,
-        isCurrentUser: userId ? stats.userId.toString() === userId : false
-      });
-    }
+        totalPracticeSessions: Number(stats.total_practice_sessions || 0),
+        achievementPoints: Number(stats.achievement_points || 0),
+        currentStreak: Number(stats.current_streak || 0)
+      };
+    });
 
-    return enrichedLeaderboard;
+    this.setCache(cacheKey, leaderboard);
+    return leaderboard;
   }
 
-  /**
-   * Get friends-only leaderboard
-   */
   async getFriendsLeaderboard(
     userId: string,
     period: LeaderboardPeriod,
     metric: LeaderboardMetric = 'score'
   ): Promise<any[]> {
-    // Get user's friends (import friendService to avoid circular dependency)
-    const { friendService } = await import('./FriendService');
-    const friends = await friendService.getFriends(userId);
-    const friendIds = friends.map(f => f.userId.toString());
+    const supabase = getSupabaseAdmin();
 
-    // Include current user
-    friendIds.push(userId);
+    const { data: friendships, error } = await supabase
+      .from('friendships')
+      .select('user1_id, user2_id')
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-    const query: any = {
-      userId: { $in: friendIds.map(id => new Types.ObjectId(id)) },
-      leaderboardOptIn: true
-    };
-
-    const sortField = this.getMetricField(metric, period);
-
-    const leaderboard = await UserStats.find(query)
-      .sort({ [sortField]: -1 })
-      .populate('userId', 'name email')
-      .lean();
-
-    // Enrich with profiles
-    const enrichedLeaderboard = [];
-
-    for (let i = 0; i < leaderboard.length; i++) {
-      const stats = leaderboard[i];
-
-      const profile = await UserProfile.findOne({ userId: stats.userId }).select('username avatar');
-
-      enrichedLeaderboard.push({
-        rank: i + 1,
-        userId: stats.userId,
-        username: profile?.username || 'Anonymous',
-        avatar: profile?.avatar,
-        score: this.getMetricValue(stats, metric, period),
-        totalSessions: stats.totalPracticeSessions + stats.totalSimulations,
-        achievements: stats.totalAchievements,
-        streak: stats.currentStreak,
-        isCurrentUser: stats.userId.toString() === userId,
-        isFriend: stats.userId.toString() !== userId
-      });
+    if (error) {
+      log.warn('Failed to load friendships for friends leaderboard', { userId, error: error.message });
     }
 
-    return enrichedLeaderboard;
+    const friendIds = (friendships || [])
+      .map((row: any) => (row.user1_id === userId ? row.user2_id : row.user1_id))
+      .filter(Boolean);
+
+    const participants = Array.from(new Set([userId, ...friendIds]));
+    if (!participants.length) return [];
+
+    const sortField = this.getMetricField(metric, period);
+    const { data, error: statsError } = await supabase
+      .from('user_stats')
+      .select(
+        'user_id, leaderboard_opt_in, average_score, total_practice_sessions, achievement_points, current_streak, weekly_score, weekly_practices, monthly_score, monthly_practices'
+      )
+      .eq('leaderboard_opt_in', true)
+      .in('user_id', participants)
+      .order(sortField as string, { ascending: false })
+      .limit(200);
+
+    if (statsError) {
+      log.error('Failed to fetch friends leaderboard', { error: statsError.message });
+      throw new Error('Failed to load friends leaderboard');
+    }
+
+    const rows = (data || []) as UserStatsRow[];
+    const userMap = await this.enrichUsers(rows.map(r => r.user_id));
+
+    return rows.map((stats, idx) => {
+      const user = userMap.get(stats.user_id) || { _id: stats.user_id };
+      return {
+        userId: user,
+        rank: idx + 1,
+        score: this.getMetricValue(stats, metric, period),
+        totalPracticeSessions: Number(stats.total_practice_sessions || 0),
+        achievementPoints: Number(stats.achievement_points || 0),
+        currentStreak: Number(stats.current_streak || 0)
+      };
+    });
   }
 
-  /**
-   * Get user's leaderboard position
-   */
   async getUserPosition(
     userId: string,
     period: LeaderboardPeriod,
@@ -131,214 +221,66 @@ export class LeaderboardService {
     totalUsers: number;
     percentile: number;
   } | null> {
-    const userStats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
+    const supabase = getSupabaseAdmin();
+    const sortField = this.getMetricField(metric, period) as string;
 
-    if (!userStats || !userStats.leaderboardOptIn) {
+    const { data: userStats } = await supabase
+      .from('user_stats')
+      .select(
+        'user_id, leaderboard_opt_in, average_score, total_practice_sessions, achievement_points, current_streak, weekly_score, weekly_practices, monthly_score, monthly_practices'
+      )
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!userStats || !(userStats as any).leaderboard_opt_in) {
       return null;
     }
 
-    const sortField = this.getMetricField(metric, period);
-    const userScore = this.getMetricValue(userStats, metric, period);
+    const score = this.getMetricValue(userStats as UserStatsRow, metric, period);
 
-    // Count users with better scores
-    const betterCount = await UserStats.countDocuments({
-      leaderboardOptIn: true,
-      [sortField]: { $gt: userScore }
-    });
+    const [{ count: betterCount }, { count: totalUsers }] = await Promise.all([
+      supabase
+        .from('user_stats')
+        .select('user_id', { head: true, count: 'exact' })
+        .eq('leaderboard_opt_in', true)
+        .gt(sortField, score),
+      supabase.from('user_stats').select('user_id', { head: true, count: 'exact' }).eq('leaderboard_opt_in', true)
+    ]);
 
-    const rank = betterCount + 1;
-
-    // Get total opted-in users
-    const totalUsers = await UserStats.countDocuments({ leaderboardOptIn: true });
-
-    const percentile = totalUsers > 0 ? ((totalUsers - rank + 1) / totalUsers) * 100 : 0;
+    const rank = (betterCount || 0) + 1;
+    const total = totalUsers || 0;
+    const percentile = total > 0 ? ((total - rank + 1) / total) * 100 : 0;
 
     return {
       rank,
-      score: userScore,
-      totalUsers,
+      score,
+      totalUsers: total,
       percentile: Math.round(percentile * 10) / 10
     };
   }
 
-  /**
-   * Opt user in to leaderboard
-   */
   async optInToLeaderboard(userId: string): Promise<void> {
-    let stats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
-
-    if (!stats) {
-      stats = new UserStats({
-        userId: new Types.ObjectId(userId),
-        leaderboardOptIn: true
-      });
-    } else {
-      stats.leaderboardOptIn = true;
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('user_stats')
+      .upsert({ user_id: userId, leaderboard_opt_in: true }, { onConflict: 'user_id' });
+    if (error) {
+      throw new Error('Failed to opt in');
     }
-
-    await stats.save();
-    log.info(`User ${userId} opted in to leaderboard`);
+    this.clearCache();
   }
 
-  /**
-   * Opt user out from leaderboard
-   */
   async optOutFromLeaderboard(userId: string): Promise<void> {
-    const stats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
-
-    if (stats) {
-      stats.leaderboardOptIn = false;
-      await stats.save();
-      log.info(`User ${userId} opted out from leaderboard`);
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('user_stats')
+      .upsert({ user_id: userId, leaderboard_opt_in: false }, { onConflict: 'user_id' });
+    if (error) {
+      throw new Error('Failed to opt out');
     }
-  }
-
-  /**
-   * Update user stats (called after practice sessions)
-   */
-  async updateUserStats(userId: string, score: number, isPractice: boolean = true): Promise<void> {
-    let stats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
-
-    if (!stats) {
-      stats = new UserStats({
-        userId: new Types.ObjectId(userId)
-      });
-    }
-
-    // Update session counts
-    if (isPractice) {
-      stats.totalPracticeSessions += 1;
-      stats.weeklyPractices += 1;
-      stats.monthlyPractices += 1;
-    } else {
-      stats.totalSimulations += 1;
-    }
-
-    // Update scores
-    const totalSessions = stats.totalPracticeSessions + stats.totalSimulations;
-    stats.averageScore = (stats.averageScore * (totalSessions - 1) + score) / totalSessions;
-
-    if (score > stats.highestScore) {
-      stats.highestScore = score;
-    }
-
-    // Update weekly/monthly scores (simplified - recalculate from recent sessions)
-    stats.weeklyScore = stats.averageScore; // Simplified
-    stats.monthlyScore = stats.averageScore; // Simplified
-
-    // Update streak
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (stats.lastPracticeDate) {
-      const lastDate = new Date(stats.lastPracticeDate);
-      lastDate.setHours(0, 0, 0, 0);
-
-      const daysDiff = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (daysDiff === 0) {
-        // Same day, no streak change
-      } else if (daysDiff === 1) {
-        // Consecutive day
-        stats.currentStreak += 1;
-        if (stats.currentStreak > stats.longestStreak) {
-          stats.longestStreak = stats.currentStreak;
-        }
-      } else {
-        // Streak broken
-        stats.currentStreak = 1;
-      }
-    } else {
-      stats.currentStreak = 1;
-    }
-
-    stats.lastPracticeDate = new Date();
-    await stats.save();
-
-    log.info(`Stats updated for user ${userId}: Score=${score}, Streak=${stats.currentStreak}`);
-  }
-
-  /**
-   * Reset weekly stats (run via cron job every Monday)
-   */
-  async resetWeeklyStats(): Promise<void> {
-    await UserStats.updateMany(
-      {},
-      {
-        $set: {
-          weeklyScore: 0,
-          weeklyPractices: 0
-        }
-      }
-    );
-
-    log.info('Weekly stats reset completed');
-  }
-
-  /**
-   * Reset monthly stats (run via cron job on 1st of each month)
-   */
-  async resetMonthlyStats(): Promise<void> {
-    await UserStats.updateMany(
-      {},
-      {
-        $set: {
-          monthlyScore: 0,
-          monthlyPractices: 0
-        }
-      }
-    );
-
-    log.info('Monthly stats reset completed');
-  }
-
-  /**
-   * Get metric field name for sorting
-   */
-  private getMetricField(metric: LeaderboardMetric, period?: LeaderboardPeriod): string {
-    if (period === 'daily' || period === 'weekly') {
-      return metric === 'score' ? 'weeklyScore' : 'weeklyPractices';
-    } else if (period === 'monthly') {
-      return metric === 'score' ? 'monthlyScore' : 'monthlyPractices';
-    }
-
-    switch (metric) {
-      case 'score':
-        return 'averageScore';
-      case 'practices':
-        return 'totalPracticeSessions';
-      case 'achievements':
-        return 'achievementPoints';
-      case 'streak':
-        return 'currentStreak';
-      default:
-        return 'averageScore';
-    }
-  }
-
-  /**
-   * Get metric value from stats
-   */
-  private getMetricValue(stats: any, metric: LeaderboardMetric, period: LeaderboardPeriod): number {
-    if (period === 'daily' || period === 'weekly') {
-      return metric === 'score' ? stats.weeklyScore : stats.weeklyPractices;
-    } else if (period === 'monthly') {
-      return metric === 'score' ? stats.monthlyScore : stats.monthlyPractices;
-    }
-
-    switch (metric) {
-      case 'score':
-        return stats.averageScore;
-      case 'practices':
-        return stats.totalPracticeSessions;
-      case 'achievements':
-        return stats.achievementPoints;
-      case 'streak':
-        return stats.currentStreak;
-      default:
-        return stats.averageScore;
-    }
+    this.clearCache();
   }
 }
 
 export const leaderboardService = new LeaderboardService();
+

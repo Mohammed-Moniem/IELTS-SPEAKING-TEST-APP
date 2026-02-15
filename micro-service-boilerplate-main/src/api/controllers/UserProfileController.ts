@@ -14,14 +14,21 @@ export class UserProfileController {
   async getOwnProfile(@CurrentUser({ required: true }) currentUser: any) {
     try {
       const profile = await userProfileService.getProfile(currentUser.id);
+      log.info('Profile retrieved successfully, about to return:', typeof profile, profile ? 'exists' : 'null');
+
+      // Explicitly serialize to ensure no mongoose artifacts
+      const cleanProfile = profile ? JSON.parse(JSON.stringify(profile)) : null;
 
       return {
         success: true,
-        data: profile
+        data: cleanProfile
       };
     } catch (error: any) {
       log.error('Error getting own profile:', error);
-      throw new BadRequestError(error.message);
+      log.error('Error stack:', error?.stack);
+      log.error('Error name:', error?.name);
+      log.error('Error message:', error?.message);
+      throw new BadRequestError(error.message || 'Failed to get profile');
     }
   }
 
@@ -53,10 +60,13 @@ export class UserProfileController {
     try {
       const profile = await userProfileService.updateProfile(currentUser.id, updates);
 
+      // Explicitly serialize to ensure no mongoose artifacts
+      const cleanProfile = profile ? JSON.parse(JSON.stringify(profile)) : null;
+
       return {
         success: true,
         message: 'Profile updated successfully',
-        data: profile
+        data: cleanProfile
       };
     } catch (error: any) {
       log.error('Error updating profile:', error);
@@ -73,10 +83,13 @@ export class UserProfileController {
     try {
       const profile = await userProfileService.updatePrivacySettings(currentUser.id, settings);
 
+      // Explicitly serialize to ensure no mongoose artifacts
+      const cleanProfile = profile ? JSON.parse(JSON.stringify(profile)) : null;
+
       return {
         success: true,
         message: 'Privacy settings updated',
-        data: profile
+        data: cleanProfile
       };
     } catch (error: any) {
       log.error('Error updating privacy settings:', error);
@@ -108,16 +121,46 @@ export class UserProfileController {
    * POST /api/profile/qr-code
    */
   @Post('/qr-code')
-  async generateQRCode(@CurrentUser({ required: true }) currentUser: any) {
+  async generateQRCode(
+    @CurrentUser({ required: true }) currentUser: any,
+    @Body() body: { purpose?: 'friend' | 'referral' } = {}
+  ) {
     try {
-      const qrCode = await userProfileService.generateQRCode(currentUser.id);
+      const purpose = body?.purpose === 'referral' ? 'referral' : 'friend';
+      const qrCode = await userProfileService.generateQRCode(currentUser.id, purpose);
 
       return {
         success: true,
-        data: { qrCode }
+        data: { qrCode, purpose }
       };
     } catch (error: any) {
       log.error('Error generating QR code:', error);
+      throw new BadRequestError(error.message);
+    }
+  }
+
+  /**
+   * Resolve QR code payload
+   * POST /api/profile/qr-code/resolve
+   */
+  @Post('/qr-code/resolve')
+  async resolveQRCode(
+    @CurrentUser({ required: true }) currentUser: any,
+    @Body() body: { code?: string }
+  ) {
+    try {
+      if (!body?.code) {
+        throw new BadRequestError('QR code data is required');
+      }
+
+      const result = await userProfileService.resolveQRCodePayload(body.code, currentUser.id);
+
+      return {
+        success: true,
+        data: result
+      };
+    } catch (error: any) {
+      log.error('Error resolving QR code:', error);
       throw new BadRequestError(error.message);
     }
   }

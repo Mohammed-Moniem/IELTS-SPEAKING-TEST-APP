@@ -1,8 +1,0 @@
-===========================================
-BACKEND + NGROK TUNNEL INFO
-===========================================
-Backend: https://1c3c16b4d101.ngrok-free.app
-API: https://1c3c16b4d101.ngrok-free.app/api/v1
-Dashboard: http://localhost:4040
-Updated: Mon Oct 13 05:29:57 +04 2025
-===========================================

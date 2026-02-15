@@ -1,7 +1,9 @@
 import React, { PropsWithChildren } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors, spacing } from "../theme/tokens";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 
 interface SectionHeadingProps {
   title: string;
@@ -10,31 +12,35 @@ interface SectionHeadingProps {
 
 export const SectionHeading: React.FC<
   PropsWithChildren<SectionHeadingProps>
-> = ({ title, action, children }) => (
-  <View style={styles.container}>
-    <View>
-      <Text style={styles.title}>{title}</Text>
-      {children ? <Text style={styles.subtitle}>{children}</Text> : null}
+> = ({ title, action, children }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.container}>
+      <View>
+        <Text style={styles.title}>{title}</Text>
+        {children ? <Text style={styles.subtitle}>{children}</Text> : null}
+      </View>
+      {action}
     </View>
-    {action}
-  </View>
-);
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: spacing.md,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: spacing.md,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    subtitle: {
+      marginTop: spacing.xs,
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+  });

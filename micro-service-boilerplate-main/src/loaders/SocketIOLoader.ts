@@ -1,9 +1,14 @@
 import { env } from '@env';
 import { Server as HTTPServer } from 'http';
-import jwt from 'jsonwebtoken';
 import { Socket, Server as SocketIOServer } from 'socket.io';
-import { encryptionService } from '../api/services/EncryptionService';
+import Container from 'typedi';
+
+import { chatService } from '../api/services/ChatService';
+import { NotificationService } from '../api/services/NotificationService';
+import { friendService } from '../api/services/FriendService';
 import { Logger } from '../lib/logger';
+import { getCurrentUserFromAccessToken } from '../lib/supabaseAuth';
+import { getSupabaseAdmin } from '../lib/supabaseClient';
 
 const log = new Logger(__filename);
 
@@ -13,9 +18,43 @@ export let io: SocketIOServer | null = null;
 const activeUsers = new Map<string, string>(); // userId -> socketId
 const userSockets = new Map<string, Set<string>>(); // userId -> Set of socketIds (multiple devices)
 
+const uniq = (items: string[]): string[] => Array.from(new Set(items.filter(Boolean)));
+
+async function updateUserStatus(userId: string, updater: (current: any | null) => any): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase.from('user_status').select('user_id, is_online, last_seen, socket_ids, currently_typing_in').eq('user_id', userId).maybeSingle();
+  const next = updater(data as any);
+  if (!data) {
+    await supabase.from('user_status').insert({ user_id: userId, ...next });
+    return;
+  }
+  await supabase.from('user_status').update(next).eq('user_id', userId);
+}
+
+function buildSocketMessagePayload(row: any) {
+  const metadata = row.metadata || {};
+  return {
+    _id: row.id,
+    senderId: row.sender_id,
+    recipientId: row.recipient_id || undefined,
+    groupId: row.group_id || undefined,
+    conversationId: row.conversation_id,
+    content: chatService.decryptMessageContent(row.encrypted_content, row.iv),
+    messageType: row.message_type,
+    metadata,
+    mediaUrl: metadata.fileUrl,
+    thumbnailUrl: metadata.thumbnailUrl,
+    readBy: Array.isArray(row.read_by) ? row.read_by : [],
+    deliveredTo: Array.isArray(row.delivered_to) ? row.delivered_to : [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    timestamp: row.created_at,
+    status: 'delivered'
+  };
+}
+
 /**
- * Initialize Socket.io server with authentication and encryption
- * @param httpServer - Express HTTP server
+ * Initialize Socket.io server with Supabase Auth and Postgres persistence.
  */
 export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
   io = new SocketIOServer(httpServer, {
@@ -28,27 +67,17 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     transports: ['websocket', 'polling']
   });
 
-  // Authentication middleware
   io.use(async (socket: Socket, next) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-
       if (!token) {
         return next(new Error('Authentication token required'));
       }
 
-      // Verify JWT token
-      const decoded = jwt.verify(token, env.auth.jwtSecret || 'your-secret-key') as any;
+      const currentUser = await getCurrentUserFromAccessToken(token);
+      socket.data.userId = currentUser.id;
+      socket.data.email = currentUser.email;
 
-      if (!decoded || !decoded.userId) {
-        return next(new Error('Invalid token'));
-      }
-
-      // Attach user info to socket
-      socket.data.userId = decoded.userId;
-      socket.data.email = decoded.email;
-
-      log.info(`Socket authenticated for user: ${decoded.userId}`);
       next();
     } catch (error) {
       log.error('Socket authentication error:', error);
@@ -56,204 +85,266 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     }
   });
 
-  // Connection handler
-  io.on('connection', (socket: Socket) => {
-    const userId = socket.data.userId;
+  io.on('connection', async (socket: Socket) => {
+    const notificationService = Container.get(NotificationService);
+    const userId = socket.data.userId as string;
+
     log.info(`User connected: ${userId} (Socket: ${socket.id})`);
 
-    // Track user connections
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId)!.add(socket.id);
     activeUsers.set(userId, socket.id);
 
-    // Join user's personal room
     socket.join(`user:${userId}`);
 
-    // Notify user's friends that they're online
-    socket.broadcast.emit('user:online', { userId });
+    // Presence: mark online + persist socket ids.
+    try {
+      await updateUserStatus(userId, current => {
+        const existing = current || {};
+        const socketIds = uniq([...(existing.socket_ids || []), socket.id]);
+        return {
+          is_online: true,
+          last_seen: new Date().toISOString(),
+          socket_ids: socketIds,
+          currently_typing_in: existing.currently_typing_in || []
+        };
+      });
 
-    // Handle direct messages (1-on-1 chat)
-    socket.on(
-      'message:send',
-      async (data: {
-        recipientId: string;
-        content: string;
-        conversationId?: string;
-        messageType?: 'text' | 'image' | 'audio' | 'file';
-        metadata?: any;
-      }) => {
-        try {
-          // Encrypt message content
-          const { encryptedContent, iv } = encryptionService.encryptMessage(data.content);
-
-          const encryptedMessage = {
-            senderId: userId,
-            recipientId: data.recipientId,
-            encryptedContent,
-            iv,
-            messageType: data.messageType || 'text',
-            metadata: data.metadata,
-            timestamp: new Date(),
-            conversationId: data.conversationId || generateConversationId(userId, data.recipientId)
-          };
-
-          // Emit to recipient(s)
-          io!.to(`user:${data.recipientId}`).emit('message:receive', encryptedMessage);
-
-          // Send confirmation to sender
-          socket.emit('message:sent', {
-            ...encryptedMessage,
-            status: 'delivered'
-          });
-
-          log.info(`Message sent from ${userId} to ${data.recipientId}`);
-        } catch (error) {
-          log.error('Error sending message:', error);
-          socket.emit('message:error', { error: 'Failed to send message' });
+      // Notify friends.
+      const friends = await friendService.getFriends(userId);
+      friends.forEach(friend => {
+        const friendUserId = (friend as any).userId || (friend as any)._id;
+        if (friendUserId) {
+          io!.to(`user:${friendUserId}`).emit('user:online', { userId, timestamp: new Date().toISOString() });
         }
-      }
-    );
+      });
+    } catch (error) {
+      log.error('Error updating user status:', error);
+    }
 
-    // Handle group messages
-    socket.on(
-      'group:message:send',
-      async (data: {
-        groupId: string;
-        content: string;
-        messageType?: 'text' | 'image' | 'audio' | 'file';
-        metadata?: any;
-      }) => {
-        try {
-          // Encrypt message content
-          const { encryptedContent, iv } = encryptionService.encryptMessage(data.content);
+    socket.on('message:send', async (data: { recipientId: string; content: string; messageType?: string; metadata?: any }) => {
+      try {
+        const saved = await chatService.sendDirectMessage(
+          userId,
+          data.recipientId,
+          data.content,
+          (data.messageType as any) || 'text',
+          data.metadata
+        );
 
-          const encryptedMessage = {
-            senderId: userId,
-            groupId: data.groupId,
-            encryptedContent,
-            iv,
-            messageType: data.messageType || 'text',
-            metadata: data.metadata,
-            timestamp: new Date(),
-            conversationId: `group_${data.groupId}`
-          };
+        const payload = buildSocketMessagePayload(saved);
 
-          // Emit to all group members
-          io!.to(`group:${data.groupId}`).emit('group:message:receive', encryptedMessage);
+        io!.to(`user:${data.recipientId}`).emit('message:receive', payload);
+        socket.emit('message:sent', payload);
 
-          log.info(`Group message sent by ${userId} to group ${data.groupId}`);
-        } catch (error) {
-          log.error('Error sending group message:', error);
-          socket.emit('group:message:error', { error: 'Failed to send group message' });
+        if (getUserConnectionCount(data.recipientId) === 0) {
+          notificationService
+            .notifyDirectMessage({
+              recipientId: data.recipientId,
+              senderId: userId,
+              message: data.content,
+              conversationId: payload.conversationId
+            })
+            .catch(error => log.error('Failed to enqueue direct message notification', error));
         }
+      } catch (error: any) {
+        const msg = error instanceof Error ? error.message : 'Failed to send message';
+        log.error('Error sending message:', error);
+        socket.emit('message:error', { error: msg });
       }
-    );
+    });
 
-    // Join study group room
+    socket.on('group:message:send', async (data: { groupId: string; content: string; messageType?: string; metadata?: any }) => {
+      try {
+        const groupId = data.groupId;
+        const memberIds = await chatService.getGroupMemberIds(groupId);
+        if (!memberIds.includes(userId)) {
+          throw new Error('Not a member of this group');
+        }
+
+        const saved = await chatService.sendGroupMessage(
+          userId,
+          groupId,
+          data.content,
+          memberIds,
+          (data.messageType as any) || 'text',
+          data.metadata
+        );
+
+        const payload = buildSocketMessagePayload(saved);
+        io!.to(`group:${groupId}`).emit('group:message:receive', payload);
+
+        const offlineMembers = memberIds.filter(memberId => memberId !== userId && getUserConnectionCount(memberId) === 0);
+        if (offlineMembers.length > 0) {
+          notificationService
+            .notifyGroupMessage({
+              recipientIds: offlineMembers,
+              senderId: userId,
+              message: data.content,
+              groupId
+            })
+            .catch(error => log.error('Failed to enqueue group message notification', error));
+        }
+      } catch (error: any) {
+        const msg = error instanceof Error ? error.message : 'Failed to send group message';
+        log.error('Error sending group message:', error);
+        socket.emit('group:message:error', { error: msg });
+      }
+    });
+
     socket.on('group:join', (groupId: string) => {
+      if (!groupId) return;
       socket.join(`group:${groupId}`);
-      log.info(`User ${userId} joined group ${groupId}`);
-
-      // Notify other group members
-      socket.to(`group:${groupId}`).emit('group:member:joined', {
-        userId,
-        groupId,
-        timestamp: new Date()
-      });
     });
 
-    // Leave study group room
     socket.on('group:leave', (groupId: string) => {
+      if (!groupId) return;
       socket.leave(`group:${groupId}`);
-      log.info(`User ${userId} left group ${groupId}`);
-
-      // Notify other group members
-      socket.to(`group:${groupId}`).emit('group:member:left', {
-        userId,
-        groupId,
-        timestamp: new Date()
-      });
     });
 
-    // Typing indicators
-    socket.on('typing:start', (data: { recipientId?: string; groupId?: string }) => {
-      if (data.recipientId) {
-        io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
-          userId,
-          isTyping: true
+    socket.on('conversation:join', (data: { conversationId: string }) => {
+      if (!data?.conversationId) return;
+      socket.join(`conversation:${data.conversationId}`);
+    });
+
+    socket.on('conversation:leave', (data: { conversationId: string }) => {
+      if (!data?.conversationId) return;
+      socket.leave(`conversation:${data.conversationId}`);
+    });
+
+    socket.on('typing:start', async (data: { conversationId: string }) => {
+      try {
+        const conversationId = data?.conversationId;
+        if (!conversationId) return;
+
+        await updateUserStatus(userId, current => {
+          const existing = current || {};
+          const typing = uniq([...(existing.currently_typing_in || []), conversationId]);
+          return { currently_typing_in: typing, updated_at: new Date().toISOString() };
         });
-      } else if (data.groupId) {
-        socket.to(`group:${data.groupId}`).emit('typing:indicator', {
-          userId,
-          groupId: data.groupId,
-          isTyping: true
-        });
+
+        const payload = { userId, conversationId, timestamp: new Date().toISOString() };
+
+        if (conversationId.startsWith('group_')) {
+          const groupId = conversationId.replace(/^group_/, '');
+          socket.to(`group:${groupId}`).emit('typing:start', payload);
+        } else {
+          const parts = conversationId.split('_').filter(Boolean);
+          const recipientId = parts.length === 2 ? (parts[0] === userId ? parts[1] : parts[0]) : undefined;
+          if (recipientId) {
+            io!.to(`user:${recipientId}`).emit('typing:start', payload);
+          }
+        }
+      } catch (error) {
+        log.error('Error handling typing:start:', error);
       }
     });
 
-    socket.on('typing:stop', (data: { recipientId?: string; groupId?: string }) => {
-      if (data.recipientId) {
-        io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
-          userId,
-          isTyping: false
+    socket.on('typing:stop', async (data: { conversationId: string }) => {
+      try {
+        const conversationId = data?.conversationId;
+        if (!conversationId) return;
+
+        await updateUserStatus(userId, current => {
+          const existing = current || {};
+          const typing = (existing.currently_typing_in || []).filter((c: string) => c !== conversationId);
+          return { currently_typing_in: typing, updated_at: new Date().toISOString() };
         });
-      } else if (data.groupId) {
-        socket.to(`group:${data.groupId}`).emit('typing:indicator', {
-          userId,
-          groupId: data.groupId,
-          isTyping: false
-        });
+
+        const payload = { userId, conversationId, timestamp: new Date().toISOString() };
+
+        if (conversationId.startsWith('group_')) {
+          const groupId = conversationId.replace(/^group_/, '');
+          socket.to(`group:${groupId}`).emit('typing:stop', payload);
+        } else {
+          const parts = conversationId.split('_').filter(Boolean);
+          const recipientId = parts.length === 2 ? (parts[0] === userId ? parts[1] : parts[0]) : undefined;
+          if (recipientId) {
+            io!.to(`user:${recipientId}`).emit('typing:stop', payload);
+          }
+        }
+      } catch (error) {
+        log.error('Error handling typing:stop:', error);
       }
     });
 
-    // Read receipts
-    socket.on('message:read', (data: { messageId: string; senderId: string }) => {
-      io!.to(`user:${data.senderId}`).emit('message:read:confirm', {
-        messageId: data.messageId,
-        readBy: userId,
-        readAt: new Date()
-      });
+    socket.on('message:read', async (data: { messageId: string }) => {
+      try {
+        const messageId = data?.messageId;
+        if (!messageId) return;
+
+        await chatService.markMessageAsRead(messageId, userId);
+
+        const supabase = getSupabaseAdmin();
+        const { data: messageRow } = await supabase
+          .from('chat_messages')
+          .select('id, conversation_id, sender_id, recipient_id, group_id')
+          .eq('id', messageId)
+          .maybeSingle();
+
+        if (!messageRow) return;
+
+        const payload = { messageId, readBy: userId, readAt: new Date().toISOString(), conversationId: (messageRow as any).conversation_id };
+
+        if ((messageRow as any).group_id) {
+          io!.to(`group:${(messageRow as any).group_id}`).emit('message:read', payload);
+        } else {
+          const otherUserId = (messageRow as any).sender_id === userId ? (messageRow as any).recipient_id : (messageRow as any).sender_id;
+          if (otherUserId) {
+            io!.to(`user:${otherUserId}`).emit('message:read', payload);
+          }
+        }
+      } catch (error) {
+        log.error('Error handling message:read:', error);
+      }
     });
 
-    // Friend request notifications
-    socket.on('friend:request:send', (data: { recipientId: string }) => {
-      io!.to(`user:${data.recipientId}`).emit('friend:request:receive', {
-        senderId: userId,
-        timestamp: new Date()
-      });
-    });
-
-    // Online status check
-    socket.on('status:check', (userIds: string[]) => {
-      const onlineUsers = userIds.filter(id => activeUsers.has(id));
-      socket.emit('status:response', { onlineUsers });
-    });
-
-    // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       log.info(`User disconnected: ${userId} (Socket: ${socket.id})`);
 
-      // Remove socket from user's socket set
       const sockets = userSockets.get(userId);
       if (sockets) {
         sockets.delete(socket.id);
+      }
 
-        // If user has no more active connections, mark as offline
-        if (sockets.size === 0) {
-          userSockets.delete(userId);
-          activeUsers.delete(userId);
+      // Persist socket id removal and presence transitions.
+      try {
+        await updateUserStatus(userId, current => {
+          const existing = current || {};
+          const socketIds = (existing.socket_ids || []).filter((sid: string) => sid !== socket.id);
+          const stillOnline = socketIds.length > 0;
+          return {
+            is_online: stillOnline,
+            last_seen: new Date().toISOString(),
+            socket_ids: socketIds,
+            currently_typing_in: stillOnline ? existing.currently_typing_in || [] : []
+          };
+        });
+      } catch (error) {
+        log.error('Error updating user status on disconnect:', error);
+      }
 
-          // Notify friends that user is offline
-          socket.broadcast.emit('user:offline', { userId });
+      if (!sockets || sockets.size === 0) {
+        userSockets.delete(userId);
+        activeUsers.delete(userId);
+
+        try {
+          const friends = await friendService.getFriends(userId);
+          friends.forEach(friend => {
+            const friendUserId = (friend as any).userId || (friend as any)._id;
+            if (friendUserId) {
+              io!.to(`user:${friendUserId}`).emit('user:offline', {
+                userId,
+                lastSeen: new Date().toISOString()
+              });
+            }
+          });
+        } catch (error) {
+          log.error('Error notifying friends on disconnect:', error);
         }
       }
-    });
-
-    // Error handling
-    socket.on('error', error => {
-      log.error(`Socket error for user ${userId}:`, error);
     });
   });
 
@@ -261,50 +352,27 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
   return io;
 }
 
-/**
- * Generate a consistent conversation ID for 1-on-1 chats
- * Ensures both users use the same conversation ID regardless of who initiated
- */
-function generateConversationId(userId1: string, userId2: string): string {
-  const sorted = [userId1, userId2].sort();
-  return `${sorted[0]}_${sorted[1]}`;
-}
-
-/**
- * Emit event to specific user(s)
- */
 export function emitToUser(userId: string, event: string, data: any) {
   if (io) {
     io.to(`user:${userId}`).emit(event, data);
   }
 }
 
-/**
- * Emit event to specific group
- */
 export function emitToGroup(groupId: string, event: string, data: any) {
   if (io) {
     io.to(`group:${groupId}`).emit(event, data);
   }
 }
 
-/**
- * Check if user is currently online
- */
 export function isUserOnline(userId: string): boolean {
   return activeUsers.has(userId);
 }
 
-/**
- * Get all online users
- */
 export function getOnlineUsers(): string[] {
   return Array.from(activeUsers.keys());
 }
 
-/**
- * Get socket connection count for a user
- */
 export function getUserConnectionCount(userId: string): number {
   return userSockets.get(userId)?.size || 0;
 }
+

@@ -107,15 +107,8 @@ export async function uploadAudio(
         );
     }
 
-    const response = await fetch(`${apiClient.defaults.baseURL}/audio/upload`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiClient.defaults.headers["x-api-key"],
-      },
-      body: formData,
-    });
-
-    const result = await response.json();
+    const response = await apiClient.post(`/audio/upload`, formData);
+    const result = response.data;
 
     if (result.success && result.data) {
       console.log("✅ Audio uploaded successfully:", result.data.recordingId);
@@ -203,11 +196,8 @@ export async function deleteRecording(
   try {
     console.log("🗑️  Deleting recording:", recordingId);
 
-    const response = await apiClient.delete(`/audio/${recordingId}`, {
-      headers: {
-        "x-user-id": userId,
-      },
-    });
+    void userId; // legacy param (server now uses bearer token)
+    const response = await apiClient.delete(`/audio/${recordingId}`);
 
     if (response.data.success) {
       console.log("✅ Recording deleted successfully");

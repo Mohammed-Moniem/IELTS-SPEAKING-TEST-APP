@@ -71,7 +71,7 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
 
   const updateQueueCount = async () => {
     const stats = await offlineStorage.getStats();
-    setQueueCount(stats.queuedEvaluations);
+    setQueueCount(stats.totalQueued);
   };
 
   // Don't render if we're in loading state or if banner should be hidden
@@ -96,14 +96,12 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
           {isOffline && (
             <Text style={styles.subtitle}>
               {queueCount > 0
-                ? `${queueCount} recording${
-                    queueCount > 1 ? "s" : ""
-                  } will sync when online`
-                : "Recordings will be saved locally"}
+                ? `${queueCount} item${queueCount > 1 ? "s" : ""} will sync when online`
+                : "Changes will be saved locally"}
             </Text>
           )}
           {isOnline && (
-            <Text style={styles.subtitle}>Syncing your recordings...</Text>
+            <Text style={styles.subtitle}>Syncing your queued work...</Text>
           )}
         </View>
       </View>

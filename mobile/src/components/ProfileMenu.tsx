@@ -4,14 +4,19 @@ import React, { useState } from "react";
 import {
   Modal,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
 
 import { useAuth } from "../auth/AuthContext";
-import { colors } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import { navigationRef } from "../navigation/navigationRef";
+import type { ColorTokens } from "../theme/tokens";
 
 interface MenuItem {
   icon: string;
@@ -21,50 +26,74 @@ interface MenuItem {
   color?: string;
 }
 
-const menuItems: MenuItem[] = [
-  {
-    icon: "person",
-    iconFamily: "Ionicons",
-    label: "Profile",
-    screen: "Profile",
-  },
-  {
-    icon: "analytics",
-    iconFamily: "Ionicons",
-    label: "Analytics",
-    screen: "Analytics",
-  },
-  {
-    icon: "settings",
-    iconFamily: "Ionicons",
-    label: "Settings",
-    screen: "Settings",
-  },
-  {
-    icon: "card",
-    iconFamily: "Ionicons",
-    label: "Subscription",
-    screen: "Subscription",
-  },
-  {
-    icon: "bar-chart",
-    iconFamily: "Ionicons",
-    label: "Usage",
-    screen: "Usage",
-  },
-  {
-    icon: "log-out",
-    iconFamily: "Ionicons",
-    label: "Logout",
-    screen: "Logout",
-    color: "#EF4444", // Red color for logout
-  },
-];
+const buildMenuItems = (options: { isGuest: boolean }): MenuItem[] => {
+  const base: MenuItem[] = [];
 
-export const ProfileMenu: React.FC = () => {
+  if (options.isGuest) {
+    base.push({
+      icon: "person-add",
+      iconFamily: "Ionicons",
+      label: "Create account",
+      screen: "UpgradeAccount",
+    });
+  }
+
+  base.push(
+    {
+      icon: "person",
+      iconFamily: "Ionicons",
+      label: "Profile",
+      screen: "Profile",
+    },
+    {
+      icon: "analytics",
+      iconFamily: "Ionicons",
+      label: "Analytics",
+      screen: "Analytics",
+    },
+    {
+      icon: "settings",
+      iconFamily: "Ionicons",
+      label: "Settings",
+      screen: "Settings",
+    },
+    {
+      icon: "bar-chart",
+      iconFamily: "Ionicons",
+      label: "Usage",
+      screen: "Usage",
+    },
+    {
+      icon: "mic",
+      iconFamily: "Ionicons",
+      label: "Recordings",
+      screen: "MyRecordings",
+    },
+    {
+      icon: "log-out",
+      iconFamily: "Ionicons",
+      label: "Logout",
+      screen: "Logout",
+      color: "#EF4444", // Red color for logout
+    }
+  );
+
+  return base;
+};
+
+interface ProfileMenuProps {
+  containerStyle?: StyleProp<ViewStyle>;
+}
+
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({
+  containerStyle,
+}) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [visible, setVisible] = useState(false);
   const navigation = useNavigation();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const menuItems = buildMenuItems({ isGuest: !!user?.isGuest });
 
   const handleMenuPress = async (item: MenuItem) => {
     setVisible(false);
@@ -74,8 +103,12 @@ export const ProfileMenu: React.FC = () => {
       return;
     }
 
-    // Navigate to the screen
+    // Navigate via the root navigation ref so this works from both Tabs and Stack headers.
     setTimeout(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate("App", { screen: item.screen } as any);
+        return;
+      }
       (navigation as any).navigate(item.screen);
     }, 100);
   };
@@ -85,7 +118,7 @@ export const ProfileMenu: React.FC = () => {
       {/* Profile Icon Button */}
       <TouchableOpacity
         onPress={() => setVisible(true)}
-        style={styles.profileButton}
+        style={[styles.profileButton, containerStyle]}
         activeOpacity={0.7}
       >
         <View style={styles.profileIconContainer}>
@@ -162,7 +195,8 @@ export const ProfileMenu: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   profileButton: {
     marginRight: 16,
     paddingLeft: 8,
@@ -246,4 +280,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
   },
-});
+  });

@@ -10,12 +10,19 @@ import {
   View,
 } from "react-native";
 
+import { Formik, FormikHelpers } from "formik";
+
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { FormTextInput } from "../../components/FormTextInput";
+import { PasswordStrengthIndicator } from "../../components/PasswordStrengthIndicator";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { AuthStackParamList } from "../../navigation/AppNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { RegisterFormValues, registerSchema } from "../../utils/validation";
 
 export type RegisterScreenProps = NativeStackScreenProps<
   AuthStackParamList,
@@ -24,38 +31,43 @@ export type RegisterScreenProps = NativeStackScreenProps<
 
 export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   navigation,
+  route,
 }) => {
-  const { register } = useAuth();
-  const [form, setForm] = useState({
+  const { register, continueWithGoogle } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const referralCodeParam = route.params?.referralCode ?? "";
+  const [showOptional, setShowOptional] = useState<boolean>(
+    !!referralCodeParam
+  );
+
+  const initialValues: RegisterFormValues = {
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
     password: "",
-  });
-  const [loading, setLoading] = useState(false);
-
-  const updateField = (key: keyof typeof form, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    confirmPassword: "",
+    referralCode: referralCodeParam,
   };
 
-  const handleRegister = async () => {
-    if (!form.email || !form.password || !form.firstName || !form.lastName) {
-      Alert.alert(
-        "Missing details",
-        "Please fill out email, password, first and last name."
-      );
-      return;
-    }
-
+  const handleRegister = async (
+    values: RegisterFormValues,
+    { setSubmitting }: FormikHelpers<RegisterFormValues>
+  ) => {
     setLoading(true);
     try {
       await register({
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        phone: form.phone.trim() || undefined,
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+        phone: values.phone?.trim() || undefined,
+        referralCode: values.referralCode
+          ? values.referralCode.trim().toUpperCase()
+          : undefined,
       });
     } catch (error: any) {
       Alert.alert(
@@ -64,11 +76,28 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       );
     } finally {
       setLoading(false);
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      await continueWithGoogle();
+    } catch (error: any) {
+      Alert.alert("Unable to continue", error?.message || "Please try again.");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   return (
-    <ScreenContainer scrollable contentContainerStyle={styles.container}>
+    <ScreenContainer
+      scrollable
+      bounces={false}
+      contentContainerStyle={styles.container}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ width: "100%" }}
@@ -81,45 +110,143 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
           </Text>
         </View>
 
-        <FormTextInput
-          label="First name"
-          value={form.firstName}
-          onChangeText={(value) => updateField("firstName", value)}
-        />
-        <FormTextInput
-          label="Last name"
-          value={form.lastName}
-          onChangeText={(value) => updateField("lastName", value)}
-        />
-        <FormTextInput
-          label="Email"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          value={form.email}
-          onChangeText={(value) => updateField("email", value)}
-          placeholder="you@example.com"
-        />
-        <FormTextInput
-          label="Phone (optional)"
-          keyboardType="phone-pad"
-          value={form.phone}
-          onChangeText={(value) => updateField("phone", value)}
-          placeholder="+44 0000 000000"
-        />
-        <FormTextInput
-          label="Password"
-          secureTextEntry
-          value={form.password}
-          onChangeText={(value) => updateField("password", value)}
-          placeholder="At least 8 characters"
+        <Button
+          title="Continue with Google"
+          variant="ghost"
+          onPress={handleGoogle}
+          loading={googleLoading}
+          disabled={loading}
         />
 
-        <Button
-          title="Create account"
-          onPress={handleRegister}
-          loading={loading}
-        />
+        <Formik<RegisterFormValues>
+          initialValues={initialValues}
+          validationSchema={registerSchema}
+          onSubmit={handleRegister}
+          enableReinitialize
+        >
+          {({
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            errors,
+            touched,
+            isSubmitting,
+            isValid,
+            setFieldValue,
+          }) => (
+            <View>
+              <FormTextInput
+                label="First name"
+                value={values.firstName}
+                onChangeText={handleChange("firstName")}
+                onBlur={handleBlur("firstName")}
+                errorMessage={touched.firstName ? errors.firstName : undefined}
+              />
+              <FormTextInput
+                label="Last name"
+                value={values.lastName}
+                onChangeText={handleChange("lastName")}
+                onBlur={handleBlur("lastName")}
+                errorMessage={touched.lastName ? errors.lastName : undefined}
+              />
+              <FormTextInput
+                label="Email"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                value={values.email}
+                onChangeText={handleChange("email")}
+                onBlur={handleBlur("email")}
+                placeholder="you@example.com"
+                errorMessage={touched.email ? errors.email : undefined}
+              />
+              <FormTextInput
+                label="Password"
+                secureTextEntry
+                value={values.password}
+                onChangeText={handleChange("password")}
+                onBlur={handleBlur("password")}
+                placeholder="At least 8 characters"
+                errorMessage={touched.password ? errors.password : undefined}
+              />
+
+              <Text style={styles.passwordHint}>
+                Use upper & lower case letters, a number, and one special
+                character (!@#$%^&*).
+              </Text>
+
+              <PasswordStrengthIndicator password={values.password} />
+
+              <FormTextInput
+                label="Confirm password"
+                secureTextEntry
+                value={values.confirmPassword}
+                onChangeText={handleChange("confirmPassword")}
+                onBlur={handleBlur("confirmPassword")}
+                placeholder="Re-enter your password"
+                errorMessage={
+                  touched.confirmPassword ? errors.confirmPassword : undefined
+                }
+              />
+
+              <TouchableOpacity
+                style={styles.optionalToggle}
+                onPress={() => setShowOptional((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.optionalToggleText}>
+                  {showOptional ? "Hide optional details" : "Add optional details"}
+                </Text>
+              </TouchableOpacity>
+
+              {showOptional ? (
+                <View style={styles.optionalSection}>
+                  <FormTextInput
+                    label="Phone (optional)"
+                    keyboardType="phone-pad"
+                    value={values.phone || ""}
+                    onChangeText={handleChange("phone")}
+                    onBlur={handleBlur("phone")}
+                    placeholder="+44 0000 000000"
+                    errorMessage={touched.phone ? errors.phone : undefined}
+                  />
+                  <FormTextInput
+                    label="Referral code (optional)"
+                    autoCapitalize="characters"
+                    maxLength={20}
+                    value={values.referralCode || ""}
+                    onChangeText={(text) =>
+                      setFieldValue("referralCode", text.toUpperCase())
+                    }
+                    onBlur={handleBlur("referralCode")}
+                    placeholder="Enter code if you have one"
+                    errorMessage={
+                      touched.referralCode ? errors.referralCode : undefined
+                    }
+                  />
+                </View>
+              ) : null}
+
+              <Button
+                title="Create account"
+                onPress={() => handleSubmit()}
+                loading={loading || isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  ((touched.firstName ||
+                    touched.lastName ||
+                    touched.email ||
+                    touched.password ||
+                    touched.confirmPassword ||
+                    touched.phone ||
+                    touched.referralCode) &&
+                    !isValid)
+                }
+              />
+            </View>
+          )}
+        </Formik>
 
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -134,18 +261,25 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: "center",
   },
   header: {
     marginBottom: spacing.xl + spacing.sm,
+    marginTop: spacing.lg,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
     color: colors.textPrimary,
+  },
+  passwordHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     marginTop: spacing.sm,
@@ -154,10 +288,23 @@ const styles = StyleSheet.create({
   },
   switchContainer: {
     marginTop: spacing.xl,
+    marginBottom: spacing.xl,
     alignItems: "center",
   },
   switchText: {
     color: colors.primary,
     fontWeight: "600",
   },
-});
+  optionalToggle: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    alignItems: "center",
+  },
+  optionalToggleText: {
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  optionalSection: {
+    marginTop: spacing.sm,
+  },
+  });

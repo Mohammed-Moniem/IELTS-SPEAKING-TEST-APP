@@ -7,13 +7,47 @@ export interface ChatMessage {
   recipientId?: string;
   groupId?: string;
   content: string; // Decrypted content
-  messageType: "text" | "image" | "audio" | "file";
+  messageType: "text" | "image" | "audio" | "video" | "file" | "gif" | "system";
+  mediaUrl?: string; // URL for media files
+  thumbnailUrl?: string; // Thumbnail for images/videos
+  fileSize?: number; // Size in bytes
+  mimeType?: string; // MIME type of media
+  metadata?: {
+    fileName?: string;
+    fileSize?: number;
+    fileUrl?: string;
+    thumbnailUrl?: string;
+    width?: number;
+    height?: number;
+    duration?: number; // For audio/video
+    waveformData?: number[];
+  };
+  sender?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    username?: string;
+    avatar?: string;
+  };
+  recipient?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    username?: string;
+    avatar?: string;
+  };
   readBy: string[];
   deliveredTo: string[];
   isEdited: boolean;
   isDeleted: boolean;
+  status?: string;
+  uploadProgress?: number; // 0-100 for ongoing uploads
+  uploadError?: string; // Error message if upload failed
   createdAt: string;
   updatedAt: string;
+  timestamp?: string;
 }
 
 export interface Conversation {
@@ -29,10 +63,12 @@ export interface Conversation {
   lastMessage?: {
     preview: string;
     timestamp: string;
-    senderId: string;
+    senderId?: string;
   };
   unreadCount: number;
   groupName?: string;
+  groupId?: string;
+  groupAvatar?: string;
 }
 
 class ChatService {
@@ -52,8 +88,13 @@ class ChatService {
     limit: number = 50,
     before?: string
   ): Promise<ChatMessage[]> {
+    const params: Record<string, any> = { limit };
+    if (before) {
+      params.before = before;
+    }
+
     const response = await apiClient.get(`/chat/messages/${conversationId}`, {
-      params: { limit, before },
+      params,
     });
     return response.data.data;
   }
@@ -98,7 +139,7 @@ class ChatService {
     newContent: string
   ): Promise<ChatMessage> {
     const response = await apiClient.put(`/chat/messages/${messageId}`, {
-      newContent,
+      content: newContent,
     });
     return response.data.data;
   }

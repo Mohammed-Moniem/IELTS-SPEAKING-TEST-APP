@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,8 +8,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { saveTestResult, TestResult } from "../../api/analyticsApi";
-import { colors, radii, shadows, spacing } from "../../theme/tokens";
+
+import { NextBestActionsCard } from "../../components/NextBestActionsCard";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { radii, shadows, spacing } from "../../theme/tokens";
 
 interface EvaluationCriteria {
   band: number;
@@ -69,15 +72,17 @@ interface EvaluationResultsProps {
     band9Example: string;
   };
   onClose: () => void;
-  onTryAgain: () => void;
+  onTryAgain?: () => void;
   // Analytics integration props
   userId?: string;
   sessionId?: string;
-  testType?: "practice" | "simulation";
+  testType?: "practice" | "simulation" | "local";
   topic?: string;
   testPart?: string;
   durationSeconds?: number;
   audioRecordingId?: string;
+  // Control button visibility
+  showTryAgain?: boolean;
 }
 
 export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
@@ -88,77 +93,17 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
   bandComparison,
   onClose,
   onTryAgain,
-  userId = "demo-user-123",
+  userId,
   sessionId,
   testType = "practice",
   topic,
   testPart,
   durationSeconds,
   audioRecordingId,
+  showTryAgain = true,
 }) => {
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  // Auto-save test result to analytics
-  useEffect(() => {
-    const saveResult = async () => {
-      if (!sessionId || !topic || saved) return;
-
-      setSaving(true);
-      try {
-        const testData: TestResult = {
-          userId,
-          sessionId,
-          testType,
-          topic,
-          testPart,
-          durationSeconds: durationSeconds || 0,
-          overallBand,
-          criteria: {
-            fluencyCoherence: {
-              band: criteria.fluencyCoherence.band,
-              feedback: criteria.fluencyCoherence.feedback,
-              strengths: criteria.fluencyCoherence.strengths,
-              improvements: criteria.fluencyCoherence.improvements,
-            },
-            lexicalResource: {
-              band: criteria.lexicalResource.band,
-              feedback: criteria.lexicalResource.feedback,
-              strengths: criteria.lexicalResource.strengths,
-              improvements: criteria.lexicalResource.improvements,
-            },
-            grammaticalRange: {
-              band: criteria.grammaticalRange.band,
-              feedback: criteria.grammaticalRange.feedback,
-              strengths: criteria.grammaticalRange.strengths,
-              improvements: criteria.grammaticalRange.improvements,
-            },
-            pronunciation: {
-              band: criteria.pronunciation.band,
-              feedback: criteria.pronunciation.feedback,
-              strengths: criteria.pronunciation.strengths,
-              improvements: criteria.pronunciation.improvements,
-            },
-          },
-          corrections,
-          suggestions,
-          audioRecordingId,
-        };
-
-        const testId = await saveTestResult(testData);
-        if (testId) {
-          console.log("✅ Test result saved to analytics:", testId);
-          setSaved(true);
-        }
-      } catch (error) {
-        console.error("❌ Failed to save test result:", error);
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    saveResult();
-  }, [sessionId, topic, saved]);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const getBandColor = (band: number): string => {
     if (band >= 8) return "#10b981"; // Green
@@ -214,7 +159,9 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
               { backgroundColor: getBandColor(data.band || 0) },
             ]}
           >
-            <Text style={styles.bandBadgeText}>{(data.band || 0).toFixed(1)}</Text>
+            <Text style={styles.bandBadgeText}>
+              {(data.band || 0).toFixed(1)}
+            </Text>
           </View>
         </View>
 
@@ -248,45 +195,46 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
           </View>
         )}
 
-      {/* Detailed Examples */}
-      {detailedExamples.length > 0 && (
-        <View style={styles.detailedSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="bulb" size={20} color={colors.warning} />
-            <Text style={styles.sectionTitle}>Detailed Examples</Text>
-          </View>
-          {detailedExamples.map((example, index) => (
-            <View key={index} style={styles.exampleCard}>
-              <Text style={styles.exampleIssue}>
-                <Text style={styles.boldText}>Issue:</Text> {example.issue}
-              </Text>
-              {example.yourResponse && (
-                <Text style={styles.yourResponse}>
-                  <Text style={styles.boldText}>Your response:</Text> "
-                  {example.yourResponse}"
-                </Text>
-              )}
-              {example.betterAlternative && (
-                <Text style={styles.betterAlternative}>
-                  <Text style={styles.boldText}>Better alternative:</Text> "
-                  {example.betterAlternative}"
-                </Text>
-              )}
-              <Text style={styles.exampleExplanation}>
-                <Text style={styles.boldText}>Why:</Text> {example.explanation}
-              </Text>
-              {example.suggestion && (
-                <Text style={styles.exampleSuggestion}>
-                  💡 {example.suggestion}
-                </Text>
-              )}
+        {/* Detailed Examples */}
+        {detailedExamples.length > 0 && (
+          <View style={styles.detailedSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="bulb" size={20} color={colors.warning} />
+              <Text style={styles.sectionTitle}>Detailed Examples</Text>
             </View>
-          ))}
-        </View>
-      )}
+            {detailedExamples.map((example, index) => (
+              <View key={index} style={styles.exampleCard}>
+                <Text style={styles.exampleIssue}>
+                  <Text style={styles.boldText}>Issue:</Text> {example.issue}
+                </Text>
+                {example.yourResponse && (
+                  <Text style={styles.yourResponse}>
+                    <Text style={styles.boldText}>Your response:</Text> "
+                    {example.yourResponse}"
+                  </Text>
+                )}
+                {example.betterAlternative && (
+                  <Text style={styles.betterAlternative}>
+                    <Text style={styles.boldText}>Better alternative:</Text> "
+                    {example.betterAlternative}"
+                  </Text>
+                )}
+                <Text style={styles.exampleExplanation}>
+                  <Text style={styles.boldText}>Why:</Text>{" "}
+                  {example.explanation}
+                </Text>
+                {example.suggestion && (
+                  <Text style={styles.exampleSuggestion}>
+                    💡 {example.suggestion}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
 
-      {/* Vocabulary Alternatives */}
-      {vocabularyAlternatives.length > 0 && (
+        {/* Vocabulary Alternatives */}
+        {vocabularyAlternatives.length > 0 && (
           <View style={styles.detailedSection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="book" size={20} color={colors.primary} />
@@ -316,47 +264,49 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
           </View>
         )}
 
-      {/* Collocations */}
-      {collocations.length > 0 && (
-        <View style={styles.detailedSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="link" size={20} color={colors.success} />
-            <Text style={styles.sectionTitle}>Useful Collocations</Text>
-          </View>
-          {collocations.map((collocation, index) => (
-            <View key={index} style={styles.collocationCard}>
-              <Text style={styles.collocationPhrase}>{collocation.phrase}</Text>
-              <Text style={styles.collocationExample}>
-                "{collocation.example}"
-              </Text>
+        {/* Collocations */}
+        {collocations.length > 0 && (
+          <View style={styles.detailedSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="link" size={20} color={colors.success} />
+              <Text style={styles.sectionTitle}>Useful Collocations</Text>
             </View>
-          ))}
-        </View>
-      )}
-
-      {/* Linking Phrases */}
-      {linkingGroups.length > 0 && (
-        <View style={styles.detailedSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="git-branch" size={20} color={colors.info} />
-            <Text style={styles.sectionTitle}>Linking Phrases</Text>
-          </View>
-          {linkingGroups.map((group, index) => (
-            <View key={index} style={styles.linkingGroup}>
-              <Text style={styles.linkingContext}>{group.context}:</Text>
-              <View style={styles.phrasesContainer}>
-                {group.phrases.map((phrase, pIndex) => (
-                  <View key={pIndex} style={styles.phraseChip}>
-                    <Text style={styles.phraseText}>{phrase}</Text>
-                  </View>
-                ))}
+            {collocations.map((collocation, index) => (
+              <View key={index} style={styles.collocationCard}>
+                <Text style={styles.collocationPhrase}>
+                  {collocation.phrase}
+                </Text>
+                <Text style={styles.collocationExample}>
+                  "{collocation.example}"
+                </Text>
               </View>
+            ))}
+          </View>
+        )}
+
+        {/* Linking Phrases */}
+        {linkingGroups.length > 0 && (
+          <View style={styles.detailedSection}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="git-branch" size={20} color={colors.info} />
+              <Text style={styles.sectionTitle}>Linking Phrases</Text>
             </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
+            {linkingGroups.map((group, index) => (
+              <View key={index} style={styles.linkingGroup}>
+                <Text style={styles.linkingContext}>{group.context}:</Text>
+                <View style={styles.phrasesContainer}>
+                  {group.phrases.map((phrase, pIndex) => (
+                    <View key={pIndex} style={styles.phraseChip}>
+                      <Text style={styles.phraseText}>{phrase}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -368,22 +318,6 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Your Results</Text>
-          {saving && (
-            <View style={styles.savingIndicator}>
-              <ActivityIndicator size="small" color={colors.warning} />
-              <Text style={styles.savingText}>Saving...</Text>
-            </View>
-          )}
-          {saved && !saving && (
-            <View style={styles.savedIndicator}>
-              <Ionicons
-                name="checkmark-circle"
-                size={16}
-                color={colors.success}
-              />
-              <Text style={styles.savedText}>Saved to history</Text>
-            </View>
-          )}
         </View>
         <View style={styles.closeButton} />
       </View>
@@ -559,19 +493,51 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
           </View>
         )}
 
+        <NextBestActionsCard
+          title="What to do next"
+          actions={[
+            showTryAgain && onTryAgain
+              ? {
+                  id: "try-again",
+                  title: "Try again",
+                  subtitle: "Redo this prompt and aim to improve your weakest areas.",
+                  icon: "refresh",
+                  onPress: onTryAgain,
+                }
+              : {
+                  id: "skip",
+                  title: "Try again",
+                  disabled: true,
+                  onPress: () => {},
+                },
+            {
+              id: "close",
+              title: "Close results",
+              subtitle: "Return to the app and review your history anytime.",
+              icon: "checkmark-circle-outline",
+              onPress: onClose,
+            },
+          ]}
+        />
+
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.tryAgainButton}
-            onPress={onTryAgain}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="refresh" size={20} color="#ffffff" />
-            <Text style={styles.tryAgainText}>Try Again</Text>
-          </TouchableOpacity>
+          {showTryAgain && onTryAgain && (
+            <TouchableOpacity
+              style={styles.tryAgainButton}
+              onPress={onTryAgain}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={20} color="#ffffff" />
+              <Text style={styles.tryAgainText}>Try Again</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
-            style={styles.doneButton}
+            style={[
+              styles.doneButton,
+              (!showTryAgain || !onTryAgain) && styles.doneButtonFull,
+            ]}
             onPress={onClose}
             activeOpacity={0.8}
           >
@@ -585,7 +551,8 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -615,26 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: colors.textPrimary,
-  },
-  savingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 4,
-  },
-  savingText: {
-    fontSize: 11,
-    color: colors.warning,
-  },
-  savedIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  savedText: {
-    fontSize: 11,
-    color: colors.success,
   },
   scrollView: {
     flex: 1,
@@ -821,6 +768,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  doneButtonFull: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
   doneText: {
     fontSize: 16,
     fontWeight: "600",
@@ -1005,4 +957,4 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: spacing.xs,
   },
-});
+  });

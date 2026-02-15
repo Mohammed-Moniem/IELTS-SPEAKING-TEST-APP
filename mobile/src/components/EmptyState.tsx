@@ -1,7 +1,10 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors, spacing } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 
 interface EmptyStateProps {
   title: string;
@@ -11,19 +14,27 @@ interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
-}) => (
-  <View style={styles.container}>
-    <Text style={styles.title}>{title}</Text>
-    {description ? <Text style={styles.description}>{description}</Text> : null}
-  </View>
-);
+}) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: spacing.xxl + spacing.md,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-  },
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>{title}</Text>
+      {description ? (
+        <Text style={styles.description}>{description}</Text>
+      ) : null}
+    </View>
+  );
+};
+
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      paddingVertical: spacing.xxl + spacing.md,
+      paddingHorizontal: spacing.md,
+      alignItems: "center",
+    },
   title: {
     fontSize: 16,
     fontWeight: "600",
@@ -34,4 +45,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
   },
-});
+  });

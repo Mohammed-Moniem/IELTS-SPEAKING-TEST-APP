@@ -9,6 +9,7 @@ export enum RecordingType {
 }
 
 export enum StorageProvider {
+  SUPABASE = 'supabase',
   MONGODB = 'mongodb',
   S3 = 's3'
 }
@@ -67,7 +68,7 @@ export class AudioRecordingModel {
       mimeType: data.mimeType!,
       fileSizeBytes: data.fileSizeBytes || 0,
       durationSeconds: data.durationSeconds || 0,
-      storageProvider: data.storageProvider || StorageProvider.MONGODB,
+      storageProvider: data.storageProvider || StorageProvider.SUPABASE,
       mongoData: data.mongoData,
       s3Key: data.s3Key,
       s3Bucket: data.s3Bucket,

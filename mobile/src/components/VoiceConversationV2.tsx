@@ -10,7 +10,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { evaluateResponse, processConversationTurn } from "../api/speechApi";
+import {
+  evaluateResponse,
+  processConversationTurn,
+  transcribeAudio,
+} from "../api/speechApi";
 import { ttsService } from "../services/textToSpeechService";
 import { colors, radii, shadows, spacing } from "../theme/tokens";
 import { VoiceOrb } from "./VoiceOrb";
@@ -25,28 +29,39 @@ type ConversationState =
 
 interface VoiceConversationProps {
   mode: ConversationMode;
+  sessionId?: string;
   topic?: string;
   question?: string;
   part?: 1 | 2 | 3;
   onEnd: () => void;
+  isFavorited?: boolean;
+  onToggleFavorite?: () => void;
+  favoriteDisabled?: boolean;
   onEvaluationComplete?: (data: {
     overallBand: number;
+    spokenSummary?: string;
     criteria: any;
     corrections: any[];
     suggestions: any[];
     bandComparison?: any;
     transcript: string;
     audioUri: string;
+    audioRecordingId?: string;
+    sessionId?: string;
     duration: number;
   }) => void;
 }
 
 export const VoiceConversation: React.FC<VoiceConversationProps> = ({
   mode,
+  sessionId,
   topic = "General Conversation",
   question = "Tell me about yourself.",
   part = 1,
   onEnd,
+  isFavorited = false,
+  onToggleFavorite,
+  favoriteDisabled = false,
   onEvaluationComplete,
 }) => {
   const [state, setState] = useState<ConversationState>("idle");
@@ -277,8 +292,11 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       setState("processing");
 
       // First, transcribe the audio
-      const { transcribeAudio } = await import("../api/speechApi");
-      const transcription = await transcribeAudio(audioUri);
+      const transcription = await transcribeAudio(audioUri, {
+        sessionId,
+        topic,
+        testPart: `part${part}`,
+      });
 
       console.log("📝 Transcription:", transcription.text);
       setUserTranscript(transcription.text);
@@ -328,12 +346,15 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       if (onEvaluationComplete && audioUri) {
         onEvaluationComplete({
           overallBand: evaluation.overallBand,
+          spokenSummary: evaluation.spokenSummary,
           criteria: evaluation.criteria,
           corrections: evaluation.corrections || [],
           suggestions: evaluation.suggestions || [],
           bandComparison: evaluation.bandComparison,
           transcript: transcription.text,
           audioUri: audioUri,
+          audioRecordingId: transcription.audioRecordingId,
+          sessionId: transcription.sessionId || sessionId,
           duration,
         });
       }
@@ -343,11 +364,9 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         typeof error?.message === "string" &&
         error.message.toLowerCase().includes("timeout")
           ? "The evaluation is taking longer than expected, but the server is still working on it. Please give it another moment and check the Results tab if it doesn't appear automatically."
-          : error.message || "Failed to evaluate your response. Please try again.";
-      Alert.alert(
-        "Evaluation Error",
-        errorMessage
-      );
+          : error.message ||
+            "Failed to evaluate your response. Please try again.";
+      Alert.alert("Evaluation Error", errorMessage);
       setState("idle");
     }
   };
@@ -494,11 +513,36 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
           )}
         </View>
 
-        <TouchableOpacity onPress={() => {}} style={styles.iconButton}>
+        <TouchableOpacity
+          onPress={() => {
+            if (onToggleFavorite) {
+              onToggleFavorite();
+            }
+          }}
+          style={styles.iconButton}
+          disabled={
+            !onToggleFavorite ||
+            favoriteDisabled ||
+            state === "ai-speaking" ||
+            state === "processing"
+          }
+        >
           <Ionicons
-            name="information-circle-outline"
+            name={
+              onToggleFavorite
+                ? isFavorited
+                  ? "star"
+                  : "star-outline"
+                : "information-circle-outline"
+            }
             size={24}
-            color={colors.textPrimary}
+            color={
+              !onToggleFavorite || favoriteDisabled || state === "ai-speaking" || state === "processing"
+                ? colors.textMuted
+                : isFavorited
+                ? "#F59E0B"
+                : colors.textPrimary
+            }
           />
         </TouchableOpacity>
       </View>

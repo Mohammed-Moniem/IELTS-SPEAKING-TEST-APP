@@ -8,11 +8,14 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { DetailedFeedbackView } from "../../components/DetailedFeedbackView";
 import { EmptyState } from "../../components/EmptyState";
+import { NextBestActionsCard } from "../../components/NextBestActionsCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { Tag } from "../../components/Tag";
+import { useThemedStyles } from "../../hooks";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { formatDateTime } from "../../utils/date";
 
 export type SimulationDetailScreenProps = NativeStackScreenProps<
@@ -25,6 +28,15 @@ export const SimulationDetailScreen: React.FC<SimulationDetailScreenProps> = ({
   navigation,
 }) => {
   const { simulation } = route.params;
+  const styles = useThemedStyles(createStyles);
+
+  const weakestPart =
+    [...(simulation.parts || [])]
+      .filter((p) => typeof p?.feedback?.overallBand === "number")
+      .sort(
+        (a, b) =>
+          Number(a.feedback?.overallBand || 0) - Number(b.feedback?.overallBand || 0)
+      )[0] || simulation.parts?.[0];
 
   // Retry simulation mutation
   const retryMutation = useMutation({
@@ -96,6 +108,41 @@ export const SimulationDetailScreen: React.FC<SimulationDetailScreenProps> = ({
         </Card>
       )}
 
+      <NextBestActionsCard
+        actions={[
+          {
+            id: "practice-weakest",
+            title: weakestPart ? `Speak Part ${weakestPart.part} again` : "Speak practice",
+            subtitle: weakestPart
+              ? "Retry the weakest part from this simulation in voice mode."
+              : "Practice with voice feedback.",
+            icon: "mic",
+            onPress: () => {
+              if (!weakestPart) return;
+              const rootNav = navigation.getParent?.() as any;
+              rootNav?.navigate?.("Tabs", {
+                screen: "VoiceTest",
+                params: {
+                  retryData: {
+                    part: weakestPart.part as 1 | 2 | 3,
+                    topic: weakestPart.topicTitle || "Simulation",
+                    question: weakestPart.question,
+                  },
+                },
+              });
+            },
+            disabled: !weakestPart,
+          },
+          {
+            id: "new-sim",
+            title: "Start a new simulation",
+            subtitle: "Run a fresh mock test across Parts 1–3.",
+            icon: "trophy-outline",
+            onPress: handleRetry,
+          },
+        ]}
+      />
+
       {/* Individual Parts */}
       <SectionHeading title="Parts breakdown" />
       {simulation.parts.map((part) => (
@@ -152,7 +199,8 @@ export const SimulationDetailScreen: React.FC<SimulationDetailScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -216,4 +264,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.xl,
   },
-});
+  });

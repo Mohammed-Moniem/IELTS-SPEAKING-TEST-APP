@@ -3,7 +3,7 @@
  * Handles audio recording upload, retrieval, and management
  */
 
-import { Response } from 'express';
+import type { Response } from 'express';
 import {
   Delete,
   Get,
@@ -37,6 +37,14 @@ export class AudioController {
     try {
       this.log.info('📤 Upload audio request received');
 
+      const currentUserId = req?.currentUser?.id as string | undefined;
+      if (!currentUserId) {
+        return {
+          success: false,
+          error: 'Authentication required'
+        };
+      }
+
       if (!file) {
         return {
           success: false,
@@ -45,7 +53,6 @@ export class AudioController {
       }
 
       const {
-        userId,
         sessionId,
         recordingType,
         durationSeconds,
@@ -59,10 +66,10 @@ export class AudioController {
         userTier
       } = req.body;
 
-      if (!userId || !sessionId) {
+      if (!sessionId) {
         return {
           success: false,
-          error: 'userId and sessionId are required'
+          error: 'sessionId is required'
         };
       }
 
@@ -78,7 +85,7 @@ export class AudioController {
           : undefined;
 
       const recording = await this.audioStorageService.uploadAudio({
-        userId,
+        userId: currentUserId,
         sessionId,
         audioBuffer: file.buffer,
         fileName: file.originalname,
@@ -114,45 +121,12 @@ export class AudioController {
   }
 
   /**
-   * Get audio recording (download or signed URL)
-   * GET /api/v1/audio/:recordingId
-   */
-  @Get('/:recordingId')
-  async getAudio(@Param('recordingId') recordingId: string, @Res() res: Response): Promise<any> {
-    try {
-      this.log.info(`📥 Get audio request: ${recordingId}`);
-
-      const result = await this.audioStorageService.getAudio(recordingId);
-
-      if (result.url) {
-        // S3 signed URL - redirect
-        return res.redirect(result.url);
-      } else if (result.buffer) {
-        // MongoDB buffer - stream
-        res.setHeader('Content-Type', result.mimeType);
-        res.setHeader('Content-Length', result.buffer.length);
-        return res.send(result.buffer);
-      } else {
-        return res.status(404).json({
-          success: false,
-          error: 'Audio not found'
-        });
-      }
-    } catch (error: any) {
-      this.log.error('❌ Get audio error:', error);
-      return res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to retrieve audio'
-      });
-    }
-  }
-
-  /**
    * List user recordings
    * GET /api/v1/audio/list/:userId
    */
   @Get('/list/:userId')
   async listRecordings(
+    @Req() req: any,
     @Param('userId') userId: string,
     @QueryParam('limit') limit?: number,
     @QueryParam('skip') skip?: number,
@@ -160,6 +134,14 @@ export class AudioController {
   ): Promise<any> {
     try {
       this.log.info(`📋 List recordings for user: ${userId}`);
+
+      const currentUserId = req?.currentUser?.id as string | undefined;
+      if (!currentUserId) {
+        return { success: false, error: 'Authentication required' };
+      }
+      if (currentUserId !== userId) {
+        return { success: false, error: 'Forbidden' };
+      }
 
       const result = await this.audioStorageService.listUserRecordings(userId, {
         limit: limit || 50,
@@ -204,15 +186,20 @@ export class AudioController {
    */
   @Delete('/:recordingId')
   async deleteRecording(
+    @Req() req: any,
     @Param('recordingId') recordingId: string,
-    @HeaderParam('x-user-id') userId?: string
+    @HeaderParam('x-user-id') legacyUserId?: string
   ): Promise<any> {
     try {
-      this.log.info(`🗑️  Delete recording request: ${recordingId}`);
+      const requester = req?.currentUser?.id ?? legacyUserId ?? 'unknown';
+      this.log.info(`🗑️  Delete recording request: ${recordingId} by ${requester}`);
 
-      // TODO: Add authorization check - verify userId owns this recording
+      const currentUserId = req?.currentUser?.id as string | undefined;
+      if (!currentUserId) {
+        return { success: false, error: 'Authentication required' };
+      }
 
-      await this.audioStorageService.deleteRecording(recordingId);
+      await this.audioStorageService.deleteRecording(recordingId, currentUserId);
 
       return {
         success: true,
@@ -232,9 +219,17 @@ export class AudioController {
    * GET /api/v1/audio/stats/:userId
    */
   @Get('/stats/:userId')
-  async getStorageStats(@Param('userId') userId: string): Promise<any> {
+  async getStorageStats(@Req() req: any, @Param('userId') userId: string): Promise<any> {
     try {
       this.log.info(`📊 Get storage stats for user: ${userId}`);
+
+      const currentUserId = req?.currentUser?.id as string | undefined;
+      if (!currentUserId) {
+        return { success: false, error: 'Authentication required' };
+      }
+      if (currentUserId !== userId) {
+        return { success: false, error: 'Forbidden' };
+      }
 
       const stats = await this.audioStorageService.getStorageStats(userId);
 
@@ -283,6 +278,44 @@ export class AudioController {
         success: false,
         error: error.message || 'Failed to cleanup recordings'
       };
+    }
+  }
+
+  /**
+   * Get audio recording (download or signed URL)
+   * GET /api/v1/audio/:recordingId
+   *
+   * NOTE: This must be declared after more specific routes like /list, /stats, /cleanup
+   * so Express does not treat those paths as a recordingId.
+   */
+  @Get('/:recordingId')
+  async getAudio(@Req() req: any, @Param('recordingId') recordingId: string, @Res() res: Response): Promise<any> {
+    try {
+      this.log.info(`📥 Get audio request: ${recordingId}`);
+
+      const currentUserId = req?.currentUser?.id as string | undefined;
+      const result = await this.audioStorageService.getAudio(recordingId, currentUserId);
+
+      if (result.url) {
+        // S3 signed URL - redirect
+        return res.redirect(result.url);
+      } else if (result.buffer) {
+        // MongoDB buffer - stream
+        res.setHeader('Content-Type', result.mimeType);
+        res.setHeader('Content-Length', result.buffer.length);
+        return res.send(result.buffer);
+      } else {
+        return res.status(404).json({
+          success: false,
+          error: 'Audio not found'
+        });
+      }
+    } catch (error: any) {
+      this.log.error('❌ Get audio error:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to retrieve audio'
+      });
     }
   }
 }

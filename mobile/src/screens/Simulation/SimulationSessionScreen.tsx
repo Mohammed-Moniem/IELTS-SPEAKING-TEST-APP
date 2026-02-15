@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -15,13 +15,15 @@ import {
 import { simulationApi } from "../../api/services";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { OfflineBanner } from "../../components/OfflineBanner";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
 import offlineStorage from "../../services/offlineStorage";
-import { colors, radii, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { radii, spacing } from "../../theme/tokens";
 import { extractErrorMessage } from "../../utils/errors";
 
 export type SimulationSessionScreenProps = NativeStackScreenProps<
@@ -36,7 +38,9 @@ export const SimulationSessionScreen: React.FC<
 > = ({ route, navigation }) => {
   const { simulationId, parts } = route.params;
   const queryClient = useQueryClient();
-  const { isOnline } = useNetworkStatus();
+  const { isOffline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [responses, setResponses] = useState<ResponseRecord>({});
   const startTimes = useRef<Record<number, number>>({});
@@ -46,19 +50,6 @@ export const SimulationSessionScreen: React.FC<
     () => [...parts].sort((a, b) => a.part - b.part),
     [parts]
   );
-
-  // Process queue when back online
-  useEffect(() => {
-    if (isOnline) {
-      offlineStorage
-        .processQueue(async (item) => {
-          // For now, we don't have a direct simulation audio upload endpoint
-          // This would need backend support similar to practice sessions
-          console.log("Queued simulation recording:", item.id);
-        })
-        .catch(console.error);
-    }
-  }, [isOnline]);
 
   const completeSimulationMutation = useMutation({
     mutationFn: (
@@ -72,6 +63,12 @@ export const SimulationSessionScreen: React.FC<
     onSuccess: (simulation) => {
       queryClient
         .invalidateQueries({ queryKey: ["test-simulations"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["simulation-results"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["usage-summary"] })
         .catch(() => undefined);
       navigation.replace("SimulationDetail", { simulation });
     },
@@ -111,12 +108,40 @@ export const SimulationSessionScreen: React.FC<
       };
     });
 
+    if (isOffline) {
+      offlineStorage
+        .queueSimulationCompletion({
+          id: `${simulationId}-${Date.now()}`,
+          simulationId,
+          parts: payload,
+          timestamp: Date.now(),
+        })
+        .then(() => {
+          Alert.alert(
+            "Saved offline",
+            "Your simulation answers have been saved and will sync when you're back online.",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.goBack(),
+              },
+            ]
+          );
+        })
+        .catch(() => {
+          Alert.alert(
+            "Unable to save",
+            "Could not save your simulation for offline sync. Please try again."
+          );
+        });
+      return;
+    }
+
     completeSimulationMutation.mutate(payload);
   };
 
   return (
     <ScreenContainer>
-      <OfflineBanner showQueueCount />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
@@ -166,7 +191,8 @@ export const SimulationSessionScreen: React.FC<
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   content: {
     paddingBottom: spacing.xxl + spacing.lg,
   },
@@ -211,4 +237,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderMuted,
     backgroundColor: colors.surfaceSubtle,
   },
-});
+  });

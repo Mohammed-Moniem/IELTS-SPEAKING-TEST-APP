@@ -11,6 +11,16 @@ export interface IUser {
   password: string;
   emailVerified: boolean;
   subscriptionPlan: SubscriptionPlan;
+  /**
+   * Guest users are device-bound sessions that can use the app without
+   * registering. They can later "upgrade" into a real account.
+   */
+  isGuest?: boolean;
+  /**
+   * Device/installation identifier used to consistently map a device to the
+   * same guest user.
+   */
+  guestDeviceId?: string;
   refreshTokens: string[];
   lastLoginAt?: Date;
   createdAt: Date;
@@ -59,6 +69,15 @@ const UserSchema = new Schema<IUser>(
       enum: ['free', 'premium', 'pro'],
       default: 'free'
     },
+    isGuest: {
+      type: Boolean,
+      default: false
+    },
+    guestDeviceId: {
+      type: String,
+      trim: true,
+      index: true
+    },
     refreshTokens: {
       type: [String],
       default: []
@@ -73,6 +92,7 @@ const UserSchema = new Schema<IUser>(
       transform: (_doc, ret) => {
         delete ret.password;
         delete ret.refreshTokens;
+        delete ret.guestDeviceId;
         return ret;
       }
     },
@@ -80,6 +100,7 @@ const UserSchema = new Schema<IUser>(
       transform: (_doc, ret) => {
         delete ret.password;
         delete ret.refreshTokens;
+        delete ret.guestDeviceId;
         return ret;
       }
     }

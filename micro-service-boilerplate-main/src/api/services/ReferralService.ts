@@ -1,324 +1,312 @@
-import { Types } from 'mongoose';
+import { env } from '@env';
 import { Logger } from '../../lib/logger';
-import { IReferral, IUserReferralStats, Referral, UserReferralStats } from '../models/ReferralModel';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
 import { encryptionService } from './EncryptionService';
 
 const log = new Logger(__filename);
 
+type ReferralStatsRow = {
+  user_id: string;
+  referral_code: string;
+  total_referrals: number;
+  successful_referrals: number;
+  pending_referrals: number;
+  today_referrals: number;
+  last_referral_date: string | null;
+  lifetime_earnings: any;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReferralRow = {
+  id: string;
+  referrer_id: string;
+  referred_user_id: string | null;
+  referral_code: string;
+  email: string | null;
+  status: string;
+  rewards: any;
+  metadata: any;
+  created_at: string;
+  updated_at: string;
+};
+
 export class ReferralService {
   private readonly MAX_REFERRALS_PER_DAY = 5;
   private readonly PRACTICE_REWARD_PER_REFERRAL = 1;
-  private readonly SIMULATION_REWARD_THRESHOLD = 2; // Need 2+ referrals to get simulation
+  private readonly SIMULATION_REWARD_THRESHOLD = 2;
 
-  /**
-   * Generate or get user's referral code
-   */
   async getUserReferralCode(userId: string): Promise<string> {
-    let stats = await UserReferralStats.findOne({ userId: new Types.ObjectId(userId) });
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('referral_stats')
+      .select('user_id, referral_code')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (!stats) {
-      // Generate unique referral code
-      const referralCode = await this.generateUniqueReferralCode();
-
-      stats = new UserReferralStats({
-        userId: new Types.ObjectId(userId),
-        referralCode
-      });
-
-      await stats.save();
-      log.info(`Referral code generated for user ${userId}: ${referralCode}`);
+    if (data?.referral_code) {
+      return (data as any).referral_code;
     }
 
-    return stats.referralCode;
+    const referralCode = await this.generateUniqueReferralCode();
+    const { error } = await supabase
+      .from('referral_stats')
+      .insert({ user_id: userId, referral_code: referralCode })
+      .throwOnError();
+
+    if (error) {
+      throw new Error('Failed to generate referral code');
+    }
+
+    log.info(`Referral code generated for user ${userId}: ${referralCode}`);
+    return referralCode;
   }
 
-  /**
-   * Redeem a referral code (called during registration)
-   */
-  async redeemReferralCode(
-    referralCode: string,
-    newUserId: string,
-    email: string
-  ): Promise<{ practiceReward: number; simulationReward: number }> {
-    // Find the referrer
-    const referrerStats = await UserReferralStats.findOne({ referralCode });
+  async getReferralStats(userId: string): Promise<any> {
+    const supabase = getSupabaseAdmin();
+    const code = await this.getUserReferralCode(userId);
+    const link = await this.createReferralLink(userId);
 
-    if (!referrerStats) {
-      throw new Error('Invalid referral code');
-    }
+    const { data } = await supabase
+      .from('referral_stats')
+      .select(
+        'user_id, referral_code, total_referrals, successful_referrals, pending_referrals, today_referrals, last_referral_date, lifetime_earnings, created_at, updated_at'
+      )
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    const referrerId = referrerStats.userId.toString();
-
-    // Check if user is trying to refer themselves
-    if (referrerId === newUserId) {
-      throw new Error('Cannot use your own referral code');
-    }
-
-    // Check daily limit
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (referrerStats.lastReferralDate) {
-      const lastReferralDate = new Date(referrerStats.lastReferralDate);
-      lastReferralDate.setHours(0, 0, 0, 0);
-
-      if (lastReferralDate.getTime() !== today.getTime()) {
-        // Reset daily count if it's a new day
-        referrerStats.todayReferrals = 0;
-      }
-    }
-
-    if (referrerStats.todayReferrals >= this.MAX_REFERRALS_PER_DAY) {
-      throw new Error('Daily referral limit reached');
-    }
-
-    // Check if this email was already referred
-    const existingReferral = await Referral.findOne({
-      referrerId: referrerStats.userId,
-      email: email.toLowerCase()
-    });
-
-    if (existingReferral && existingReferral.status === 'completed') {
-      throw new Error('This email has already been referred');
-    }
-
-    // Create or update referral record
-    let referral: IReferral;
-    if (existingReferral) {
-      existingReferral.referredUserId = new Types.ObjectId(newUserId);
-      existingReferral.status = 'completed';
-      existingReferral.metadata = {
-        registeredAt: new Date()
-      };
-      referral = await existingReferral.save();
-    } else {
-      referral = new Referral({
-        referrerId: referrerStats.userId,
-        referredUserId: new Types.ObjectId(newUserId),
-        referralCode,
-        email: email.toLowerCase(),
-        status: 'completed',
-        metadata: {
-          registeredAt: new Date()
-        }
-      });
-      await referral.save();
-    }
-
-    // Calculate rewards
-    const practiceReward = this.PRACTICE_REWARD_PER_REFERRAL;
-    const simulationReward = referrerStats.todayReferrals + 1 >= this.SIMULATION_REWARD_THRESHOLD ? 1 : 0;
-
-    // Update referral stats
-    referrerStats.totalReferrals += 1;
-    referrerStats.successfulReferrals += 1;
-    referrerStats.todayReferrals += 1;
-    referrerStats.lastReferralDate = new Date();
-    referrerStats.totalPracticeSessionsEarned += practiceReward;
-    referrerStats.totalSimulationSessionsEarned += simulationReward;
-    referrerStats.lifetimeEarnings.practices += practiceReward;
-    referrerStats.lifetimeEarnings.simulations += simulationReward;
-
-    await referrerStats.save();
-
-    // Grant rewards to referrer
-    referral.rewards = {
-      practiceSessionsGranted: practiceReward,
-      simulationSessionsGranted: simulationReward,
-      grantedAt: new Date()
+    const row = (data as ReferralStatsRow | null) || {
+      user_id: userId,
+      referral_code: code,
+      total_referrals: 0,
+      successful_referrals: 0,
+      pending_referrals: 0,
+      today_referrals: 0,
+      last_referral_date: null,
+      lifetime_earnings: { practices: 0, simulations: 0 },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
-    await referral.save();
 
-    await this.grantRewards(referrerId, practiceReward, simulationReward);
+    const { canRefer, remaining } = await this.canReferToday(userId);
 
-    log.info(
-      `Referral completed: ${referralCode} -> ${newUserId}. Rewards: ${practiceReward} practices, ${simulationReward} simulations`
-    );
+    const lifetime = row.lifetime_earnings || { practices: 0, simulations: 0 };
 
     return {
-      practiceReward,
-      simulationReward
+      referralCode: row.referral_code,
+      referralLink: link,
+      totalReferrals: Number(row.total_referrals || 0),
+      successfulReferrals: Number(row.successful_referrals || 0),
+      pendingReferrals: Number(row.pending_referrals || 0),
+      lifetimeEarnings: {
+        practiceSessionsGranted: Number(lifetime.practices || 0),
+        simulationSessionsGranted: Number(lifetime.simulations || 0)
+      },
+      canReferToday: canRefer,
+      remainingToday: remaining
     };
   }
 
-  /**
-   * Get user's referral statistics
-   */
-  async getReferralStats(userId: string): Promise<IUserReferralStats | null> {
-    return await UserReferralStats.findOne({ userId: new Types.ObjectId(userId) });
-  }
-
-  /**
-   * Get referral history
-   */
-  async getReferralHistory(userId: string, limit: number = 50): Promise<IReferral[]> {
-    const stats = await UserReferralStats.findOne({ userId: new Types.ObjectId(userId) });
-
-    if (!stats) {
-      return [];
-    }
-
-    return await Referral.find({
-      referrerId: stats.userId
-    })
-      .populate('referredUserId', 'name email')
-      .sort({ createdAt: -1 })
-      .limit(limit);
-  }
-
-  /**
-   * Check if user can make more referrals today
-   */
   async canReferToday(userId: string): Promise<{ canRefer: boolean; remaining: number }> {
-    const stats = await UserReferralStats.findOne({ userId: new Types.ObjectId(userId) });
+    const supabase = getSupabaseAdmin();
+    const { data } = await supabase
+      .from('referral_stats')
+      .select('user_id, today_referrals, last_referral_date')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (!stats) {
+    if (!data) {
       return { canRefer: true, remaining: this.MAX_REFERRALS_PER_DAY };
     }
 
-    // Check if it's a new day
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+    const last = (data as any).last_referral_date as string | null;
+    const isSameDay = last === todayStr;
 
-    if (stats.lastReferralDate) {
-      const lastReferralDate = new Date(stats.lastReferralDate);
-      lastReferralDate.setHours(0, 0, 0, 0);
+    const todayReferrals = isSameDay ? Number((data as any).today_referrals || 0) : 0;
 
-      if (lastReferralDate.getTime() !== today.getTime()) {
-        // New day, reset count
-        return { canRefer: true, remaining: this.MAX_REFERRALS_PER_DAY };
-      }
+    if (!isSameDay) {
+      // Reset counter for a new day.
+      await supabase
+        .from('referral_stats')
+        .update({ today_referrals: 0 })
+        .eq('user_id', userId);
     }
 
-    const remaining = this.MAX_REFERRALS_PER_DAY - stats.todayReferrals;
-    return {
-      canRefer: remaining > 0,
-      remaining: Math.max(0, remaining)
-    };
+    const remaining = this.MAX_REFERRALS_PER_DAY - todayReferrals;
+    return { canRefer: remaining > 0, remaining: Math.max(0, remaining) };
   }
 
-  /**
-   * Create a referral link
-   */
-  async createReferralLink(userId: string, baseUrl: string = 'https://app.ielts-practice.com'): Promise<string> {
+  async createReferralLink(userId: string, baseUrl?: string): Promise<string> {
     const referralCode = await this.getUserReferralCode(userId);
-    return `${baseUrl}/register?ref=${referralCode}`;
+    const configuredBase = (baseUrl ?? env.referral?.baseUrl ?? 'https://app.spokio.local').replace(/\/$/, '');
+    return `${configuredBase}/referral/${encodeURIComponent(referralCode)}`;
   }
 
-  /**
-   * Get leaderboard of top referrers
-   */
+  async getReferralHistory(userId: string, limit: number = 50): Promise<any[]> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('referrals')
+      .select(
+        'id, referrer_id, referred_user_id, referral_code, email, status, rewards, metadata, created_at, updated_at'
+      )
+      .eq('referrer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error('Failed to load referral history');
+    }
+
+    const rows = (data || []) as ReferralRow[];
+    const referredIds = rows.map(r => r.referred_user_id).filter(Boolean) as string[];
+
+    const [{ data: referredProfiles }, { data: referredSocial }] = await Promise.all([
+      referredIds.length
+        ? supabase.from('profiles').select('id, email').in('id', referredIds)
+        : Promise.resolve({ data: [] as any[] }),
+      referredIds.length
+        ? supabase.from('user_profiles').select('user_id, username, avatar').in('user_id', referredIds)
+        : Promise.resolve({ data: [] as any[] })
+    ]);
+
+    const profileById = new Map<string, any>((referredProfiles || []).map((p: any) => [p.id, p]));
+    const socialById = new Map<string, any>((referredSocial || []).map((p: any) => [p.user_id, p]));
+
+    return rows.map(row => {
+      const rewards = row.rewards || {};
+      const referred = row.referred_user_id ? profileById.get(row.referred_user_id) : null;
+      const referredSocialRow = row.referred_user_id ? socialById.get(row.referred_user_id) : null;
+
+      return {
+        _id: row.id,
+        referredUserId: row.referred_user_id
+          ? {
+              _id: row.referred_user_id,
+              email: referred?.email,
+              username: referredSocialRow?.username
+            }
+          : undefined,
+        referralCode: row.referral_code,
+        email: row.email || undefined,
+        status: row.status,
+        rewards: {
+          practiceSessionsGranted: Number(rewards.practiceSessionsGranted || rewards.practice_sessions_granted || 0),
+          simulationSessionsGranted: Number(rewards.simulationSessionsGranted || rewards.simulation_sessions_granted || 0)
+        },
+        createdAt: row.created_at,
+        completedAt: rewards.grantedAt || rewards.granted_at || row.metadata?.registeredAt || undefined
+      };
+    });
+  }
+
   async getReferralLeaderboard(limit: number = 10): Promise<any[]> {
-    const topReferrers = await UserReferralStats.find()
-      .sort({ successfulReferrals: -1 })
-      .limit(limit)
-      .populate('userId', 'name email');
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('referral_stats')
+      .select('user_id, referral_code, successful_referrals')
+      .order('successful_referrals', { ascending: false })
+      .limit(limit);
 
-    return topReferrers.map((stats, index) => ({
-      rank: index + 1,
-      userId: stats.userId,
-      referralCode: stats.referralCode,
-      totalReferrals: stats.successfulReferrals,
-      totalEarnings: {
-        practices: stats.lifetimeEarnings.practices,
-        simulations: stats.lifetimeEarnings.simulations
-      }
-    }));
+    if (error) {
+      return [];
+    }
+
+    const rows = (data || []) as Array<{ user_id: string; referral_code: string; successful_referrals: number }>;
+    const userIds = rows.map(r => r.user_id);
+
+    const [{ data: profiles }, { data: social }] = await Promise.all([
+      userIds.length ? supabase.from('profiles').select('id, email').in('id', userIds) : Promise.resolve({ data: [] }),
+      userIds.length ? supabase.from('user_profiles').select('user_id, username, avatar').in('user_id', userIds) : Promise.resolve({ data: [] })
+    ]);
+
+    const profileById = new Map<string, any>((profiles || []).map((p: any) => [p.id, p]));
+    const socialById = new Map<string, any>((social || []).map((p: any) => [p.user_id, p]));
+
+    return rows.map((row, idx) => {
+      const p = profileById.get(row.user_id);
+      const s = socialById.get(row.user_id);
+      return {
+        userId: {
+          _id: row.user_id,
+          email: p?.email,
+          username: s?.username,
+          avatar: s?.avatar
+        },
+        successfulReferrals: Number(row.successful_referrals || 0),
+        rank: idx + 1
+      };
+    });
   }
 
-  /**
-   * Generate a unique referral code
-   */
+  async getReferralLandingInfo(referralCode: string) {
+    if (!referralCode) {
+      return null;
+    }
+
+    const normalized = referralCode.trim().toUpperCase();
+    if (!/^[A-Z0-9-]{4,32}$/.test(normalized)) {
+      return null;
+    }
+
+    const supabase = getSupabaseAdmin();
+    const { data: stats } = await supabase
+      .from('referral_stats')
+      .select('user_id, referral_code, total_referrals, successful_referrals')
+      .eq('referral_code', normalized)
+      .maybeSingle();
+
+    if (!stats) {
+      return null;
+    }
+
+    const referrerId = (stats as any).user_id as string;
+    const [{ data: profile }, { data: social }] = await Promise.all([
+      supabase.from('profiles').select('id, email, first_name, last_name').eq('id', referrerId).maybeSingle(),
+      supabase.from('user_profiles').select('user_id, username, avatar').eq('user_id', referrerId).maybeSingle()
+    ]);
+
+    const displayName =
+      (social as any)?.username
+        ? `@${(social as any).username}`
+        : [profile?.first_name, profile?.last_name].filter(Boolean).join(' ').trim() || profile?.email || 'A fellow learner';
+
+    return {
+      referralCode: (stats as any).referral_code,
+      referrer: {
+        id: referrerId,
+        name: displayName,
+        avatar: (social as any)?.avatar ?? null,
+        totalReferrals: Number((stats as any).total_referrals || 0),
+        successfulReferrals: Number((stats as any).successful_referrals || 0)
+      },
+      rewards: {
+        practicePerReferral: this.PRACTICE_REWARD_PER_REFERRAL,
+        simulationThreshold: this.SIMULATION_REWARD_THRESHOLD,
+        referrerPoints: 100,
+        refereePoints: 100
+      }
+    } as const;
+  }
+
   private async generateUniqueReferralCode(): Promise<string> {
-    let code: string;
-    let exists = true;
+    const supabase = getSupabaseAdmin();
     let attempts = 0;
     const maxAttempts = 10;
 
-    while (exists && attempts < maxAttempts) {
-      code = encryptionService.generateReferralCode();
-      const existingCode = await UserReferralStats.findOne({ referralCode: code });
-      exists = !!existingCode;
-      attempts++;
+    while (attempts < maxAttempts) {
+      const code = encryptionService.generateReferralCode();
+      const { data } = await supabase.from('referral_stats').select('user_id').eq('referral_code', code).maybeSingle();
+      if (!data) {
+        return code;
+      }
+      attempts += 1;
     }
 
-    if (exists) {
-      throw new Error('Failed to generate unique referral code');
-    }
-
-    return code!;
-  }
-
-  /**
-   * Grant rewards to user (update their usage limits)
-   * This will be handled by the controller/middleware when checking usage limits
-   */
-  private async grantRewards(userId: string, practiceReward: number, simulationReward: number): Promise<void> {
-    // Log the reward grant
-    // The actual implementation will be in the usage tracking system
-    // where it checks bonus sessions before applying regular limits
-
-    log.info(`Rewards granted to user ${userId}: +${practiceReward} practices, +${simulationReward} simulations`);
-
-    // TODO: Integrate with UsageRecordModel or similar system
-    // to track bonus sessions that can be used on top of regular limits
-  }
-
-  /**
-   * Track referral click (optional analytics)
-   */
-  async trackReferralClick(referralCode: string): Promise<void> {
-    const stats = await UserReferralStats.findOne({ referralCode });
-
-    if (stats) {
-      // You could add click tracking here if needed
-      log.info(`Referral code clicked: ${referralCode}`);
-    }
-  }
-
-  /**
-   * Send referral invitation (create pending referral)
-   */
-  async sendReferralInvitation(userId: string, email: string): Promise<IReferral> {
-    const referralCode = await this.getUserReferralCode(userId);
-
-    // Check daily limit
-    const { canRefer } = await this.canReferToday(userId);
-    if (!canRefer) {
-      throw new Error('Daily referral limit reached');
-    }
-
-    // Check if already referred
-    const existing = await Referral.findOne({
-      referrerId: new Types.ObjectId(userId),
-      email: email.toLowerCase()
-    });
-
-    if (existing) {
-      throw new Error('This email has already been invited');
-    }
-
-    // Create pending referral
-    const referral = new Referral({
-      referrerId: new Types.ObjectId(userId),
-      referralCode,
-      email: email.toLowerCase(),
-      status: 'pending'
-    });
-
-    await referral.save();
-
-    // Update stats
-    const stats = await UserReferralStats.findOne({ userId: new Types.ObjectId(userId) });
-    if (stats) {
-      stats.totalReferrals += 1;
-      stats.pendingReferrals += 1;
-      await stats.save();
-    }
-
-    log.info(`Referral invitation sent: ${email} by ${userId}`);
-    return referral;
+    throw new Error('Failed to generate unique referral code');
   }
 }
 
 export const referralService = new ReferralService();
+

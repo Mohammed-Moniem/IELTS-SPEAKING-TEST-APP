@@ -1,5 +1,38 @@
 import { Document, Schema, Types, model } from 'mongoose';
 
+export interface NotificationSettings {
+  dailyReminderEnabled: boolean;
+  dailyReminderHour: number;
+  dailyReminderMinute: number;
+  achievementsEnabled: boolean;
+  streakRemindersEnabled: boolean;
+  inactivityRemindersEnabled: boolean;
+  feedbackNotificationsEnabled: boolean;
+  directMessagesEnabled: boolean;
+  groupMessagesEnabled: boolean;
+  systemAnnouncementsEnabled: boolean;
+  offersEnabled: boolean;
+}
+
+export interface NotificationState {
+  lastInactivityNotificationAt?: Date;
+  lastSystemBroadcastAt?: Date;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  dailyReminderEnabled: true,
+  dailyReminderHour: 19,
+  dailyReminderMinute: 0,
+  achievementsEnabled: true,
+  streakRemindersEnabled: true,
+  inactivityRemindersEnabled: true,
+  feedbackNotificationsEnabled: true,
+  directMessagesEnabled: true,
+  groupMessagesEnabled: true,
+  systemAnnouncementsEnabled: true,
+  offersEnabled: true
+};
+
 export interface IUserProfile extends Document {
   userId: Types.ObjectId;
   username: string; // Unique username for search
@@ -47,6 +80,8 @@ export interface IUserProfile extends Document {
   // Metadata
   lastActive?: Date;
   deviceTokens?: string[]; // For push notifications
+  notificationSettings?: NotificationSettings;
+  notificationState?: NotificationState;
 
   createdAt: Date;
   updatedAt: Date;
@@ -162,6 +197,64 @@ const UserProfileSchema = new Schema<IUserProfile>(
       showStudyGoals: {
         type: Boolean,
         default: true
+      }
+    },
+    notificationSettings: {
+      dailyReminderEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.dailyReminderEnabled
+      },
+      dailyReminderHour: {
+        type: Number,
+        min: 0,
+        max: 23,
+        default: DEFAULT_NOTIFICATION_SETTINGS.dailyReminderHour
+      },
+      dailyReminderMinute: {
+        type: Number,
+        min: 0,
+        max: 59,
+        default: DEFAULT_NOTIFICATION_SETTINGS.dailyReminderMinute
+      },
+      achievementsEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.achievementsEnabled
+      },
+      streakRemindersEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.streakRemindersEnabled
+      },
+      inactivityRemindersEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.inactivityRemindersEnabled
+      },
+      feedbackNotificationsEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.feedbackNotificationsEnabled
+      },
+      directMessagesEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.directMessagesEnabled
+      },
+      groupMessagesEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.groupMessagesEnabled
+      },
+      systemAnnouncementsEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.systemAnnouncementsEnabled
+      },
+      offersEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.offersEnabled
+      }
+    },
+    notificationState: {
+      lastInactivityNotificationAt: {
+        type: Date
+      },
+      lastSystemBroadcastAt: {
+        type: Date
       }
     },
     badges: [

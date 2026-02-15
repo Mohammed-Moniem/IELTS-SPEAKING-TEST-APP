@@ -6,6 +6,30 @@ const log = new Logger(__filename);
 
 @JsonController('/leaderboard')
 export class LeaderboardController {
+  private resolvePeriod(raw?: string): LeaderboardPeriod {
+    switch ((raw || '').trim()) {
+      case 'daily':
+      case 'weekly':
+      case 'monthly':
+      case 'all-time':
+        return raw as LeaderboardPeriod;
+      default:
+        return 'all-time';
+    }
+  }
+
+  private resolveMetric(raw?: string): LeaderboardMetric {
+    switch ((raw || '').trim()) {
+      case 'score':
+      case 'practices':
+      case 'achievements':
+      case 'streak':
+        return raw as LeaderboardMetric;
+      default:
+        return 'score';
+    }
+  }
+
   /**
    * Get leaderboard
    * GET /api/leaderboard
@@ -13,14 +37,14 @@ export class LeaderboardController {
   @Get('/')
   async getLeaderboard(
     @CurrentUser() currentUser: any,
-    @QueryParam('period') period?: LeaderboardPeriod,
-    @QueryParam('metric') metric?: LeaderboardMetric,
+    @QueryParam('period') period?: string,
+    @QueryParam('metric') metric?: string,
     @QueryParam('limit') limit?: number
   ) {
     try {
       const leaderboard = await leaderboardService.getLeaderboard(
-        period || 'all-time',
-        metric || 'score',
+        this.resolvePeriod(period),
+        this.resolveMetric(metric),
         limit || 100,
         currentUser?.id
       );
@@ -42,14 +66,14 @@ export class LeaderboardController {
   @Get('/friends')
   async getFriendsLeaderboard(
     @CurrentUser({ required: true }) currentUser: any,
-    @QueryParam('period') period?: LeaderboardPeriod,
-    @QueryParam('metric') metric?: LeaderboardMetric
+    @QueryParam('period') period?: string,
+    @QueryParam('metric') metric?: string
   ) {
     try {
       const leaderboard = await leaderboardService.getFriendsLeaderboard(
         currentUser.id,
-        period || 'all-time',
-        metric || 'score'
+        this.resolvePeriod(period),
+        this.resolveMetric(metric)
       );
 
       return {
@@ -69,14 +93,14 @@ export class LeaderboardController {
   @Get('/position')
   async getUserPosition(
     @CurrentUser({ required: true }) currentUser: any,
-    @QueryParam('period') period?: LeaderboardPeriod,
-    @QueryParam('metric') metric?: LeaderboardMetric
+    @QueryParam('period') period?: string,
+    @QueryParam('metric') metric?: string
   ) {
     try {
       const position = await leaderboardService.getUserPosition(
         currentUser.id,
-        period || 'all-time',
-        metric || 'score'
+        this.resolvePeriod(period),
+        this.resolveMetric(metric)
       );
 
       return {

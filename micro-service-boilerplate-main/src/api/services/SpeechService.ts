@@ -1,3 +1,4 @@
+import { FullTestEvaluationPayload, FullTestEvaluationResult } from '@interfaces/ITestEvaluation';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import OpenAI from 'openai';
@@ -479,6 +480,240 @@ Return only the JSON object.`;
       this.log.error('Evaluation failed:', error);
       throw new Error(`Failed to evaluate response: ${error?.message || 'Unknown error'}`);
     }
+  }
+
+  public async evaluateFullTest(payload: FullTestEvaluationPayload): Promise<FullTestEvaluationResult> {
+    if (!env.openai.apiKey) {
+      throw new Error('OpenAI API key is not configured on the server');
+    }
+
+    const fullTranscript = payload.fullTranscript?.trim();
+    if (!fullTranscript) {
+      throw new Error('Full transcript is required for full test evaluation');
+    }
+
+    const prompt = this.buildFullTestEvaluationPrompt(payload);
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: env.openai.model || 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.25,
+        response_format: { type: 'json_object' }
+      });
+
+      const content = completion.choices[0].message.content || '{}';
+      const rawEvaluation = JSON.parse(content) as FullTestEvaluationResult;
+
+      const normalizedEvaluation = this.normalizeFullTestEvaluation(rawEvaluation);
+      normalizedEvaluation.evaluatorModel = env.openai.model || 'gpt-4o-mini';
+
+      this.log.info(`Full test evaluation completed. Overall band: ${normalizedEvaluation.overallBand}`, {
+        userId: payload.userId,
+        partScores: normalizedEvaluation.partScores
+      });
+
+      return normalizedEvaluation;
+    } catch (error) {
+      this.log.error('Full test evaluation failed:', error);
+      throw new Error(`Failed to evaluate full test: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private buildFullTestEvaluationPrompt(payload: FullTestEvaluationPayload): string {
+    const metaLines: string[] = [];
+    if (payload.metadata?.candidateName) {
+      metaLines.push(`Candidate Name: ${payload.metadata.candidateName}`);
+    }
+    if (payload.metadata?.difficulty) {
+      metaLines.push(`Difficulty: ${payload.metadata.difficulty}`);
+    }
+    if (payload.metadata?.testStartedAt) {
+      metaLines.push(`Started At: ${payload.metadata.testStartedAt}`);
+    }
+    if (payload.metadata?.testCompletedAt) {
+      metaLines.push(`Completed At: ${payload.metadata.testCompletedAt}`);
+    }
+    if (payload.durationSeconds) {
+      metaLines.push(`Duration (seconds): ${payload.durationSeconds}`);
+    }
+
+    const partsSection = payload.parts
+      .map(part => {
+        const partHeader = `Part ${part.partNumber}`;
+
+        const questions = part.questions
+          .map((question, index) => {
+            const topicSegment = question.topic ? ` (Topic: ${question.topic})` : '';
+            const idSegment = question.questionId ? ` [ID: ${question.questionId}]` : '';
+            const difficultySegment = question.difficulty ? ` [Difficulty: ${question.difficulty}]` : '';
+            return `Q${index + 1}${idSegment}${topicSegment}${difficultySegment}: ${question.question}`;
+          })
+          .join('\n');
+
+        const responses = part.responses
+          .map(response => {
+            const transcript = response.transcript?.trim() || '';
+            const duration = typeof response.durationSeconds === 'number' ? ` (${response.durationSeconds}s)` : '';
+            const recordingInfo = response.recordingUrl ? ` [Recording: ${response.recordingUrl}]` : '';
+            const cleaned = transcript.length ? transcript : '[No response provided]';
+            return `A${response.questionIndex + 1}${duration}${recordingInfo}: ${cleaned}`;
+          })
+          .join('\n');
+
+        return `${partHeader}\nQuestions:\n${questions || 'None'}\nResponses:\n${responses || 'None'}`;
+      })
+      .join('\n\n');
+
+    return `You are an experienced IELTS Speaking examiner. Evaluate the ENTIRE IELTS speaking test and provide a holistic assessment aligned with official IELTS descriptors. Consider fluency, lexical resource, grammar, pronunciation, and consistency across all parts.
+
+CANDIDATE CONTEXT:
+- User ID: ${payload.userId}
+${metaLines.length ? `- ${metaLines.join('\n- ')}` : ''}
+
+FULL TEST TRANSCRIPT:
+${payload.fullTranscript.trim()}
+
+PER-PART BREAKDOWN:
+${partsSection}
+
+Produce JSON ONLY that matches this EXACT schema:
+{
+  "overallBand": 6.5,
+  "spokenSummary": "2-3 sentences that mention the overall score and main takeaway.",
+  "detailedFeedback": "Multi-paragraph summary weaving together key findings from all criteria.",
+  "criteria": {
+    "fluencyCoherence": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific transcript-based strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "lexicalResource": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "grammaticalRange": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "pronunciation": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    }
+  },
+  "corrections": [
+    { "original": "Exact quoted error", "corrected": "Corrected version", "explanation": "Why it matters", "category": "grammar" },
+    { "original": "Another quote", "corrected": "Correction", "explanation": "Explanation", "category": "lexical" },
+    { "original": "Another quote", "corrected": "Correction", "explanation": "Explanation", "category": "pronunciation" }
+  ],
+  "suggestions": [
+    { "category": "fluency", "suggestion": "Actionable plan with practice idea", "priority": "high" },
+    { "category": "lexical", "suggestion": "Actionable plan", "priority": "medium" },
+    { "category": "pronunciation", "suggestion": "Practice technique", "priority": "medium" }
+  ],
+  "partScores": {
+    "part1": 6.5,
+    "part2": 6.5,
+    "part3": 6.5
+  }
+}
+
+MANDATORY RULES:
+1. All strengths/improvements must reference specific ideas or phrases from the transcript.
+2. Do not invent content that contradicts the provided transcript.
+3. Use the category field in corrections to label the primary issue (grammar, vocabulary, pronunciation, fluency, coherence, etc.).
+4. Suggestions must be concrete practice actions the candidate can take.
+5. If the candidate skipped a question, note this explicitly and adjust feedback accordingly.
+6. Return strictly valid JSON with double quotes and no trailing commas.`;
+  }
+
+  private normalizeFullTestEvaluation(evaluation: FullTestEvaluationResult): FullTestEvaluationResult {
+    const ensureArray = <T>(value: T[] | undefined, fallback: T[]): T[] => {
+      if (!Array.isArray(value)) {
+        return fallback;
+      }
+      return value;
+    };
+
+    const normalizedCorrections = ensureArray(evaluation.corrections, []).map(correction => ({
+      ...correction,
+      category: correction.category || this.inferCorrectionCategory(correction.explanation)
+    }));
+
+    const normalizedSuggestions = ensureArray(evaluation.suggestions, []).map(suggestion => ({
+      category: suggestion.category || 'general',
+      suggestion: suggestion.suggestion,
+      priority: suggestion.priority === 'high' || suggestion.priority === 'low' ? suggestion.priority : 'medium'
+    }));
+
+    const defaultCriteria = () => ({
+      fluencyCoherence: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      lexicalResource: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      grammaticalRange: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      pronunciation: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      }
+    });
+
+    const criteria = evaluation.criteria ? evaluation.criteria : defaultCriteria();
+
+    return {
+      ...evaluation,
+      corrections: normalizedCorrections,
+      suggestions: normalizedSuggestions,
+      criteria: {
+        fluencyCoherence: criteria.fluencyCoherence,
+        lexicalResource: criteria.lexicalResource,
+        grammaticalRange: criteria.grammaticalRange,
+        pronunciation: criteria.pronunciation
+      }
+    };
+  }
+
+  private inferCorrectionCategory(explanation: string | undefined): string {
+    if (!explanation) {
+      return 'general';
+    }
+
+    const normalized = explanation.toLowerCase();
+    if (normalized.includes('pronunciation') || normalized.includes('sound')) {
+      return 'pronunciation';
+    }
+    if (normalized.includes('vocabulary') || normalized.includes('word choice') || normalized.includes('lexical')) {
+      return 'vocabulary';
+    }
+    if (normalized.includes('fluency') || normalized.includes('coherence')) {
+      return 'fluency';
+    }
+    if (normalized.includes('grammar') || normalized.includes('tense') || normalized.includes('agreement')) {
+      return 'grammar';
+    }
+    return 'general';
   }
 
   private getExaminerSystemPrompt(

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import socketService from "../services/socketService";
+
+import socketService, { OnlineStatus } from "../services/socketService";
 
 export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -15,7 +16,7 @@ export const useSocket = () => {
     };
 
     // Listen for online status updates
-    const handleOnlineStatus = (userId: string, isOnline: boolean) => {
+    const handleOnlineStatus = ({ userId, isOnline }: OnlineStatus) => {
       setOnlineUsers((prev) => {
         const newSet = new Set(prev);
         if (isOnline) {
@@ -30,10 +31,16 @@ export const useSocket = () => {
     socketService.onConnectionChange(handleConnectionChange);
     socketService.onOnlineStatus(handleOnlineStatus);
 
-    // Cleanup on unmount
+    // Cleanup on unmount - CRITICAL for preventing memory leaks
     return () => {
-      // Keep connection alive but remove listeners if needed
-      // socketService.disconnect() would be called when app closes
+      // Remove callback listeners
+      socketService.offConnectionChange(handleConnectionChange);
+      socketService.offOnlineStatus(handleOnlineStatus);
+
+      // Disconnect socket and clean up all event listeners
+      // Only disconnect if this is the last component using the socket
+      // (In production, you might want to keep socket alive and only disconnect on logout)
+      socketService.disconnect();
     };
   }, []);
 

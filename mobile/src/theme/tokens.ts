@@ -1,30 +1,44 @@
-import { amber, blue, grass, red, slate, violet } from "@radix-ui/colors";
+import { amber, grass, red } from "@radix-ui/colors";
 
+// Spokio Brand Colors - Purple Palette
 export const colors = {
-  background: slate.slate1,
-  backgroundMuted: slate.slate2,
-  surface: "#ffffff",
-  surfaceSubtle: slate.slate3,
-  overlay: "#ffffff",
-  border: slate.slate6,
-  borderMuted: slate.slate5,
-  divider: slate.slate4,
-  textPrimary: slate.slate12,
-  textSecondary: slate.slate11,
-  textMuted: slate.slate9,
-  textMutedStrong: slate.slate10,
-  textInverse: "#ffffff",
-  primary: blue.blue9,
-  primaryHover: blue.blue10,
-  primarySoft: blue.blue4,
-  primaryStrong: blue.blue11,
-  primaryOn: "#ffffff",
-  secondary: violet.violet9,
-  secondarySoft: violet.violet4,
-  secondaryOn: "#ffffff",
-  info: blue.blue9,
-  infoSoft: blue.blue4,
-  infoOn: "#ffffff",
+  // Backgrounds
+  background: "#FFFFFF",
+  backgroundMuted: "#F8F7FB", // gray-50
+  surface: "#FFFFFF",
+  surfaceSubtle: "#F1EFF8", // gray-100
+  overlay: "#FFFFFF",
+
+  // Borders
+  border: "rgba(124, 58, 237, 0.15)",
+  borderMuted: "#E4E1F0", // gray-200
+  divider: "#E4E1F0", // gray-200
+
+  // Text
+  textPrimary: "#221E2B", // gray-900
+  textSecondary: "#4A4358", // gray-700
+  textMuted: "#7A7090", // gray-500
+  textMutedStrong: "#5E5670", // gray-600
+  textInverse: "#FFFFFF",
+
+  // Primary (Purple - Spokio Brand)
+  primary: "#7C3AED", // brand-primary
+  primaryHover: "#9333EA", // brand-primary-light
+  primarySoft: "#F3E8FF", // purple-100
+  primaryStrong: "#6D28D9", // brand-primary-dark
+  primaryOn: "#FFFFFF",
+
+  // Secondary (Pink accent)
+  secondary: "#EC4899", // brand-secondary
+  secondarySoft: "#FCE7F3",
+  secondaryOn: "#FFFFFF",
+
+  // Info
+  info: "#8B5CF6", // brand-accent
+  infoSoft: "#E9D5FF", // purple-200
+  infoOn: "#FFFFFF",
+
+  // Status colors (keep standard)
   success: grass.grass9,
   successSoft: grass.grass4,
   successOn: grass.grass12,
@@ -33,8 +47,10 @@ export const colors = {
   warningOn: amber.amber12,
   danger: red.red9,
   dangerSoft: red.red4,
-  dangerOn: "#ffffff",
-  tabInactive: slate.slate8,
+  dangerOn: "#FFFFFF",
+
+  // Tab
+  tabInactive: "#7A7090", // gray-500
 };
 
 export const radii = {
@@ -71,3 +87,5 @@ export const shadows = {
     elevation: 4,
   },
 };
+
+export type ColorTokens = typeof colors;

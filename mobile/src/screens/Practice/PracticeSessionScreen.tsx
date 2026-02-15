@@ -1,7 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, {
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -22,15 +21,17 @@ import { practiceApi } from "../../api/services";
 import { AudioRecorder } from "../../components/AudioRecorder";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { OfflineBanner } from "../../components/OfflineBanner";
 import { ProfileMenu } from "../../components/ProfileMenu";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { useNotificationManager } from "../../hooks/useNotificationManager";
+import { useThemedStyles } from "../../hooks";
 import { PracticeStackParamList } from "../../navigation/PracticeNavigator";
 import offlineStorage from "../../services/offlineStorage";
-import { colors, radii, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { radii, spacing } from "../../theme/tokens";
 import { PracticeSessionStart } from "../../types/api";
 import { extractErrorMessage } from "../../utils/errors";
 
@@ -50,7 +51,9 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
     useNotificationManager();
   const { session: initialSession } = route.params;
   const queryClient = useQueryClient();
-  const { isOffline, isOnline } = useNetworkStatus();
+  const { isOffline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [response, setResponse] = useState("");
   const [useAudio, setUseAudio] = useState(true); // Default to audio mode
@@ -69,33 +72,18 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
     });
   }, [navigation]);
 
-  // Process queued items when coming back online
-  useEffect(() => {
-    if (isOnline) {
-      offlineStorage
-        .processQueue(async (item) => {
-          // Upload the queued audio
-          await practiceApi.uploadAudio(
-            item.sessionId,
-            item.audioUri,
-            () => {} // No progress callback for background sync
-          );
-        })
-        .then((result) => {
-          if (result.success > 0) {
-            console.log(`✅ Synced ${result.success} recordings`);
-          }
-        })
-        .catch(console.error);
-    }
-  }, [isOnline]);
-
   const completeSessionMutation = useMutation({
     mutationFn: (payload: { userResponse: string; timeSpent?: number }) =>
       practiceApi.completeSession(session.sessionId, payload),
     onSuccess: () => {
       queryClient
         .invalidateQueries({ queryKey: ["practice-sessions"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["practice-results"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["usage-summary"] })
         .catch(() => undefined);
 
       // Track practice session for notifications
@@ -118,6 +106,12 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
     onSuccess: (data) => {
       queryClient
         .invalidateQueries({ queryKey: ["practice-sessions"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["practice-results"] })
+        .catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: ["usage-summary"] })
         .catch(() => undefined);
 
       // Track practice session for notifications
@@ -204,6 +198,37 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
     const elapsedSeconds = Math.round(
       (Date.now() - startTimeRef.current) / 1000
     );
+
+    if (isOffline) {
+      offlineStorage
+        .queuePracticeTextCompletion({
+          id: `${session.sessionId}-${Date.now()}`,
+          sessionId: session.sessionId,
+          userResponse: response,
+          timeSpent: elapsedSeconds,
+          timestamp: Date.now(),
+        })
+        .then(() => {
+          Alert.alert(
+            "Saved offline",
+            "Your response has been saved and will sync when you're back online.",
+            [
+              {
+                text: "OK",
+                onPress: () => navigation.goBack(),
+              },
+            ]
+          );
+        })
+        .catch(() => {
+          Alert.alert(
+            "Unable to save",
+            "Could not save your response for offline sync. Please try again."
+          );
+        });
+      return;
+    }
+
     completeSessionMutation.mutate({
       userResponse: response,
       timeSpent: elapsedSeconds,
@@ -219,7 +244,6 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
 
   return (
     <ScreenContainer scrollable>
-      <OfflineBanner showQueueCount />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={80}
@@ -349,7 +373,8 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "700",
@@ -463,4 +488,4 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 22,
   },
-});
+  });

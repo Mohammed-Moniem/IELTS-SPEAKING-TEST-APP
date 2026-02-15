@@ -1,12 +1,15 @@
 /**
- * Analytics Service
- * Provides comprehensive progress tracking and performance analytics
+ * Analytics Service (Supabase/Postgres)
+ * Provides comprehensive progress tracking and performance analytics.
+ *
+ * This replaces the legacy MongoDB implementation by persisting into
+ * `public.test_history` (JSONB for criteria/corrections/suggestions).
  */
 
-import { Db, MongoClient, ObjectId } from 'mongodb';
 import { Service } from 'typedi';
-import { env } from '../../env';
+
 import { Logger } from '../../lib/logger';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
 import { TestHistory, TestHistoryModel, TestType } from '../models/TestHistory';
 
 export interface ProgressStats {
@@ -61,19 +64,156 @@ export interface CriteriaComparison {
   trend: 'up' | 'down' | 'stable';
 }
 
+type TestHistoryRow = {
+  id: string;
+  user_id: string;
+  session_id: string;
+  test_type: 'practice' | 'simulation';
+  topic: string;
+  test_part: string | null;
+  duration_seconds: number;
+  completed_at: string;
+  overall_band: number;
+  criteria: any;
+  corrections: any;
+  suggestions: any;
+  audio_recording_id: string | null;
+  metadata: any;
+  created_at: string;
+};
+
+type UserStatsRow = {
+  user_id: string;
+  total_practice_sessions: number;
+  total_simulations: number;
+  average_score: number;
+  highest_score: number;
+  current_streak: number;
+  longest_streak: number;
+  weekly_score: number;
+  monthly_score: number;
+  weekly_practices: number;
+  monthly_practices: number;
+  last_practice_at?: string | null;
+};
+
+function toTestHistory(row: TestHistoryRow): TestHistory {
+  return {
+    _id: row.id,
+    userId: row.user_id,
+    sessionId: row.session_id,
+    testType: row.test_type as TestType,
+    topic: row.topic,
+    testPart: row.test_part || undefined,
+    durationSeconds: row.duration_seconds || 0,
+    completedAt: new Date(row.completed_at),
+    overallBand: Number(row.overall_band),
+    criteria: row.criteria,
+    corrections: Array.isArray(row.corrections) ? row.corrections : row.corrections || [],
+    suggestions: Array.isArray(row.suggestions) ? row.suggestions : row.suggestions || [],
+    audioRecordingId: row.audio_recording_id || undefined,
+    metadata: row.metadata || {},
+    createdAt: new Date(row.created_at)
+  };
+}
+
 @Service()
 export class AnalyticsService {
   private log = new Logger(__filename);
-  private db: Db;
 
-  async initializeMongoDB(): Promise<void> {
-    try {
-      const client = await MongoClient.connect(env.db.mongoURL);
-      this.db = client.db();
-      this.log.info('✅ Analytics MongoDB initialized');
-    } catch (error) {
-      this.log.error('❌ Failed to initialize Analytics MongoDB:', error);
-      throw error;
+  private startOfDayUtc(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  }
+
+  private async updateUserStatsFromTest(params: {
+    userId: string;
+    overallBand: number;
+    testType: TestType;
+    completedAt: Date;
+  }): Promise<void> {
+    const supabase = getSupabaseAdmin();
+    const userId = params.userId;
+
+    const { data: existing, error } = await supabase
+      .from('user_stats')
+      .select(
+        'user_id, total_practice_sessions, total_simulations, average_score, highest_score, current_streak, longest_streak, weekly_score, monthly_score, weekly_practices, monthly_practices, last_practice_at'
+      )
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      this.log.warn('Failed to load user_stats (will upsert defaults)', { userId, error: error.message });
+    }
+
+    const stats = (existing as UserStatsRow | null) || {
+      user_id: userId,
+      total_practice_sessions: 0,
+      total_simulations: 0,
+      average_score: 0,
+      highest_score: 0,
+      current_streak: 0,
+      longest_streak: 0,
+      weekly_score: 0,
+      monthly_score: 0,
+      weekly_practices: 0,
+      monthly_practices: 0,
+      last_practice_at: null
+    };
+
+    const isPractice = params.testType === TestType.PRACTICE;
+
+    const prevTotal = Number(stats.total_practice_sessions || 0) + Number(stats.total_simulations || 0);
+    const nextTotal = prevTotal + 1;
+    const prevAverage = Number(stats.average_score || 0);
+    const nextAverage = nextTotal > 0 ? (prevAverage * prevTotal + Number(params.overallBand || 0)) / nextTotal : 0;
+
+    const nextHighest = Math.max(Number(stats.highest_score || 0), Number(params.overallBand || 0));
+
+    let currentStreak = Number(stats.current_streak || 0);
+    let longestStreak = Number(stats.longest_streak || 0);
+    let lastPracticeAt: string | null | undefined = stats.last_practice_at ?? null;
+
+    if (isPractice) {
+      const completedAt = params.completedAt || new Date();
+      const today = this.startOfDayUtc(completedAt);
+
+      if (lastPracticeAt) {
+        const last = this.startOfDayUtc(new Date(lastPracticeAt));
+        const daysDiff = Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff === 0) {
+          // same day: streak unchanged
+        } else if (daysDiff === 1) {
+          currentStreak = Math.max(1, currentStreak + 1);
+        } else {
+          currentStreak = 1;
+        }
+      } else {
+        currentStreak = 1;
+      }
+
+      longestStreak = Math.max(longestStreak, currentStreak);
+      lastPracticeAt = completedAt.toISOString();
+    }
+
+    const nextPayload = {
+      user_id: userId,
+      total_practice_sessions: Number(stats.total_practice_sessions || 0) + (isPractice ? 1 : 0),
+      total_simulations: Number(stats.total_simulations || 0) + (isPractice ? 0 : 1),
+      average_score: Math.round(nextAverage * 10) / 10,
+      highest_score: Math.round(nextHighest * 10) / 10,
+      weekly_score: Math.round(nextAverage * 10) / 10,
+      monthly_score: Math.round(nextAverage * 10) / 10,
+      weekly_practices: Number(stats.weekly_practices || 0) + (isPractice ? 1 : 0),
+      monthly_practices: Number(stats.monthly_practices || 0) + (isPractice ? 1 : 0),
+      current_streak: currentStreak,
+      longest_streak: longestStreak,
+      last_practice_at: lastPracticeAt
+    };
+
+    const { error: upsertError } = await supabase.from('user_stats').upsert(nextPayload, { onConflict: 'user_id' });
+    if (upsertError) {
+      this.log.warn('Failed to update user_stats', { userId, error: upsertError.message });
     }
   }
 
@@ -81,18 +221,51 @@ export class AnalyticsService {
    * Save test result to history
    */
   async saveTestResult(testData: Partial<TestHistory>): Promise<TestHistory> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
+    const supabase = getSupabaseAdmin();
     const testHistory = TestHistoryModel.create(testData);
 
-    const result = await collection.insertOne(testHistory as any);
-    testHistory._id = result.insertedId.toString();
+    const insertPayload = {
+      user_id: testHistory.userId,
+      session_id: testHistory.sessionId,
+      test_type: testHistory.testType,
+      topic: testHistory.topic,
+      test_part: testHistory.testPart || null,
+      duration_seconds: testHistory.durationSeconds || 0,
+      completed_at: testHistory.completedAt?.toISOString?.() || new Date().toISOString(),
+      overall_band: testHistory.overallBand,
+      criteria: testHistory.criteria,
+      corrections: testHistory.corrections || [],
+      suggestions: testHistory.suggestions || [],
+      audio_recording_id: testHistory.audioRecordingId || null,
+      metadata: testHistory.metadata || {},
+      created_at: testHistory.createdAt?.toISOString?.() || new Date().toISOString()
+    };
 
-    this.log.info(`📊 Test result saved: ${testHistory._id} - Band ${testHistory.overallBand}`);
-    return testHistory;
+    const { data, error } = await supabase
+      .from('test_history')
+      .insert(insertPayload)
+      .select(
+        'id, user_id, session_id, test_type, topic, test_part, duration_seconds, completed_at, overall_band, criteria, corrections, suggestions, audio_recording_id, metadata, created_at'
+      )
+      .single();
+
+    if (error || !data) {
+      this.log.error('❌ Failed to save test history', { error: error?.message || error });
+      throw new Error('Failed to save test result');
+    }
+
+    const saved = toTestHistory(data as TestHistoryRow);
+    this.log.info(`📊 Test result saved: ${saved._id} - Band ${saved.overallBand}`);
+
+    // Keep leaderboard/achievements stats in sync (best-effort).
+    await this.updateUserStatsFromTest({
+      userId: saved.userId,
+      overallBand: saved.overallBand,
+      testType: saved.testType as TestType,
+      completedAt: saved.completedAt || new Date()
+    });
+
+    return saved;
   }
 
   /**
@@ -105,27 +278,34 @@ export class AnalyticsService {
       includeTests?: number;
     }
   ): Promise<ProgressStats> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    const supabase = getSupabaseAdmin();
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
+    let query = supabase
+      .from('test_history')
+      .select(
+        'id, user_id, session_id, test_type, topic, test_part, duration_seconds, completed_at, overall_band, criteria, corrections, suggestions, audio_recording_id, metadata, created_at',
+        { count: 'exact' }
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    // Query parameters
-    const query: any = { userId };
     if (options?.daysBack) {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - options.daysBack);
-      query.createdAt = { $gte: cutoffDate };
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - options.daysBack);
+      query = query.gte('created_at', cutoff.toISOString());
     }
 
-    const tests = await collection.find(query).sort({ createdAt: -1 }).toArray();
+    const { data, error } = await query;
+    if (error) {
+      this.log.error('❌ Failed to fetch test history for stats', { userId, error: error.message });
+      throw new Error('Failed to load analytics');
+    }
 
+    const tests = (data || []).map(row => toTestHistory(row as TestHistoryRow));
     if (tests.length === 0) {
       return this.getEmptyStats();
     }
 
-    // Calculate statistics
     const practiceTests = tests.filter(t => t.testType === TestType.PRACTICE);
     const simulationTests = tests.filter(t => t.testType === TestType.SIMULATION);
 
@@ -134,19 +314,11 @@ export class AnalyticsService {
     const highestBand = Math.max(...bands);
     const lowestBand = Math.min(...bands);
 
-    // Calculate band trend
     const bandTrend = this.calculateBandTrend(tests);
-
-    // Calculate criteria averages
     const criteriaAverages = this.calculateCriteriaAverages(tests);
-
-    // Identify strengths and weaknesses
     const { strengths, weaknesses } = this.identifyStrengthsWeaknesses(criteriaAverages);
 
-    // Recent tests
     const recentTests = tests.slice(0, options?.includeTests || 10);
-
-    // Monthly progress
     const monthlyProgress = this.calculateMonthlyProgress(tests);
 
     return {
@@ -169,30 +341,34 @@ export class AnalyticsService {
    * Get band distribution
    */
   async getBandDistribution(userId: string): Promise<BandDistribution[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('test_history')
+      .select('overall_band')
+      .eq('user_id', userId);
+
+    if (error) {
+      this.log.error('❌ Failed to fetch band distribution', { userId, error: error.message });
+      throw new Error('Failed to load band distribution');
     }
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const tests = await collection.find({ userId }).toArray();
+    const bands = (data || [])
+      .map((row: any) => Number(row.overall_band))
+      .filter((b: any) => typeof b === 'number' && !Number.isNaN(b));
 
-    if (tests.length === 0) {
-      return [];
-    }
+    if (bands.length === 0) return [];
 
-    // Group by band (rounded to 0.5)
     const bandCounts = new Map<number, number>();
-    tests.forEach(test => {
-      const roundedBand = Math.round(test.overallBand * 2) / 2;
+    bands.forEach(b => {
+      const roundedBand = Math.round(b * 2) / 2;
       bandCounts.set(roundedBand, (bandCounts.get(roundedBand) || 0) + 1);
     });
 
-    // Convert to array and calculate percentages
     const distribution: BandDistribution[] = Array.from(bandCounts.entries())
       .map(([band, count]) => ({
         band,
         count,
-        percentage: Math.round((count / tests.length) * 100)
+        percentage: Math.round((count / bands.length) * 100)
       }))
       .sort((a, b) => b.band - a.band);
 
@@ -203,32 +379,31 @@ export class AnalyticsService {
    * Get performance by topic
    */
   async getTopicPerformance(userId: string, limit: number = 10): Promise<TopicPerformance[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('test_history')
+      .select('topic, overall_band, created_at')
+      .eq('user_id', userId);
+
+    if (error) {
+      this.log.error('❌ Failed to fetch topic performance', { userId, error: error.message });
+      throw new Error('Failed to load topic performance');
     }
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const tests = await collection.find({ userId }).toArray();
+    const rows = data || [];
+    if (rows.length === 0) return [];
 
-    if (tests.length === 0) {
-      return [];
-    }
-
-    // Group by topic
     const topicStats = new Map<string, { bands: number[]; dates: Date[] }>();
-    tests.forEach(test => {
-      if (!test.topic) return;
-
-      if (!topicStats.has(test.topic)) {
-        topicStats.set(test.topic, { bands: [], dates: [] });
+    rows.forEach((row: any) => {
+      if (!row.topic) return;
+      if (!topicStats.has(row.topic)) {
+        topicStats.set(row.topic, { bands: [], dates: [] });
       }
-
-      const stats = topicStats.get(test.topic)!;
-      stats.bands.push(test.overallBand);
-      stats.dates.push(test.createdAt);
+      const stats = topicStats.get(row.topic)!;
+      stats.bands.push(Number(row.overall_band));
+      stats.dates.push(new Date(row.created_at));
     });
 
-    // Calculate averages and sort by test count
     const performance: TopicPerformance[] = Array.from(topicStats.entries())
       .map(([topic, stats]) => ({
         topic,
@@ -246,24 +421,29 @@ export class AnalyticsService {
    * Compare criteria performance (current vs previous period)
    */
   async compareCriteriaPerformance(userId: string, daysBack: number = 30): Promise<CriteriaComparison[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-
-    const currentDate = new Date();
-    const midpoint = new Date();
-    midpoint.setDate(midpoint.getDate() - daysBack / 2);
+    const supabase = getSupabaseAdmin();
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Get current period tests
-    const currentTests = await collection.find({ userId, createdAt: { $gte: midpoint } }).toArray();
+    const midpoint = new Date();
+    midpoint.setDate(midpoint.getDate() - daysBack / 2);
 
-    // Get previous period tests
-    const previousTests = await collection.find({ userId, createdAt: { $gte: startDate, $lt: midpoint } }).toArray();
+    const { data, error } = await supabase
+      .from('test_history')
+      .select('id, user_id, session_id, test_type, topic, test_part, duration_seconds, completed_at, overall_band, criteria, corrections, suggestions, audio_recording_id, metadata, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      this.log.error('❌ Failed to fetch criteria comparison data', { userId, error: error.message });
+      throw new Error('Failed to load criteria comparison');
+    }
+
+    const tests = (data || []).map(row => toTestHistory(row as TestHistoryRow));
+    const currentTests = tests.filter(t => t.createdAt >= midpoint);
+    const previousTests = tests.filter(t => t.createdAt < midpoint);
 
     if (currentTests.length === 0 || previousTests.length === 0) {
       return [];
@@ -272,7 +452,7 @@ export class AnalyticsService {
     const currentAvg = this.calculateCriteriaAverages(currentTests);
     const previousAvg = this.calculateCriteriaAverages(previousTests);
 
-    const comparisons: CriteriaComparison[] = [
+    return [
       {
         criterion: 'Fluency & Coherence',
         currentAverage: currentAvg.fluencyCoherence,
@@ -302,8 +482,6 @@ export class AnalyticsService {
         trend: this.getTrend(currentAvg.pronunciation, previousAvg.pronunciation)
       }
     ];
-
-    return comparisons;
   }
 
   /**
@@ -317,71 +495,90 @@ export class AnalyticsService {
       testType?: TestType;
     }
   ): Promise<{ tests: TestHistory[]; total: number }> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    const supabase = getSupabaseAdmin();
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
+    const limit = Math.min(Math.max(options?.limit || 20, 1), 100);
+    const skip = Math.max(options?.skip || 0, 0);
 
-    const query: any = { userId };
+    let query = supabase
+      .from('test_history')
+      .select(
+        'id, user_id, session_id, test_type, topic, test_part, duration_seconds, completed_at, overall_band, criteria, corrections, suggestions, audio_recording_id, metadata, created_at',
+        { count: 'exact' }
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(skip, skip + limit - 1);
+
     if (options?.testType) {
-      query.testType = options.testType;
+      query = query.eq('test_type', options.testType);
     }
 
-    const total = await collection.countDocuments(query);
-    const tests = await collection
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(options?.skip || 0)
-      .limit(options?.limit || 20)
-      .toArray();
+    const { data, error, count } = await query;
+    if (error) {
+      this.log.error('❌ Failed to fetch test history', { userId, error: error.message });
+      throw new Error('Failed to load test history');
+    }
 
-    return { tests: tests as TestHistory[], total };
+    return {
+      tests: (data || []).map(row => toTestHistory(row as TestHistoryRow)),
+      total: typeof count === 'number' ? count : (data || []).length
+    };
   }
 
   /**
    * Get single test details
    */
-  async getTestDetails(testId: string): Promise<TestHistory | null> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+  async getTestDetails(userId: string, testId: string): Promise<TestHistory | null> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('test_history')
+      .select(
+        'id, user_id, session_id, test_type, topic, test_part, duration_seconds, completed_at, overall_band, criteria, corrections, suggestions, audio_recording_id, metadata, created_at'
+      )
+      .eq('id', testId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      this.log.error('❌ Failed to fetch test details', { userId, testId, error: error.message });
+      throw new Error('Failed to load test details');
     }
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const test = await collection.findOne({ _id: new ObjectId(testId) as any });
-
-    return test as TestHistory | null;
+    if (!data) return null;
+    return toTestHistory(data as TestHistoryRow);
   }
 
   /**
    * Delete test from history
    */
-  async deleteTest(testId: string): Promise<void> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+  async deleteTest(userId: string, testId: string): Promise<boolean> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase.from('test_history').delete().eq('id', testId).eq('user_id', userId).select('id');
+
+    if (error) {
+      this.log.error('❌ Failed to delete test', { userId, testId, error: error.message });
+      throw new Error('Failed to delete test');
     }
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    await collection.deleteOne({ _id: new ObjectId(testId) as any });
-
-    this.log.info(`🗑️  Deleted test: ${testId}`);
+    const deleted = Array.isArray(data) && data.length > 0;
+    if (deleted) {
+      this.log.info(`🗑️  Deleted test: ${testId}`);
+    }
+    return deleted;
   }
 
-  /**
-   * Helper: Calculate band trend
-   */
+  // Helpers (ported from the legacy implementation)
+
   private calculateBandTrend(tests: TestHistory[]): 'improving' | 'declining' | 'stable' {
     if (tests.length < 5) return 'stable';
 
-    // Compare average of recent 5 vs previous 5
     const recent = tests.slice(0, 5).map(t => t.overallBand);
     const previous = tests.slice(5, 10).map(t => t.overallBand);
-
     if (previous.length === 0) return 'stable';
 
     const recentAvg = recent.reduce((sum, b) => sum + b, 0) / recent.length;
     const previousAvg = previous.reduce((sum, b) => sum + b, 0) / previous.length;
-
     const diff = recentAvg - previousAvg;
 
     if (diff > 0.3) return 'improving';
@@ -389,9 +586,6 @@ export class AnalyticsService {
     return 'stable';
   }
 
-  /**
-   * Helper: Calculate criteria averages
-   */
   private calculateCriteriaAverages(tests: TestHistory[]): ProgressStats['criteriaAverages'] {
     const sums = {
       fluencyCoherence: 0,
@@ -401,13 +595,13 @@ export class AnalyticsService {
     };
 
     tests.forEach(test => {
-      sums.fluencyCoherence += test.criteria.fluencyCoherence.band;
-      sums.lexicalResource += test.criteria.lexicalResource.band;
-      sums.grammaticalRange += test.criteria.grammaticalRange.band;
-      sums.pronunciation += test.criteria.pronunciation.band;
+      sums.fluencyCoherence += Number(test.criteria?.fluencyCoherence?.band || 0);
+      sums.lexicalResource += Number(test.criteria?.lexicalResource?.band || 0);
+      sums.grammaticalRange += Number(test.criteria?.grammaticalRange?.band || 0);
+      sums.pronunciation += Number(test.criteria?.pronunciation?.band || 0);
     });
 
-    const count = tests.length;
+    const count = Math.max(tests.length, 1);
     return {
       fluencyCoherence: Math.round((sums.fluencyCoherence / count) * 10) / 10,
       lexicalResource: Math.round((sums.lexicalResource / count) * 10) / 10,
@@ -416,9 +610,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Helper: Identify strengths and weaknesses
-   */
   private identifyStrengthsWeaknesses(averages: ProgressStats['criteriaAverages']): {
     strengths: string[];
     weaknesses: string[];
@@ -431,29 +622,23 @@ export class AnalyticsService {
     ];
 
     criteria.sort((a, b) => b.score - a.score);
-
     return {
       strengths: criteria.slice(0, 2).map(c => c.name),
       weaknesses: criteria.slice(2, 4).map(c => c.name)
     };
   }
 
-  /**
-   * Helper: Calculate monthly progress
-   */
   private calculateMonthlyProgress(tests: TestHistory[]): MonthlyProgress[] {
     const monthlyData = new Map<string, { bands: number[]; practice: number; simulation: number }>();
 
     tests.forEach(test => {
-      const month = test.createdAt.toISOString().substring(0, 7); // 'YYYY-MM'
-
+      const month = test.createdAt.toISOString().substring(0, 7);
       if (!monthlyData.has(month)) {
         monthlyData.set(month, { bands: [], practice: 0, simulation: 0 });
       }
 
       const data = monthlyData.get(month)!;
       data.bands.push(test.overallBand);
-
       if (test.testType === TestType.PRACTICE) {
         data.practice++;
       } else {
@@ -461,7 +646,7 @@ export class AnalyticsService {
       }
     });
 
-    const progress: MonthlyProgress[] = Array.from(monthlyData.entries())
+    return Array.from(monthlyData.entries())
       .map(([month, data]) => ({
         month,
         testCount: data.bands.length,
@@ -470,13 +655,8 @@ export class AnalyticsService {
         simulationCount: data.simulation
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
-
-    return progress;
   }
 
-  /**
-   * Helper: Get trend direction
-   */
   private getTrend(current: number, previous: number): 'up' | 'down' | 'stable' {
     const diff = current - previous;
     if (diff > 0.2) return 'up';
@@ -484,9 +664,6 @@ export class AnalyticsService {
     return 'stable';
   }
 
-  /**
-   * Helper: Get empty stats structure
-   */
   private getEmptyStats(): ProgressStats {
     return {
       totalTests: 0,

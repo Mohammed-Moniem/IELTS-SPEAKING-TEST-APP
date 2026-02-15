@@ -10,6 +10,8 @@ export interface IReferral extends Document {
     practiceSessionsGranted: number;
     simulationSessionsGranted: number;
     grantedAt?: Date;
+    pointsGranted?: boolean; // Track if referral points were granted (Phase 2: Gamification)
+    pointsGrantedAt?: Date; // When points were granted
   };
   metadata: {
     registeredAt?: Date;
@@ -60,6 +62,13 @@ const ReferralSchema = new Schema<IReferral>(
         default: 0
       },
       grantedAt: {
+        type: Date
+      },
+      pointsGranted: {
+        type: Boolean,
+        default: false
+      },
+      pointsGrantedAt: {
         type: Date
       }
     },

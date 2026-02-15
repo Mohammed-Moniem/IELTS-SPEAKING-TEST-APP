@@ -8,7 +8,10 @@ import {
   View,
 } from "react-native";
 
-import { colors, spacing } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 import { PracticeFeedback } from "../types/api";
 import { Card } from "./Card";
 import { Tag } from "./Tag";
@@ -28,6 +31,8 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
   children,
   defaultExpanded = false,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
@@ -52,6 +57,8 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 export const DetailedFeedbackView: React.FC<DetailedFeedbackViewProps> = ({
   feedback,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const getBandColor = (band?: number) => {
     if (!band) return colors.textMuted;
     if (band >= 8) return colors.success;
@@ -434,7 +441,8 @@ export const DetailedFeedbackView: React.FC<DetailedFeedbackViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -628,4 +636,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
-});
+  });

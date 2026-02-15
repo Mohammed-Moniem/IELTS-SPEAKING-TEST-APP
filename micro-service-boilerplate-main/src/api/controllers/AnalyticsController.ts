@@ -3,7 +3,7 @@
  * Provides endpoints for progress tracking and performance analytics
  */
 
-import { Body, Delete, Get, JsonController, Param, Post, QueryParam } from 'routing-controllers';
+import { Body, Delete, Get, JsonController, Param, Post, QueryParam, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { Logger } from '../../lib/logger';
 import { TestType } from '../models/TestHistory';
@@ -16,17 +16,39 @@ export class AnalyticsController {
 
   constructor(private analyticsService: AnalyticsService) {}
 
+  private getCurrentUserId(req: any): string | undefined {
+    return req?.currentUser?.id;
+  }
+
+  private assertSameUser(req: any, userId: string): { success: false; error: string } | undefined {
+    const currentUserId = this.getCurrentUserId(req);
+    if (!currentUserId) {
+      return { success: false, error: 'Authentication required' };
+    }
+    if (currentUserId !== userId) {
+      return { success: false, error: 'Forbidden' };
+    }
+    return undefined;
+  }
+
   /**
    * Save test result to history
    * POST /api/v1/analytics/test
    */
   @Post('/test')
-  async saveTestResult(@Body() body: any): Promise<any> {
+  async saveTestResult(@Req() req: any, @Body() body: any): Promise<any> {
     try {
       this.log.info('📊 Save test result request');
 
+      const currentUserId = this.getCurrentUserId(req);
+      if (!currentUserId) {
+        return {
+          success: false,
+          error: 'Authentication required'
+        };
+      }
+
       const {
-        userId,
         sessionId,
         testType,
         topic,
@@ -39,15 +61,15 @@ export class AnalyticsController {
         audioRecordingId
       } = body;
 
-      if (!userId || !sessionId || !topic || !overallBand || !criteria) {
+      if (!sessionId || !topic || !overallBand || !criteria) {
         return {
           success: false,
-          error: 'Missing required fields: userId, sessionId, topic, overallBand, criteria'
+          error: 'Missing required fields: sessionId, topic, overallBand, criteria'
         };
       }
 
       const testHistory = await this.analyticsService.saveTestResult({
-        userId,
+        userId: currentUserId,
         sessionId,
         testType: testType || TestType.PRACTICE,
         topic,
@@ -84,11 +106,17 @@ export class AnalyticsController {
    */
   @Get('/progress/:userId')
   async getProgressStats(
+    @Req() req: any,
     @Param('userId') userId: string,
     @QueryParam('daysBack') daysBack?: number,
     @QueryParam('includeTests') includeTests?: number
   ): Promise<any> {
     try {
+      const accessError = this.assertSameUser(req, userId);
+      if (accessError) {
+        return accessError;
+      }
+
       this.log.info(`📈 Get progress stats for user: ${userId}`);
 
       const stats = await this.analyticsService.getProgressStats(userId, {
@@ -114,8 +142,13 @@ export class AnalyticsController {
    * GET /api/v1/analytics/band-distribution/:userId
    */
   @Get('/band-distribution/:userId')
-  async getBandDistribution(@Param('userId') userId: string): Promise<any> {
+  async getBandDistribution(@Req() req: any, @Param('userId') userId: string): Promise<any> {
     try {
+      const accessError = this.assertSameUser(req, userId);
+      if (accessError) {
+        return accessError;
+      }
+
       this.log.info(`📊 Get band distribution for user: ${userId}`);
 
       const distribution = await this.analyticsService.getBandDistribution(userId);
@@ -140,8 +173,17 @@ export class AnalyticsController {
    * GET /api/v1/analytics/topics/:userId
    */
   @Get('/topics/:userId')
-  async getTopicPerformance(@Param('userId') userId: string, @QueryParam('limit') limit?: number): Promise<any> {
+  async getTopicPerformance(
+    @Req() req: any,
+    @Param('userId') userId: string,
+    @QueryParam('limit') limit?: number
+  ): Promise<any> {
     try {
+      const accessError = this.assertSameUser(req, userId);
+      if (accessError) {
+        return accessError;
+      }
+
       this.log.info(`📚 Get topic performance for user: ${userId}`);
 
       const topics = await this.analyticsService.getTopicPerformance(userId, limit ? parseInt(limit.toString()) : 10);
@@ -166,8 +208,17 @@ export class AnalyticsController {
    * GET /api/v1/analytics/criteria-comparison/:userId
    */
   @Get('/criteria-comparison/:userId')
-  async compareCriteria(@Param('userId') userId: string, @QueryParam('daysBack') daysBack?: number): Promise<any> {
+  async compareCriteria(
+    @Req() req: any,
+    @Param('userId') userId: string,
+    @QueryParam('daysBack') daysBack?: number
+  ): Promise<any> {
     try {
+      const accessError = this.assertSameUser(req, userId);
+      if (accessError) {
+        return accessError;
+      }
+
       this.log.info(`🔄 Compare criteria for user: ${userId}`);
 
       const comparison = await this.analyticsService.compareCriteriaPerformance(
@@ -196,12 +247,18 @@ export class AnalyticsController {
    */
   @Get('/history/:userId')
   async getTestHistory(
+    @Req() req: any,
     @Param('userId') userId: string,
     @QueryParam('limit') limit?: number,
     @QueryParam('skip') skip?: number,
     @QueryParam('testType') testType?: TestType
   ): Promise<any> {
     try {
+      const accessError = this.assertSameUser(req, userId);
+      if (accessError) {
+        return accessError;
+      }
+
       this.log.info(`📜 Get test history for user: ${userId}`);
 
       const result = await this.analyticsService.getTestHistory(userId, {
@@ -233,11 +290,19 @@ export class AnalyticsController {
    * GET /api/v1/analytics/test/:testId
    */
   @Get('/test/:testId')
-  async getTestDetails(@Param('testId') testId: string): Promise<any> {
+  async getTestDetails(@Req() req: any, @Param('testId') testId: string): Promise<any> {
     try {
       this.log.info(`📄 Get test details: ${testId}`);
 
-      const test = await this.analyticsService.getTestDetails(testId);
+      const currentUserId = this.getCurrentUserId(req);
+      if (!currentUserId) {
+        return {
+          success: false,
+          error: 'Authentication required'
+        };
+      }
+
+      const test = await this.analyticsService.getTestDetails(currentUserId, testId);
 
       if (!test) {
         return {
@@ -264,13 +329,25 @@ export class AnalyticsController {
    * DELETE /api/v1/analytics/test/:testId
    */
   @Delete('/test/:testId')
-  async deleteTest(@Param('testId') testId: string): Promise<any> {
+  async deleteTest(@Req() req: any, @Param('testId') testId: string): Promise<any> {
     try {
       this.log.info(`🗑️  Delete test: ${testId}`);
 
-      // TODO: Add authorization check
+      const currentUserId = this.getCurrentUserId(req);
+      if (!currentUserId) {
+        return {
+          success: false,
+          error: 'Authentication required'
+        };
+      }
 
-      await this.analyticsService.deleteTest(testId);
+      const deleted = await this.analyticsService.deleteTest(currentUserId, testId);
+      if (!deleted) {
+        return {
+          success: false,
+          error: 'Test not found'
+        };
+      }
 
       return {
         success: true,

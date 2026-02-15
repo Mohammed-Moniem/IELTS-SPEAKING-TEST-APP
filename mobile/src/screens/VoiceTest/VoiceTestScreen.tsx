@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -7,691 +9,510 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  checkUsageLimit,
-  getSubscriptionPlans,
-  SubscriptionPlan,
-  upgradeSubscription,
-} from "../../api/subscriptionApi";
+
 import { GeneratedTopic, getCachedRandomTopic } from "../../api/topicApi";
-import { AuthenticFullTest } from "../../components/AuthenticFullTest";
-import { AuthenticFullTestV2 } from "../../components/AuthenticFullTestV2";
+import { favoritesApi, practiceApi } from "../../api/services";
+import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { PartSelectionModal } from "../../components/PartSelectionModal";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import { SimulationMode } from "../../components/SimulationMode";
-import { SubscriptionPlansModal } from "../../components/SubscriptionPlansModal";
 import { UsageLimitModal } from "../../components/UsageLimitModal";
 import { VoiceConversation } from "../../components/VoiceConversationV2";
+import { useTheme } from "../../context";
+import { useThemedStyles, useUsageGuard } from "../../hooks";
+import { useNetworkStatus } from "../../hooks/useNetworkStatus";
+import type { MainTabParamList } from "../../navigation/AppNavigator";
 import { resultsStorage } from "../../services/resultsStorage";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { extractErrorMessage } from "../../utils/errors";
+import { uuidv4 } from "../../utils/uuid";
 import { EvaluationResultsScreen } from "../EvaluationResults/EvaluationResultsScreen";
 
-// For demo purposes - in production, get this from auth context
-const DEMO_USER_ID = "demo-user-123";
+type VoiceTestScreenRouteProp = RouteProp<MainTabParamList, "VoiceTest">;
 
 export const VoiceTestScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<VoiceTestScreenRouteProp>();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const { isOffline } = useNetworkStatus();
+
+  const favoriteQuestionsQuery = useQuery({
+    queryKey: ["favorites", "ielts_question"],
+    queryFn: () => favoritesApi.list("ielts_question"),
+    enabled: !isOffline,
+  });
+
+  const favoriteQuestionIds = useMemo(
+    () => new Set<string>(favoriteQuestionsQuery.data ?? []),
+    [favoriteQuestionsQuery.data]
+  );
+
+  const toggleQuestionFavorite = useMutation({
+    mutationFn: async (payload: { questionId: string; isFavorite: boolean }) => {
+      if (payload.isFavorite) {
+        await favoritesApi.remove("ielts_question", payload.questionId);
+        return;
+      }
+      await favoritesApi.add({ entityType: "ielts_question", entityId: payload.questionId });
+    },
+    onSuccess: () => {
+      queryClient
+        .invalidateQueries({ queryKey: ["favorites", "ielts_question"] })
+        .catch(() => undefined);
+    },
+    onError: (error) => {
+      Alert.alert("Unable to update favorite", extractErrorMessage(error));
+    },
+  });
+
   const [showVoiceUI, setShowVoiceUI] = useState(false);
   const [showPartSelection, setShowPartSelection] = useState(false);
   const [selectedPart, setSelectedPart] = useState<1 | 2 | 3>(1);
-  const [mode, setMode] = useState<
-    "practice" | "simulation" | "fulltest" | "fulltest-v2"
-  >("practice");
   const [currentTopic, setCurrentTopic] = useState<GeneratedTopic | null>(null);
   const [isLoadingTopic, setIsLoadingTopic] = useState(false);
+
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [evaluationData, setEvaluationData] = useState<any>(null);
 
-  // Session tracking for analytics
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
 
-  // Subscription state
-  const [currentTier, setCurrentTier] = useState<string>("free");
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [showPlansModal, setShowPlansModal] = useState(false);
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<any>(null);
+  const { ensureCanStart, limitState, dismissLimit, refreshUsage, subscriptionInfo } =
+    useUsageGuard();
 
-  // Load subscription plans on mount
+  // Handle retry from results screen
   useEffect(() => {
-    loadPlans();
-  }, []);
-
-  const loadPlans = async () => {
-    try {
-      const subscriptionPlans = await getSubscriptionPlans();
-      setPlans(subscriptionPlans);
-    } catch (error) {
-      console.error("Failed to load plans:", error);
+    const retry = (route.params as any)?.retryData as
+      | { part: 1 | 2 | 3; topic: string; question: string }
+      | undefined;
+    if (!retry) {
+      return;
     }
-  };
 
-  const startPractice = async () => {
-    try {
-      // Check usage limit first
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "practice");
+    const retryTopic: GeneratedTopic = {
+      question: retry.question,
+      category: `part${retry.part}` as "part1" | "part2" | "part3",
+      difficulty: "medium",
+      keywords: [retry.topic],
+      cueCard:
+        retry.part === 2
+          ? {
+              mainTopic: retry.topic,
+              bulletPoints: [],
+              timeToSpeak: 120,
+              preparationTime: 60,
+            }
+          : undefined,
+    };
 
-      if (!limitCheck.allowed) {
-        // Show limit modal
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
+    setCurrentTopic(retryTopic);
+    setSelectedPart(retry.part);
+    setSessionId(uuidv4());
+    setSessionStartTime(Date.now());
+    setShowVoiceUI(true);
 
-      // Show part selection modal
-      setShowPartSelection(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start practice. Please try again.", [
-        { text: "OK" },
-      ]);
+    navigation.setParams({ retryData: undefined } as any);
+  }, [navigation, route.params]);
+
+  const startPractice = useCallback(() => {
+    if (!ensureCanStart("practice")) {
+      return;
     }
-  };
+    setShowPartSelection(true);
+  }, [ensureCanStart]);
 
-  const handlePartSelected = async (part: 1 | 2 | 3) => {
-    try {
-      setSelectedPart(part);
-      setIsLoadingTopic(true);
+  const handlePartSelected = useCallback(
+    async (part: 1 | 2 | 3) => {
+      try {
+        setSelectedPart(part);
+        setIsLoadingTopic(true);
 
-      // Map part to topic part name
-      const partName = `part${part}` as "part1" | "part2" | "part3";
+        const partName = `part${part}` as "part1" | "part2" | "part3";
+        const usedQuestions = await resultsStorage.getUsedQuestions();
 
-      // Get list of used questions to avoid duplicates
-      const usedQuestions = await resultsStorage.getUsedQuestions();
-      console.log(`📋 Used questions count: ${usedQuestions.length}`);
+        const topic = await getCachedRandomTopic(partName, "medium", usedQuestions);
+        await resultsStorage.markQuestionAsUsed(topic.question, part);
 
-      // Get a random question for the selected part (excluding used ones)
-      const topic = await getCachedRandomTopic(
-        partName,
-        "medium",
-        usedQuestions
-      );
-
-      console.log(`📝 Got Part ${part} topic:`, topic);
-
-      // Mark this question as used
-      await resultsStorage.markQuestionAsUsed(topic.question, part);
-
-      setCurrentTopic(topic);
-      setMode("practice");
-      setShowVoiceUI(true);
-    } catch (error: any) {
-      console.error("Failed to get topic:", error);
-      const errorMessage = error.message?.includes("timeout")
-        ? "Request took too long. The AI is generating your topic. Please try again."
-        : "Failed to load practice question. Please check your connection and try again.";
-
-      Alert.alert("Connection Error", errorMessage, [{ text: "OK" }]);
-    } finally {
-      setIsLoadingTopic(false);
-    }
-  };
-
-  const startSimulation = async () => {
-    try {
-      // Check usage limit first
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "simulation");
-
-      if (!limitCheck.allowed) {
-        // Show limit modal
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
-
-      setMode("simulation");
-
-      // Start session tracking
-      const newSessionId = `session_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      setSessionId(newSessionId);
-      setSessionStartTime(Date.now());
-
-      setShowVoiceUI(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start simulation. Please try again.", [
-        { text: "OK" },
-      ]);
-    }
-  };
-
-  const startFullTest = async () => {
-    try {
-      // Full test uses simulation quota
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "simulation");
-
-      if (!limitCheck.allowed) {
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
-
-      setMode("fulltest");
-
-      // Start session tracking
-      const newSessionId = `fulltest_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      setSessionId(newSessionId);
-      setSessionStartTime(Date.now());
-
-      setShowVoiceUI(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start full test. Please try again.", [
-        { text: "OK" },
-      ]);
-    }
-  };
-
-  const handleSessionEnd = async () => {
-    setShowVoiceUI(false);
-    // Note: Usage logging is handled by the backend automatically
-    // through practice session completion endpoints
-  };
-
-  const handleEvaluationComplete = async (data: {
-    overallBand: number;
-    criteria: any;
-    corrections: any[];
-    suggestions: any[];
-    transcript: string;
-    audioUri: string;
-    duration: number;
-    bandComparison?: any;
-  }) => {
-    let normalizedData: any = null;
-    try {
-      const normalizeArray = <T,>(value: T[] | undefined | null): T[] =>
-        Array.isArray(value) ? value : [];
-
-      const sanitizeLinkingGroups = (value: any) =>
-        normalizeArray(value)
-          .map((group: any) => ({
-            context:
-              typeof group?.context === "string" ? group.context.trim() : "",
-            phrases: normalizeArray(group?.phrases).filter(
-              (phrase): phrase is string =>
-                typeof phrase === "string" && phrase.trim().length > 0
-            ),
-          }))
-          .filter(
-            (group) => group.context.length > 0 || group.phrases.length > 0
-          );
-
-      const sanitizeVocabularyAlternatives = (value: any) =>
-        normalizeArray(value)
-          .map((entry: any) => ({
-            original:
-              typeof entry?.original === "string" ? entry.original.trim() : "",
-            alternatives: normalizeArray(entry?.alternatives).filter(
-              (alt): alt is string =>
-                typeof alt === "string" && alt.trim().length > 0
-            ),
-            exampleSentence:
-              typeof entry?.exampleSentence === "string"
-                ? entry.exampleSentence.trim()
-                : "",
-          }))
-          .filter(
-            (entry) =>
-              entry.original.length > 0 || entry.alternatives.length > 0
-          );
-
-      const sanitizeDetailedExamples = (value: any) =>
-        normalizeArray(value)
-          .map((entry: any) => ({
-            issue: typeof entry?.issue === "string" ? entry.issue.trim() : "",
-            yourResponse:
-              typeof entry?.yourResponse === "string"
-                ? entry.yourResponse.trim()
-                : "",
-            betterAlternative:
-              typeof entry?.betterAlternative === "string"
-                ? entry.betterAlternative.trim()
-                : "",
-            explanation:
-              typeof entry?.explanation === "string"
-                ? entry.explanation.trim()
-                : "",
-            suggestion:
-              typeof entry?.suggestion === "string"
-                ? entry.suggestion.trim()
-                : undefined,
-          }))
-          .filter(
-            (entry) =>
-              entry.issue.length > 0 ||
-              entry.yourResponse.length > 0 ||
-              entry.betterAlternative.length > 0 ||
-              entry.explanation.length > 0
-          );
-
-      const sanitizeCollocations = (value: any) =>
-        normalizeArray(value)
-          .map((entry: any) => ({
-            phrase:
-              typeof entry?.phrase === "string" ? entry.phrase.trim() : "",
-            example:
-              typeof entry?.example === "string" ? entry.example.trim() : "",
-          }))
-          .filter(
-            (entry) => entry.phrase.length > 0 || entry.example.length > 0
-          );
-
-      const sanitizeCorrections = (value: any) =>
-        normalizeArray(value)
-          .map((entry: any) => ({
-            original:
-              typeof entry?.original === "string" ? entry.original.trim() : "",
-            corrected:
-              typeof entry?.corrected === "string"
-                ? entry.corrected.trim()
-                : "",
-            explanation:
-              typeof entry?.explanation === "string"
-                ? entry.explanation.trim()
-                : "",
-          }))
-          .filter(
-            (entry) => entry.original.length > 0 || entry.corrected.length > 0
-          );
-
-      const sanitizeSuggestions = (value: any) =>
-        normalizeArray(value)
-          .map((entry: any) =>
-            typeof entry === "string"
-              ? entry.trim()
-              : typeof entry?.suggestion === "string"
-              ? entry.suggestion.trim()
-              : ""
+        setCurrentTopic(topic);
+        setSessionId(uuidv4());
+        setSessionStartTime(Date.now());
+        setShowVoiceUI(true);
+      } catch (error) {
+        Alert.alert(
+          "Unable to start",
+          extractErrorMessage(
+            error,
+            "Failed to load a practice question. Please check your connection and try again."
           )
-          .filter((entry) => entry.length > 0);
+        );
+      } finally {
+        setIsLoadingTopic(false);
+      }
+    },
+    []
+  );
 
-      const ensureCriteriaSection = (
-        section: any,
-        options?: { includeLexicalExtras?: boolean; includeLinking?: boolean }
-      ) => {
-        const strengths = normalizeArray(section?.strengths).filter(
-          (item): item is string =>
-            typeof item === "string" && item.trim().length > 0
-        );
-        const improvements = normalizeArray(section?.improvements).filter(
-          (item): item is string =>
-            typeof item === "string" && item.trim().length > 0
-        );
-        const detailedExamples = sanitizeDetailedExamples(
-          section?.detailedExamples
-        );
+  const handleSessionEnd = useCallback(async () => {
+    setShowVoiceUI(false);
+    await refreshUsage();
+  }, [refreshUsage]);
 
-        return {
-          band: typeof section?.band === "number" ? section.band : 0,
-          feedback:
-            typeof section?.feedback === "string" ? section.feedback : "",
-          strengths,
-          improvements,
-          detailedExamples,
-          linkingPhrases: options?.includeLinking
-            ? sanitizeLinkingGroups(section?.linkingPhrases)
-            : undefined,
-          vocabularyAlternatives: options?.includeLexicalExtras
-            ? sanitizeVocabularyAlternatives(section?.vocabularyAlternatives)
-            : undefined,
-          collocations: options?.includeLexicalExtras
-            ? sanitizeCollocations(section?.collocations)
-            : undefined,
+  const handleEvaluationComplete = useCallback(
+    async (data: {
+      overallBand: number;
+      spokenSummary?: string;
+      criteria: any;
+      corrections: any[];
+      suggestions: any[];
+      transcript: string;
+      audioUri: string;
+      audioRecordingId?: string;
+      sessionId?: string;
+      duration: number;
+      bandComparison?: any;
+    }) => {
+      let normalizedData: any = null;
+      try {
+        const normalizeArray = <T,>(value: T[] | undefined | null): T[] =>
+          Array.isArray(value) ? value : [];
+
+        const sanitizeLinkingGroups = (value: any) =>
+          normalizeArray(value)
+            .map((group: any) => ({
+              context:
+                typeof group?.context === "string" ? group.context.trim() : "",
+              phrases: normalizeArray(group?.phrases).filter(
+                (phrase): phrase is string =>
+                  typeof phrase === "string" && phrase.trim().length > 0
+              ),
+            }))
+            .filter(
+              (group) => group.context.length > 0 || group.phrases.length > 0
+            );
+
+        const sanitizeVocabularyAlternatives = (value: any) =>
+          normalizeArray(value)
+            .map((entry: any) => ({
+              original:
+                typeof entry?.original === "string" ? entry.original.trim() : "",
+              alternatives: normalizeArray(entry?.alternatives).filter(
+                (alt): alt is string =>
+                  typeof alt === "string" && alt.trim().length > 0
+              ),
+              exampleSentence:
+                typeof entry?.exampleSentence === "string"
+                  ? entry.exampleSentence.trim()
+                  : "",
+            }))
+            .filter(
+              (entry) =>
+                entry.original.length > 0 || entry.alternatives.length > 0
+            );
+
+        const sanitizeDetailedExamples = (value: any) =>
+          normalizeArray(value)
+            .map((entry: any) => ({
+              issue: typeof entry?.issue === "string" ? entry.issue.trim() : "",
+              yourResponse:
+                typeof entry?.yourResponse === "string"
+                  ? entry.yourResponse.trim()
+                  : "",
+              betterAlternative:
+                typeof entry?.betterAlternative === "string"
+                  ? entry.betterAlternative.trim()
+                  : "",
+              explanation:
+                typeof entry?.explanation === "string"
+                  ? entry.explanation.trim()
+                  : "",
+              suggestion:
+                typeof entry?.suggestion === "string"
+                  ? entry.suggestion.trim()
+                  : undefined,
+            }))
+            .filter(
+              (entry) =>
+                entry.issue.length > 0 ||
+                entry.yourResponse.length > 0 ||
+                entry.betterAlternative.length > 0 ||
+                entry.explanation.length > 0
+            );
+
+        const sanitizeCollocations = (value: any) =>
+          normalizeArray(value)
+            .map((entry: any) => ({
+              phrase: typeof entry?.phrase === "string" ? entry.phrase.trim() : "",
+              example: typeof entry?.example === "string" ? entry.example.trim() : "",
+            }))
+            .filter(
+              (entry) => entry.phrase.length > 0 || entry.example.length > 0
+            );
+
+        const sanitizeCorrections = (value: any) =>
+          normalizeArray(value)
+            .map((entry: any) => ({
+              original:
+                typeof entry?.original === "string" ? entry.original.trim() : "",
+              corrected:
+                typeof entry?.corrected === "string"
+                  ? entry.corrected.trim()
+                  : "",
+              explanation:
+                typeof entry?.explanation === "string"
+                  ? entry.explanation.trim()
+                  : "",
+            }))
+            .filter(
+              (entry) => entry.original.length > 0 || entry.corrected.length > 0
+            );
+
+        const sanitizeSuggestions = (value: any) =>
+          normalizeArray(value)
+            .map((entry: any) =>
+              typeof entry === "string"
+                ? entry.trim()
+                : typeof entry?.suggestion === "string"
+                ? entry.suggestion.trim()
+                : ""
+            )
+            .filter((entry) => entry.length > 0);
+
+        const ensureCriteriaSection = (
+          section: any,
+          options?: { includeLexicalExtras?: boolean; includeLinking?: boolean }
+        ) => {
+          const strengths = normalizeArray(section?.strengths).filter(
+            (item): item is string =>
+              typeof item === "string" && item.trim().length > 0
+          );
+          const improvements = normalizeArray(section?.improvements).filter(
+            (item): item is string =>
+              typeof item === "string" && item.trim().length > 0
+          );
+          const detailedExamples = sanitizeDetailedExamples(section?.detailedExamples);
+
+          return {
+            band: typeof section?.band === "number" ? section.band : 0,
+            feedback: typeof section?.feedback === "string" ? section.feedback : "",
+            strengths,
+            improvements,
+            detailedExamples,
+            linkingPhrases: options?.includeLinking
+              ? sanitizeLinkingGroups(section?.linkingPhrases)
+              : undefined,
+            vocabularyAlternatives: options?.includeLexicalExtras
+              ? sanitizeVocabularyAlternatives(section?.vocabularyAlternatives)
+              : undefined,
+            collocations: options?.includeLexicalExtras
+              ? sanitizeCollocations(section?.collocations)
+              : undefined,
+          };
         };
-      };
 
-      const overallBand =
-        typeof data.overallBand === "number" ? data.overallBand : 0;
+        const overallBand =
+          typeof data.overallBand === "number" ? data.overallBand : 0;
 
-      const ensureBandComparison = (comparison: any) => {
-        if (!comparison) {
-          return undefined;
-        }
+        const ensureBandComparison = (comparison: any) => {
+          if (!comparison) {
+            return undefined;
+          }
 
-        const fallbackNextBand = Math.min(overallBand + 0.5, 9);
-        const currentBandLabel =
-          typeof comparison.currentBandLabel === "string" &&
-          comparison.currentBandLabel.trim().length > 0
-            ? comparison.currentBandLabel.trim()
-            : `Band ${overallBand.toFixed(1)} Overview`;
+          const fallbackNextBand = Math.min(overallBand + 0.5, 9);
+          const currentBandLabel =
+            typeof comparison.currentBandLabel === "string" &&
+            comparison.currentBandLabel.trim().length > 0
+              ? comparison.currentBandLabel.trim()
+              : `Band ${overallBand.toFixed(1)} Overview`;
 
-        const nextBandLabel =
-          typeof comparison.nextBandLabel === "string" &&
-          comparison.nextBandLabel.trim().length > 0
-            ? comparison.nextBandLabel.trim()
-            : "Next Band Target";
+          const nextBandLabel =
+            typeof comparison.nextBandLabel === "string" &&
+            comparison.nextBandLabel.trim().length > 0
+              ? comparison.nextBandLabel.trim()
+              : "Next Band Target";
 
-        const nextBandExample = comparison.nextBandExample || {};
+          const nextBandExample = comparison.nextBandExample || {};
 
-        const sanitizedResponse =
-          typeof nextBandExample.response === "string" &&
-          nextBandExample.response.trim().length > 0
-            ? nextBandExample.response.trim()
-            : "A higher-band speaker would extend ideas with precise vocabulary, cohesive linking devices, and clearer examples related to the question.";
+          const sanitizedResponse =
+            typeof nextBandExample.response === "string" &&
+            nextBandExample.response.trim().length > 0
+              ? nextBandExample.response.trim()
+              : "";
 
-        return {
-          currentBandLabel,
-          currentBandCharacteristics: normalizeArray(
-            comparison.currentBandCharacteristics
-          ).filter(
-            (item): item is string =>
-              typeof item === "string" && item.trim().length > 0
-          ),
-          nextBandLabel,
-          nextBandCharacteristics: normalizeArray(
-            comparison.nextBandCharacteristics
-          ).filter(
-            (item): item is string =>
-              typeof item === "string" && item.trim().length > 0
-          ),
-          nextBandExample: {
-            band:
-              typeof nextBandExample.band === "number"
-                ? nextBandExample.band
-                : fallbackNextBand,
-            title:
-              typeof nextBandExample.title === "string"
-                ? nextBandExample.title.trim()
-                : undefined,
-            response: sanitizedResponse,
-            highlights: normalizeArray(nextBandExample.highlights).filter(
+          return {
+            currentBandLabel,
+            currentBandCharacteristics: normalizeArray(
+              comparison.currentBandCharacteristics
+            ).filter(
               (item): item is string =>
                 typeof item === "string" && item.trim().length > 0
             ),
-          },
-          band9Example:
-            typeof comparison.band9Example === "string" &&
-            comparison.band9Example.trim().length > 0
-              ? comparison.band9Example.trim()
-              : "A Band 9 response delivers a fully developed, coherent answer with sophisticated, precise vocabulary, effortless control of complex grammar, and native-like pronunciation throughout.",
+            nextBandLabel,
+            nextBandCharacteristics: normalizeArray(
+              comparison.nextBandCharacteristics
+            ).filter(
+              (item): item is string =>
+                typeof item === "string" && item.trim().length > 0
+            ),
+            nextBandExample: sanitizedResponse
+              ? {
+                  band:
+                    typeof nextBandExample.band === "number"
+                      ? nextBandExample.band
+                      : fallbackNextBand,
+                  title:
+                    typeof nextBandExample.title === "string"
+                      ? nextBandExample.title.trim()
+                      : undefined,
+                  response: sanitizedResponse,
+                  highlights: normalizeArray(nextBandExample.highlights).filter(
+                    (item): item is string =>
+                      typeof item === "string" && item.trim().length > 0
+                  ),
+                }
+              : undefined,
+            band9Example:
+              typeof comparison.band9Example === "string"
+                ? comparison.band9Example.trim()
+                : "",
+          };
         };
-      };
 
-      normalizedData = {
-        ...data,
-        overallBand,
-        criteria: {
-          fluencyCoherence: ensureCriteriaSection(
-            data.criteria?.fluencyCoherence,
-            { includeLinking: true }
-          ),
-          lexicalResource: ensureCriteriaSection(
-            data.criteria?.lexicalResource,
-            {
-              includeLexicalExtras: true,
-            }
-          ),
-          grammaticalRange: ensureCriteriaSection(
-            data.criteria?.grammaticalRange
-          ),
-          pronunciation: ensureCriteriaSection(data.criteria?.pronunciation),
-        },
-        corrections: sanitizeCorrections(data.corrections),
-        suggestions: sanitizeSuggestions(data.suggestions),
-        bandComparison: ensureBandComparison(data.bandComparison),
-        testPart: `Part ${selectedPart}`,
-      };
+        const criteria = {
+          fluencyCoherence: ensureCriteriaSection(data.criteria?.fluencyCoherence),
+          lexicalResource: ensureCriteriaSection(data.criteria?.lexicalResource, {
+            includeLexicalExtras: true,
+          }),
+          grammaticalRange: ensureCriteriaSection(data.criteria?.grammaticalRange),
+          pronunciation: ensureCriteriaSection(data.criteria?.pronunciation, {
+            includeLinking: true,
+          }),
+        };
 
-      const criteriaSummary = {
-        fluency: {
-          score: normalizedData.criteria.fluencyCoherence.band || 0,
-          feedback: normalizedData.criteria.fluencyCoherence.feedback || "",
-        },
-        lexicalResource: {
-          score: normalizedData.criteria.lexicalResource.band || 0,
-          feedback: normalizedData.criteria.lexicalResource.feedback || "",
-        },
-        grammaticalRange: {
-          score: normalizedData.criteria.grammaticalRange.band || 0,
-          feedback: normalizedData.criteria.grammaticalRange.feedback || "",
-        },
-        pronunciation: {
-          score: normalizedData.criteria.pronunciation.band || 0,
-          feedback: normalizedData.criteria.pronunciation.feedback || "",
-        },
-      };
-
-      // Save result to AsyncStorage
-      const result = {
-        id: `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: Date.now(),
-        part: selectedPart,
-        topic: currentTopic?.category || "General",
-        question: currentTopic?.question || "",
-        transcript: normalizedData.transcript,
-        audioUri: normalizedData.audioUri,
-        evaluation: {
-          overallBand: normalizedData.overallBand,
-          criteria: criteriaSummary,
-          detailed: normalizedData.criteria,
-          corrections: normalizedData.corrections,
-          suggestions: normalizedData.suggestions,
-          bandComparison: normalizedData.bandComparison,
-        },
-        duration: normalizedData.duration,
-      };
-
-      await resultsStorage.savePracticeResult(result);
-      console.log("✅ Result saved to storage:", result.id);
-
-      // Store evaluation data for immediate display
-      setEvaluationData(normalizedData);
-
-      // Close voice UI modal
-      setShowVoiceUI(false);
-
-      // Show evaluation results modal
-      setShowEvaluation(true);
-    } catch (error) {
-      console.error("❌ Failed to save result:", error);
-
-      // Still show evaluation even if save failed
-      setEvaluationData(
-        normalizedData || {
-          ...data,
+        normalizedData = {
+          overallBand,
+          spokenSummary: data.spokenSummary,
+          criteria,
+          corrections: sanitizeCorrections(data.corrections),
+          suggestions: sanitizeSuggestions(data.suggestions),
+          transcript: data.transcript || "",
+          audioUri: data.audioUri,
+          duration: data.duration,
+          bandComparison: ensureBandComparison(data.bandComparison),
           testPart: `Part ${selectedPart}`,
+          sessionId: data.sessionId || sessionId || undefined,
+          audioRecordingId: data.audioRecordingId,
+        };
+
+        // Persist to backend practice history (canonical) so Results is fully server-backed.
+        const voiceSessionId = String(normalizedData.sessionId || "").trim();
+        const audioRecordingId = String(normalizedData.audioRecordingId || "").trim();
+        if (!voiceSessionId) {
+          throw new Error("Missing session id for voice session");
         }
-      );
-      setShowVoiceUI(false);
-      setShowEvaluation(true);
-    }
-  };
+        if (!audioRecordingId) {
+          throw new Error("Missing audio recording id from transcription");
+        }
 
-  const handleSelectPlan = async (tier: "free" | "premium" | "pro") => {
-    try {
-      await upgradeSubscription(DEMO_USER_ID, tier);
-      setCurrentTier(tier);
-      setShowPlansModal(false);
+        const topicTitle =
+          currentTopic?.cueCard?.mainTopic ||
+          currentTopic?.keywords?.[0] ||
+          currentTopic?.category ||
+          "Voice practice";
 
-      Alert.alert(
-        "Success!",
-        `You've been upgraded to ${tier}. Enjoy unlimited access!`,
-        [{ text: "OK" }]
-      );
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to upgrade subscription", [
-        { text: "OK" },
-      ]);
-    }
-  };
+        await practiceApi.voiceComplete({
+          sessionId: voiceSessionId,
+          questionId: currentTopic?.questionId,
+          topicTitle,
+          question: currentTopic?.question || "",
+          part: selectedPart,
+          difficulty: currentTopic?.difficulty,
+          durationSeconds: Number(normalizedData.duration || 0),
+          transcript: normalizedData.transcript,
+          evaluation: {
+            overallBand: normalizedData.overallBand,
+            spokenSummary: normalizedData.spokenSummary,
+            criteria: normalizedData.criteria,
+            corrections: normalizedData.corrections,
+            suggestions: normalizedData.suggestions,
+            bandComparison: normalizedData.bandComparison,
+          },
+          audioRecordingId,
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["practice-results"] }).catch(() => undefined);
+        queryClient.invalidateQueries({ queryKey: ["practice-sessions"] }).catch(() => undefined);
+        queryClient.invalidateQueries({ queryKey: ["recordings"] }).catch(() => undefined);
+
+        setEvaluationData(normalizedData);
+        setShowVoiceUI(false);
+        setShowEvaluation(true);
+        await refreshUsage();
+      } catch (error) {
+        setEvaluationData(normalizedData || { ...data, testPart: `Part ${selectedPart}` });
+        setShowVoiceUI(false);
+        setShowEvaluation(true);
+      }
+    },
+    [currentTopic?.category, currentTopic?.question, queryClient, refreshUsage, selectedPart, sessionId]
+  );
+
+  const canUpgrade = !!subscriptionInfo?.stripe?.enabled;
+  const currentQuestionId = currentTopic?.questionId;
+  const isCurrentQuestionFavorited = currentQuestionId
+    ? favoriteQuestionIds.has(currentQuestionId)
+    : false;
 
   return (
-    <ScreenContainer scrollable>
+    <ScreenContainer>
       <View style={styles.container}>
-        <Text style={styles.title}>🎤 Voice Interface Demo</Text>
+        <Text style={styles.title}>Speak practice</Text>
         <Text style={styles.subtitle}>
-          Test the new ChatGPT-style voice conversation interface
+          Answer a real IELTS prompt out loud and get AI feedback with band
+          scores and actionable improvements.
         </Text>
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Practice Mode</Text>
+          <Text style={styles.cardTitle}>Start a voice session</Text>
           <Text style={styles.cardDescription}>
-            Record your answer to a single question. Get detailed AI feedback
-            with band scores.
+            Choose Part 1, 2, or 3. Record your answer and receive a full
+            breakdown.
           </Text>
+
           {isLoadingTopic ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading question...</Text>
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.loadingText}>Loading question…</Text>
             </View>
           ) : (
             <Button
-              title="Start Practice Session"
+              title="Choose a part"
               onPress={startPractice}
-              style={styles.button}
               disabled={showVoiceUI || isLoadingTopic}
             />
           )}
-          {showVoiceUI && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
         </Card>
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Full Test Simulation</Text>
+          <Text style={styles.cardTitle}>Take a mock test</Text>
           <Text style={styles.cardDescription}>
-            Real-time conversation with AI examiner. Complete all 3 parts of
-            IELTS Speaking Test.
+            Run a full simulation across Parts 1–3 and get overall feedback.
           </Text>
           <Button
-            title="Start Full Simulation"
-            onPress={startSimulation}
+            title="Start mock test"
             variant="secondary"
-            style={styles.button}
-            disabled={showVoiceUI || isLoadingTopic}
+            onPress={() =>
+              navigation.getParent?.()?.navigate?.("Simulations") ??
+              navigation.navigate("Simulations")
+            }
           />
-          {(showVoiceUI || isLoadingTopic) && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
         </Card>
-
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>🎯 Authentic Full Test (NEW)</Text>
-          <Text style={styles.cardDescription}>
-            Experience the REAL IELTS Speaking Test! No buttons, automatic flow,
-            just like the actual exam. All 3 parts with strict timing.
-          </Text>
-          <Button
-            title="Start Authentic Test"
-            onPress={startFullTest}
-            variant="primary"
-            style={styles.button}
-            disabled={showVoiceUI || isLoadingTopic}
-          />
-          {(showVoiceUI || isLoadingTopic) && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
-        </Card>
-
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>🎤 Simple Mic Test (V2)</Text>
-          <Text style={styles.cardDescription}>
-            NEW APPROACH: Simple mic button control. Press mic → Speak → Press
-            again to stop. Full IELTS test with 11-14 minute duration. Parts 1,
-            2, 3 with proper timing.
-          </Text>
-          <Button
-            title="Try Simple Mic Test"
-            onPress={() => {
-              setMode("fulltest-v2");
-              setShowVoiceUI(true);
-            }}
-            variant="primary"
-            style={styles.button}
-            disabled={showVoiceUI || isLoadingTopic}
-          />
-          {(showVoiceUI || isLoadingTopic) && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
-        </Card>
-
-        <View style={styles.features}>
-          <Text style={styles.featuresTitle}>✨ New Features:</Text>
-          <Text style={styles.feature}>
-            • Animated voice orb (like ChatGPT)
-          </Text>
-          <Text style={styles.feature}>• Real-time audio recording</Text>
-          <Text style={styles.feature}>• Premium dark UI design</Text>
-          <Text style={styles.feature}>• Smooth animations</Text>
-          <Text style={styles.feature}>• Mute/unmute controls</Text>
-        </View>
       </View>
 
-      <Modal
-        visible={showVoiceUI && mode === "practice"}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={handleSessionEnd}
-      >
-        <VoiceConversation
-          mode="practice"
-          question={currentTopic ? currentTopic.question : undefined}
-          topic={undefined}
-          part={selectedPart}
-          onEnd={handleSessionEnd}
-          onEvaluationComplete={handleEvaluationComplete}
-        />
-      </Modal>
-
-      {/* Authentic Full Test Modal */}
-      <Modal
-        visible={showVoiceUI && mode === "fulltest"}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={handleSessionEnd}
-      >
-        <AuthenticFullTest
-          onComplete={(results) => {
-            console.log("Full test complete:", results);
-            handleSessionEnd();
-            // TODO: Show results screen
-            Alert.alert(
-              "Test Complete!",
-              "Your authentic IELTS test has been completed. Results will be evaluated soon.",
-              [{ text: "OK" }]
-            );
-          }}
-          onExit={handleSessionEnd}
-        />
-      </Modal>
-
-      {/* Authentic Full Test V2 - Simple Mic Control */}
-      <Modal
-        visible={showVoiceUI && mode === "fulltest-v2"}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={handleSessionEnd}
-      >
-        <AuthenticFullTestV2
-          onComplete={(results) => {
-            console.log("Full test V2 complete:", results);
-            handleSessionEnd();
-            Alert.alert(
-              "Test Complete!",
-              "Your IELTS test has been completed. Well done!",
-              [{ text: "OK" }]
-            );
-          }}
-          onExit={handleSessionEnd}
-        />
-      </Modal>
-
-      {/* Part Selection Modal */}
       <PartSelectionModal
         visible={showPartSelection}
         onClose={() => setShowPartSelection(false)}
@@ -699,163 +520,141 @@ export const VoiceTestScreen: React.FC = () => {
       />
 
       <Modal
-        visible={showVoiceUI && mode === "simulation"}
+        visible={showVoiceUI}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={handleSessionEnd}
       >
-        <SimulationMode
-          onEnd={(evaluationData) => {
-            handleSessionEnd();
-            if (evaluationData) {
-              setEvaluationData(evaluationData);
-              setShowEvaluation(true);
-            }
-          }}
+        <VoiceConversation
+          mode="practice"
+          sessionId={sessionId || undefined}
+          question={currentTopic ? currentTopic.question : undefined}
+          topic={
+            currentTopic?.cueCard?.mainTopic ||
+            currentTopic?.keywords?.[0] ||
+            undefined
+          }
+          part={selectedPart}
+          isFavorited={isCurrentQuestionFavorited}
+          onToggleFavorite={
+            currentQuestionId
+              ? () =>
+                  toggleQuestionFavorite.mutate({
+                    questionId: currentQuestionId,
+                    isFavorite: isCurrentQuestionFavorited,
+                  })
+              : undefined
+          }
+          favoriteDisabled={isOffline || toggleQuestionFavorite.isPending}
+          onEnd={handleSessionEnd}
+          onEvaluationComplete={handleEvaluationComplete}
         />
       </Modal>
 
-      {/* Evaluation Results Modal */}
       <Modal
         visible={showEvaluation}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={() => setShowEvaluation(false)}
       >
-        {evaluationData && (
+        {evaluationData ? (
           <EvaluationResultsScreen
             overallBand={evaluationData.overallBand}
             criteria={evaluationData.criteria}
             corrections={evaluationData.corrections || []}
             suggestions={evaluationData.suggestions || []}
+            bandComparison={evaluationData.bandComparison}
             onClose={() => setShowEvaluation(false)}
             onTryAgain={async () => {
-              // When retrying, unmark the question so it can be used again
               if (currentTopic && selectedPart) {
-                await resultsStorage.unmarkQuestion(
-                  currentTopic.question,
-                  selectedPart
-                );
+                await resultsStorage.unmarkQuestion(currentTopic.question, selectedPart);
               }
               setShowEvaluation(false);
               setShowVoiceUI(true);
             }}
-            // Analytics data
-            userId={DEMO_USER_ID}
-            sessionId={sessionId || undefined}
-            testType={
-              mode === "fulltest" || mode === "fulltest-v2"
-                ? "simulation"
-                : mode
-            }
-            topic={currentTopic?.question || undefined}
+            userId={user?._id}
+            sessionId={evaluationData.sessionId || sessionId || undefined}
+            testType="practice"
+            topic={evaluationData.topic || currentTopic?.question || undefined}
             testPart={evaluationData.testPart}
+            audioRecordingId={evaluationData.audioRecordingId}
             durationSeconds={
-              sessionStartTime
+              evaluationData.durationSeconds !== undefined
+                ? evaluationData.durationSeconds
+                : sessionStartTime
                 ? Math.floor((Date.now() - sessionStartTime) / 1000)
                 : undefined
             }
           />
-        )}
+        ) : null}
       </Modal>
 
-      {/* Subscription Plans Modal */}
-      <SubscriptionPlansModal
-        visible={showPlansModal}
-        plans={plans}
-        currentTier={currentTier}
-        onClose={() => setShowPlansModal(false)}
-        onSelectPlan={handleSelectPlan}
-      />
-
-      {/* Usage Limit Modal */}
-      {limitInfo && (
+      {limitState ? (
         <UsageLimitModal
-          visible={showLimitModal}
-          sessionType={
-            mode === "fulltest" || mode === "fulltest-v2" ? "simulation" : mode
-          }
-          currentTier={limitInfo.tier}
-          used={limitInfo.used}
-          limit={limitInfo.limit}
-          resetDate={new Date(limitInfo.resetDate)}
-          onClose={() => setShowLimitModal(false)}
+          visible
+          sessionType={limitState.sessionType}
+          currentTier={limitState.currentTier}
+          used={limitState.used}
+          limit={limitState.limit}
+          resetDate={limitState.resetDate}
+          onClose={dismissLimit}
+          upgradeEnabled={canUpgrade}
           onUpgrade={() => {
-            setShowLimitModal(false);
-            setShowPlansModal(true);
+            dismissLimit();
+            if (!canUpgrade) {
+              Alert.alert(
+                "Unavailable",
+                "Billing is disabled in this build. Please try again after your usage resets."
+              );
+              return;
+            }
+            navigation.getParent?.()?.navigate?.("Profile") ?? navigation.navigate("Profile");
           }}
         />
-      )}
+      ) : null}
     </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: spacing.lg,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textMuted,
-    marginBottom: spacing.xl,
-  },
-  card: {
-    marginBottom: spacing.md,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-    lineHeight: 20,
-  },
-  button: {
-    marginTop: spacing.sm,
-  },
-  features: {
-    marginTop: spacing.xl,
-    padding: spacing.md,
-    backgroundColor: colors.backgroundMuted,
-    borderRadius: 12,
-  },
-  featuresTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  feature: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    lineHeight: 20,
-  },
-  loadingContainer: {
-    paddingVertical: spacing.md,
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  disabledText: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: "center",
-    fontStyle: "italic",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: spacing.lg,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+      marginBottom: spacing.lg,
+    },
+    card: {
+      marginBottom: spacing.md,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    cardDescription: {
+      color: colors.textSecondary,
+      marginBottom: spacing.sm,
+      lineHeight: 20,
+    },
+    loadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+  });

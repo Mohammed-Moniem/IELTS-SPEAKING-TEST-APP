@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface ReferralStats {
   referralCode: string;
@@ -15,6 +13,11 @@ export interface ReferralStats {
   canReferToday: boolean;
   remainingToday: number;
 }
+
+type ReferralStatsPayload = Partial<ReferralStats> & {
+  code?: string;
+  link?: string;
+};
 
 export interface ReferralHistory {
   _id: string;
@@ -45,38 +48,20 @@ export interface ReferralLeaderboardEntry {
   rank: number;
 }
 
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
-
 class ReferralService {
   /**
    * Get user's referral code and stats
    */
-  async getReferralCode(): Promise<ReferralStats> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/referrals/code`, {
-      headers,
-    });
+  async getReferralCode(): Promise<ReferralStatsPayload> {
+    const response = await apiClient.get(`/referrals/code`);
     return response.data.data;
   }
 
   /**
    * Get referral statistics
    */
-  async getReferralStats(): Promise<ReferralStats> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/referrals/stats`, {
-      headers,
-    });
+  async getReferralStats(): Promise<ReferralStatsPayload> {
+    const response = await apiClient.get(`/referrals/stats`);
     return response.data.data;
   }
 
@@ -84,10 +69,7 @@ class ReferralService {
    * Get referral history
    */
   async getReferralHistory(): Promise<ReferralHistory[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/referrals/history`, {
-      headers,
-    });
+    const response = await apiClient.get(`/referrals/history`);
     return response.data.data;
   }
 
@@ -97,14 +79,9 @@ class ReferralService {
   async getReferralLeaderboard(
     limit: number = 10
   ): Promise<ReferralLeaderboardEntry[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(
-      `${API_BASE_URL}/referrals/leaderboard`,
-      {
-        headers,
-        params: { limit },
-      }
-    );
+    const response = await apiClient.get(`/referrals/leaderboard`, {
+      params: { limit },
+    });
     return response.data.data;
   }
 }

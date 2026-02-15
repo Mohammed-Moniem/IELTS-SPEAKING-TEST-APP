@@ -2,6 +2,7 @@ import { AxiosResponse } from "axios";
 
 import {
   AuthResponse,
+  NotificationSettings,
   PracticeSession,
   PracticeSessionStart,
   Preferences,
@@ -25,6 +26,7 @@ export const authApi = {
     firstName: string;
     lastName: string;
     phone?: string;
+    referralCode?: string;
   }) => unwrap<AuthResponse>(apiClient.post("/auth/register", payload)),
   login: (payload: { email: string; password: string }) =>
     unwrap<AuthResponse>(apiClient.post("/auth/login", payload)),
@@ -32,6 +34,20 @@ export const authApi = {
     unwrap<AuthResponse>(apiClient.post("/auth/refresh", { refreshToken })),
   logout: (refreshToken: string) =>
     unwrap<void>(apiClient.post("/auth/logout", { refreshToken })),
+  guestSession: (payload: { deviceId: string }) =>
+    unwrap<AuthResponse>(apiClient.post("/auth/guest-session", payload)),
+  upgradeGuest: (payload: {
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    referralCode?: string;
+  }) => unwrap<AuthResponse>(apiClient.post("/auth/upgrade-guest", payload)),
+  requestPasswordReset: (payload: { email: string }) =>
+    unwrap<void>(apiClient.post("/auth/password-reset/request", payload)),
+  confirmPasswordReset: (payload: { token: string; newPassword: string }) =>
+    unwrap<void>(apiClient.post("/auth/password-reset/confirm", payload)),
 };
 
 export const userApi = {
@@ -40,7 +56,19 @@ export const userApi = {
     firstName?: string;
     lastName?: string;
     phone?: string;
+    appTheme?: string;
   }) => unwrap<User>(apiClient.patch("/users/me", payload)),
+};
+
+export const profileApi = {
+  stats: (userId: string) => unwrap<any>(apiClient.get(`/profile/stats/${userId}`)),
+};
+
+export const analyticsApi = {
+  progress: (
+    userId: string,
+    params?: { daysBack?: number; includeTests?: number }
+  ) => unwrap<any>(apiClient.get(`/analytics/progress/${userId}`, { params })),
 };
 
 export const usageApi = {
@@ -54,6 +82,8 @@ export const topicApi = {
     offset?: number;
     excludeCompleted?: boolean;
     category?: "part1" | "part2" | "part3";
+    difficulty?: "beginner" | "intermediate" | "advanced";
+    q?: string;
   }) =>
     unwrap<{
       topics: Topic[];
@@ -105,9 +135,6 @@ export const practiceApi = {
 
     return unwrap<PracticeSession & { transcription?: any }>(
       apiClient.post(`/practice/sessions/${sessionId}/audio`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const progress = (progressEvent.loaded / progressEvent.total) * 100;
@@ -123,6 +150,18 @@ export const practiceApi = {
     topicId?: string;
   }) =>
     unwrap<PracticeSession[]>(apiClient.get("/practice/sessions", { params })),
+  voiceComplete: (payload: {
+    sessionId: string;
+    questionId?: string;
+    topicTitle: string;
+    question: string;
+    part: 1 | 2 | 3;
+    difficulty?: "easy" | "medium" | "hard";
+    durationSeconds: number;
+    transcript: string;
+    evaluation: any;
+    audioRecordingId: string;
+  }) => unwrap<PracticeSession>(apiClient.post("/practice/voice-complete", payload)),
 };
 
 export const simulationApi = {
@@ -159,6 +198,7 @@ export const subscriptionApi = {
     unwrap<SubscriptionInfo>(apiClient.get("/subscription/current")),
   checkout: (payload: {
     planType: "premium" | "pro";
+    couponCode?: string;
     successUrl?: string;
     cancelUrl?: string;
   }) =>
@@ -168,4 +208,43 @@ export const subscriptionApi = {
       publishableKey?: string | null;
     }>(apiClient.post("/subscription/checkout", payload)),
   config: () => unwrap<StripeConfig>(apiClient.get("/subscription/config")),
+};
+
+export const notificationsApi = {
+  getPreferences: () =>
+    unwrap<NotificationSettings>(apiClient.get("/notifications/preferences")),
+  updatePreferences: (payload: NotificationSettings) =>
+    unwrap<NotificationSettings>(
+      apiClient.put("/notifications/preferences", payload)
+    ),
+  registerDevice: (token: string) =>
+    unwrap<void>(apiClient.post("/notifications/device", { token })),
+  unregisterDevice: (token: string) =>
+    unwrap<void>(
+      apiClient.delete("/notifications/device", {
+        data: { token },
+      })
+    ),
+};
+
+export const favoritesApi = {
+  list: (entityType: "topic" | "ielts_question" | "practice_session" | "test_simulation" | "audio_recording") =>
+    unwrap<string[]>(apiClient.get("/favorites", { params: { entityType } })),
+  add: (payload: {
+    entityType: "topic" | "ielts_question" | "practice_session" | "test_simulation" | "audio_recording";
+    entityId: string;
+  }) => unwrap<void>(apiClient.post("/favorites", payload)),
+  remove: (entityType: string, entityId: string) =>
+    unwrap<void>(apiClient.delete(`/favorites/${entityType}/${entityId}`)),
+};
+
+export const supportApi = {
+  createTicket: (payload: { subject: string; message: string; context?: Record<string, any> }) =>
+    unwrap<{ ticketId: string; createdAt: string }>(apiClient.post("/support/tickets", payload)),
+  listTickets: () => unwrap<any[]>(apiClient.get("/support/tickets")),
+};
+
+export const accountApi = {
+  export: () => unwrap<any>(apiClient.get("/account/export")),
+  delete: () => unwrap<void>(apiClient.delete("/account")),
 };

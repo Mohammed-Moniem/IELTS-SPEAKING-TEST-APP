@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface LeaderboardEntry {
   userId: {
@@ -26,18 +24,6 @@ export interface UserPosition {
 type LeaderboardPeriod = "all-time" | "daily" | "weekly" | "monthly";
 type LeaderboardMetric = "score" | "practices" | "achievements" | "streak";
 
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
-
 class LeaderboardService {
   /**
    * Get leaderboard rankings
@@ -47,9 +33,7 @@ class LeaderboardService {
     metric: LeaderboardMetric = "score",
     limit: number = 100
   ): Promise<LeaderboardEntry[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/leaderboard`, {
-      headers,
+    const response = await apiClient.get(`/leaderboard`, {
       params: { period, metric, limit },
     });
     return response.data.data;
@@ -62,14 +46,9 @@ class LeaderboardService {
     period: LeaderboardPeriod = "all-time",
     metric: LeaderboardMetric = "score"
   ): Promise<LeaderboardEntry[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(
-      `${API_BASE_URL}/leaderboard/friends`,
-      {
-        headers,
-        params: { period, metric },
-      }
-    );
+    const response = await apiClient.get(`/leaderboard/friends`, {
+      params: { period, metric },
+    });
     return response.data.data;
   }
 
@@ -80,14 +59,9 @@ class LeaderboardService {
     period: LeaderboardPeriod = "all-time",
     metric: LeaderboardMetric = "score"
   ): Promise<UserPosition> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(
-      `${API_BASE_URL}/leaderboard/position`,
-      {
-        headers,
-        params: { period, metric },
-      }
-    );
+    const response = await apiClient.get(`/leaderboard/position`, {
+      params: { period, metric },
+    });
     return response.data.data;
   }
 
@@ -95,12 +69,7 @@ class LeaderboardService {
    * Opt in to leaderboard
    */
   async optIn(): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/leaderboard/opt-in`,
-      {},
-      { headers }
-    );
+    const response = await apiClient.post(`/leaderboard/opt-in`, {});
     return response.data;
   }
 
@@ -108,12 +77,7 @@ class LeaderboardService {
    * Opt out from leaderboard
    */
   async optOut(): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/leaderboard/opt-out`,
-      {},
-      { headers }
-    );
+    const response = await apiClient.post(`/leaderboard/opt-out`, {});
     return response.data;
   }
 }

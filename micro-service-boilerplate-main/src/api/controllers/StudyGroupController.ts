@@ -22,7 +22,7 @@ export class StudyGroupController {
   @HttpCode(201)
   async createGroup(
     @CurrentUser({ required: true }) currentUser: any,
-    @Body() body: { name: string; description?: string; metadata?: any; settings?: any }
+    @Body() body: { name: string; description?: string; metadata?: any; settings?: any; memberIds?: string[] }
   ) {
     try {
       const group = await studyGroupService.createGroup(
@@ -30,7 +30,8 @@ export class StudyGroupController {
         body.name,
         body.description,
         body.metadata,
-        body.settings
+        body.settings,
+        body.memberIds || []
       );
       return { success: true, data: group };
     } catch (error: any) {
@@ -49,10 +50,54 @@ export class StudyGroupController {
     }
   }
 
-  @Get('/:groupId')
-  async getGroup(@Param('groupId') groupId: string) {
+  @Get('/search')
+  async searchGroups(
+    @CurrentUser({ required: true }) currentUser: any,
+    @QueryParam('q') query: string,
+    @QueryParam('ieltsType') ieltsType?: string,
+    @QueryParam('targetCountry') targetCountry?: string,
+    @QueryParam('limit') limit?: number
+  ) {
     try {
-      const group = await studyGroupService.getGroup(groupId);
+      const resolvedIeltsType =
+        ieltsType === 'academic' || ieltsType === 'general' ? (ieltsType as 'academic' | 'general') : undefined;
+
+      const groups = await studyGroupService.searchGroups(
+        query,
+        currentUser.id,
+        { ieltsType: resolvedIeltsType, targetCountry },
+        limit || 20
+      );
+      return { success: true, data: groups };
+    } catch (error: any) {
+      throw new BadRequestError(error.message);
+    }
+  }
+
+  @Get('/suggestions')
+  async getSuggestedGroups(@CurrentUser({ required: true }) currentUser: any, @QueryParam('limit') limit?: number) {
+    try {
+      const groups = await studyGroupService.getSuggestedGroups(currentUser.id, limit || 10);
+      return { success: true, data: groups };
+    } catch (error: any) {
+      throw new BadRequestError(error.message);
+    }
+  }
+
+  @Get('/invites')
+  async getUserInvites(@CurrentUser({ required: true }) currentUser: any) {
+    try {
+      const invites = await studyGroupService.getUserInvites(currentUser.id);
+      return { success: true, data: invites };
+    } catch (error: any) {
+      throw new BadRequestError(error.message);
+    }
+  }
+
+  @Get('/:groupId')
+  async getGroup(@CurrentUser({ required: true }) currentUser: any, @Param('groupId') groupId: string) {
+    try {
+      const group = await studyGroupService.getGroup(groupId, currentUser.id);
       return { success: true, data: group };
     } catch (error: any) {
       throw new BadRequestError(error.message);
@@ -97,6 +142,20 @@ export class StudyGroupController {
     }
   }
 
+  @Post('/:groupId/members')
+  async addMember(
+    @CurrentUser({ required: true }) currentUser: any,
+    @Param('groupId') groupId: string,
+    @Body() body: { memberId: string }
+  ) {
+    try {
+      const group = await studyGroupService.addMember(groupId, currentUser.id, body.memberId);
+      return { success: true, data: group };
+    } catch (error: any) {
+      throw new BadRequestError(error.message);
+    }
+  }
+
   @Post('/invites/:inviteId/accept')
   async acceptInvite(@CurrentUser({ required: true }) currentUser: any, @Param('inviteId') inviteId: string) {
     try {
@@ -120,8 +179,8 @@ export class StudyGroupController {
   @Post('/:groupId/join')
   async joinGroup(@CurrentUser({ required: true }) currentUser: any, @Param('groupId') groupId: string) {
     try {
-      // Assuming public group join logic here
-      return { success: true, message: 'Joined group' };
+      const group = await studyGroupService.joinGroup(groupId, currentUser.id);
+      return { success: true, data: group };
     } catch (error: any) {
       throw new BadRequestError(error.message);
     }
@@ -184,47 +243,6 @@ export class StudyGroupController {
     try {
       await studyGroupService.removeAdmin(groupId, currentUser.id, userId);
       return { success: true, message: 'Admin privileges removed' };
-    } catch (error: any) {
-      throw new BadRequestError(error.message);
-    }
-  }
-
-  @Get('/search')
-  async searchGroups(
-    @CurrentUser({ required: true }) currentUser: any,
-    @QueryParam('q') query: string,
-    @QueryParam('ieltsType') ieltsType?: 'academic' | 'general',
-    @QueryParam('targetCountry') targetCountry?: string,
-    @QueryParam('limit') limit?: number
-  ) {
-    try {
-      const groups = await studyGroupService.searchGroups(
-        query,
-        currentUser.id,
-        { ieltsType, targetCountry },
-        limit || 20
-      );
-      return { success: true, data: groups };
-    } catch (error: any) {
-      throw new BadRequestError(error.message);
-    }
-  }
-
-  @Get('/suggestions')
-  async getSuggestedGroups(@CurrentUser({ required: true }) currentUser: any, @QueryParam('limit') limit?: number) {
-    try {
-      const groups = await studyGroupService.getSuggestedGroups(currentUser.id, limit || 10);
-      return { success: true, data: groups };
-    } catch (error: any) {
-      throw new BadRequestError(error.message);
-    }
-  }
-
-  @Get('/invites')
-  async getUserInvites(@CurrentUser({ required: true }) currentUser: any) {
-    try {
-      const invites = await studyGroupService.getUserInvites(currentUser.id);
-      return { success: true, data: invites };
     } catch (error: any) {
       throw new BadRequestError(error.message);
     }

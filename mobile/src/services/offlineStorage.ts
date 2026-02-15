@@ -19,6 +19,26 @@ interface QueuedEvaluation {
   };
 }
 
+interface QueuedPracticeTextCompletion {
+  id: string;
+  sessionId: string;
+  userResponse: string;
+  timeSpent?: number;
+  timestamp: number;
+}
+
+interface QueuedSimulationCompletion {
+  id: string;
+  simulationId: string;
+  parts: Array<{
+    part: number;
+    question: string;
+    response?: string;
+    timeSpent?: number;
+  }>;
+  timestamp: number;
+}
+
 interface CachedTopic {
   _id: string;
   title: string;
@@ -43,6 +63,8 @@ interface OfflineRecording {
 class OfflineStorageService {
   private KEYS = {
     QUEUED_EVALUATIONS: "queued_evaluations",
+    QUEUED_PRACTICE_TEXT: "queued_practice_text_completions",
+    QUEUED_SIMULATION_COMPLETIONS: "queued_simulation_completions",
     CACHED_TOPICS: "cached_topics",
     OFFLINE_RECORDINGS: "offline_recordings",
     LAST_SYNC: "last_sync_timestamp",
@@ -197,6 +219,72 @@ class OfflineStorageService {
     }
   }
 
+  async queuePracticeTextCompletion(data: QueuedPracticeTextCompletion): Promise<void> {
+    try {
+      const queue = await this.getQueuedPracticeTextCompletions();
+      queue.push(data);
+      await AsyncStorage.setItem(this.KEYS.QUEUED_PRACTICE_TEXT, JSON.stringify(queue));
+      console.log("✅ Queued practice completion:", data.id);
+    } catch (error) {
+      console.error("❌ Failed to queue practice completion:", error);
+      throw error;
+    }
+  }
+
+  async getQueuedPracticeTextCompletions(): Promise<QueuedPracticeTextCompletion[]> {
+    try {
+      const data = await AsyncStorage.getItem(this.KEYS.QUEUED_PRACTICE_TEXT);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("❌ Failed to get queued practice completions:", error);
+      return [];
+    }
+  }
+
+  async removePracticeTextCompletion(id: string): Promise<void> {
+    try {
+      const queue = await this.getQueuedPracticeTextCompletions();
+      const filtered = queue.filter((item) => item.id !== id);
+      await AsyncStorage.setItem(this.KEYS.QUEUED_PRACTICE_TEXT, JSON.stringify(filtered));
+      console.log("✅ Removed queued practice completion:", id);
+    } catch (error) {
+      console.error("❌ Failed to remove queued practice completion:", error);
+    }
+  }
+
+  async queueSimulationCompletion(data: QueuedSimulationCompletion): Promise<void> {
+    try {
+      const queue = await this.getQueuedSimulationCompletions();
+      queue.push(data);
+      await AsyncStorage.setItem(this.KEYS.QUEUED_SIMULATION_COMPLETIONS, JSON.stringify(queue));
+      console.log("✅ Queued simulation completion:", data.id);
+    } catch (error) {
+      console.error("❌ Failed to queue simulation completion:", error);
+      throw error;
+    }
+  }
+
+  async getQueuedSimulationCompletions(): Promise<QueuedSimulationCompletion[]> {
+    try {
+      const data = await AsyncStorage.getItem(this.KEYS.QUEUED_SIMULATION_COMPLETIONS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("❌ Failed to get queued simulation completions:", error);
+      return [];
+    }
+  }
+
+  async removeSimulationCompletion(id: string): Promise<void> {
+    try {
+      const queue = await this.getQueuedSimulationCompletions();
+      const filtered = queue.filter((item) => item.id !== id);
+      await AsyncStorage.setItem(this.KEYS.QUEUED_SIMULATION_COMPLETIONS, JSON.stringify(filtered));
+      console.log("✅ Removed queued simulation completion:", id);
+    } catch (error) {
+      console.error("❌ Failed to remove queued simulation completion:", error);
+    }
+  }
+
   /**
    * Check if device is online
    */
@@ -242,6 +330,54 @@ class OfflineStorageService {
       `📊 Queue processing complete: ${successCount} success, ${failedCount} failed`
     );
 
+    return { success: successCount, failed: failedCount };
+  }
+
+  async processPracticeTextQueue(
+    callback: (item: QueuedPracticeTextCompletion) => Promise<void>
+  ): Promise<{ success: number; failed: number }> {
+    const isConnected = await this.isOnline();
+    if (!isConnected) return { success: 0, failed: 0 };
+
+    const queue = await this.getQueuedPracticeTextCompletions();
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const item of queue) {
+      try {
+        await callback(item);
+        await this.removePracticeTextCompletion(item.id);
+        successCount++;
+      } catch (error) {
+        failedCount++;
+      }
+    }
+
+    await this.updateLastSync();
+    return { success: successCount, failed: failedCount };
+  }
+
+  async processSimulationCompletionQueue(
+    callback: (item: QueuedSimulationCompletion) => Promise<void>
+  ): Promise<{ success: number; failed: number }> {
+    const isConnected = await this.isOnline();
+    if (!isConnected) return { success: 0, failed: 0 };
+
+    const queue = await this.getQueuedSimulationCompletions();
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const item of queue) {
+      try {
+        await callback(item);
+        await this.removeSimulationCompletion(item.id);
+        successCount++;
+      } catch (error) {
+        failedCount++;
+      }
+    }
+
+    await this.updateLastSync();
     return { success: successCount, failed: failedCount };
   }
 
@@ -291,6 +427,8 @@ class OfflineStorageService {
     try {
       await AsyncStorage.multiRemove([
         this.KEYS.QUEUED_EVALUATIONS,
+        this.KEYS.QUEUED_PRACTICE_TEXT,
+        this.KEYS.QUEUED_SIMULATION_COMPLETIONS,
         this.KEYS.CACHED_TOPICS,
         this.KEYS.OFFLINE_RECORDINGS,
         this.KEYS.LAST_SYNC,
@@ -306,19 +444,28 @@ class OfflineStorageService {
    */
   async getStats(): Promise<{
     queuedEvaluations: number;
+    queuedPracticeTextCompletions: number;
+    queuedSimulationCompletions: number;
+    totalQueued: number;
     cachedTopics: number;
     offlineRecordings: number;
     lastSync: number | null;
   }> {
-    const [queue, topics, recordings, lastSync] = await Promise.all([
+    const [queue, practiceText, simulationCompletions, topics, recordings, lastSync] = await Promise.all([
       this.getQueuedEvaluations(),
+      this.getQueuedPracticeTextCompletions(),
+      this.getQueuedSimulationCompletions(),
       this.getCachedTopics(),
       this.getOfflineRecordings(),
       this.getLastSync(),
     ]);
 
+    const totalQueued = queue.length + practiceText.length + simulationCompletions.length;
     return {
       queuedEvaluations: queue.length,
+      queuedPracticeTextCompletions: practiceText.length,
+      queuedSimulationCompletions: simulationCompletions.length,
+      totalQueued,
       cachedTopics: topics.length,
       offlineRecordings: recordings.length,
       lastSync,

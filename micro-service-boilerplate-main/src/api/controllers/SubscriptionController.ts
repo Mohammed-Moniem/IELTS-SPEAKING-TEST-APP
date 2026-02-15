@@ -6,10 +6,11 @@ import { ActivatePlanRequest, CreateCheckoutSessionRequest } from '@dto/Subscrip
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
-import { SubscriptionPlan } from '@models/UserModel';
 import { StandardResponse } from '@responses/StandardResponse';
 import { SubscriptionService } from '@services/SubscriptionService';
 import { UsageService } from '@services/UsageService';
+
+type SubscriptionPlan = 'free' | 'premium' | 'pro';
 
 @JsonController('/subscription')
 @UseBefore(AuthMiddleware)

@@ -1,51 +1,73 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import type { SubscriptionPlan } from "../api/subscriptionApi";
+
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { SubscriptionPlan } from "../types/api";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
+
+export interface SubscriptionPlanOption {
+  tier: SubscriptionPlan;
+  name: string;
+  price: number;
+  currency?: string;
+  description?: string;
+  features?: string[];
+  limits?: {
+    practice?: number | null;
+    simulation?: number | null;
+  };
+}
 
 interface SubscriptionPlansModalProps {
   visible: boolean;
-  plans: SubscriptionPlan[];
-  currentTier: string;
+  plans: SubscriptionPlanOption[];
+  currentTier?: SubscriptionPlan | string;
+  loading?: boolean;
   onClose: () => void;
-  onSelectPlan: (tier: "free" | "premium" | "pro") => void;
+  onSelectPlan: (
+    plan: SubscriptionPlanOption,
+    options?: { couponCode?: string }
+  ) => void;
 }
 
-export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
-  visible,
-  plans,
-  currentTier,
-  onClose,
-  onSelectPlan,
-}) => {
-  const getTierColor = (tier: string): string => {
-    switch (tier) {
-      case "premium":
-        return "#3b82f6";
-      case "pro":
-        return "#d4a745";
-      default:
-        return "#64748b";
-    }
-  };
+const formatLimit = (value?: number | null) => {
+  if (value === null || value === undefined) {
+    return "Unlimited";
+  }
+  if (value <= 0) {
+    return "Not included";
+  }
+  return `${value} / month`;
+};
 
-  const getTierIcon = (tier: string): string => {
-    switch (tier) {
-      case "premium":
-        return "star";
-      case "pro":
-        return "diamond";
-      default:
-        return "gift";
+export const SubscriptionPlansModal: React.FC<
+  SubscriptionPlansModalProps
+> = ({ visible, plans, currentTier, loading, onClose, onSelectPlan }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const [couponCode, setCouponCode] = useState("");
+
+  useEffect(() => {
+    if (!visible) {
+      setCouponCode("");
     }
-  };
+  }, [visible]);
+
+  const orderedPlans = useMemo(() => {
+    return [...plans].sort((a, b) => a.price - b.price);
+  }, [plans]);
 
   return (
     <Modal
@@ -55,268 +77,346 @@ export const SubscriptionPlansModal: React.FC<SubscriptionPlansModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Choose Your Plan</Text>
+          <Text style={styles.headerTitle}>Choose your plan</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color="#fff" />
+            <Ionicons name="close" size={26} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
         <ScrollView
           style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Current Plan Badge */}
-          {currentTier && currentTier !== "free" && (
+          {currentTier ? (
             <View style={styles.currentPlanBadge}>
-              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
               <Text style={styles.currentPlanText}>
-                Current Plan:{" "}
-                {currentTier.charAt(0).toUpperCase() + currentTier.slice(1)}
+                Current plan: {currentTier.toString().toUpperCase()}
               </Text>
             </View>
-          )}
+          ) : null}
 
-          {/* Plans */}
-          {plans.map((plan) => {
-            const isCurrentPlan = plan.tier === currentTier;
-            const tierColor = getTierColor(plan.tier);
+          <View style={styles.couponCard}>
+            <Text style={styles.couponLabel}>Have a coupon?</Text>
+            <TextInput
+              value={couponCode}
+              autoCapitalize="characters"
+              onChangeText={setCouponCode}
+              placeholder="Enter code"
+              placeholderTextColor={colors.textMuted}
+              style={styles.couponInput}
+            />
+            <Text style={styles.couponHint}>
+              Enter your discount code before selecting a plan.
+            </Text>
+          </View>
 
-            return (
-              <View
-                key={plan.tier}
-                style={[
-                  styles.planCard,
-                  isCurrentPlan && styles.planCardActive,
-                  { borderColor: tierColor },
-                ]}
-              >
-                {/* Plan Header */}
-                <View style={styles.planHeader}>
-                  <View style={styles.planTitleRow}>
-                    <Ionicons
-                      name={getTierIcon(plan.tier) as any}
-                      size={28}
-                      color={tierColor}
-                    />
-                    <Text style={[styles.planName, { color: tierColor }]}>
-                      {plan.name}
-                    </Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            orderedPlans.map((plan) => {
+              const isCurrentPlan =
+                currentTier && plan.tier.toLowerCase() === currentTier.toLowerCase();
+              const currency = plan.currency ?? "$";
+              const features = plan.features ?? [];
+
+              return (
+                <View key={plan.tier} style={styles.planCard}>
+                  <View style={styles.planHeader}>
+                    <View style={styles.planTitleRow}>
+                      <Ionicons
+                        name={
+                          plan.tier === "pro"
+                            ? "diamond"
+                            : plan.tier === "premium"
+                            ? "star"
+                            : "gift"
+                        }
+                        size={26}
+                        color={
+                          plan.tier === "pro"
+                            ? colors.warning
+                            : plan.tier === "premium"
+                            ? colors.primary
+                            : colors.textSecondary
+                        }
+                      />
+                      <View>
+                        <Text style={styles.planName}>{plan.name}</Text>
+                        {plan.description ? (
+                          <Text style={styles.planDescription}>{plan.description}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {isCurrentPlan ? (
+                      <View style={[styles.statusPill, { backgroundColor: colors.successSoft }]}>
+                        <Text style={[styles.statusPillText, { color: colors.success }]}>
+                          ACTIVE
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
-                  {isCurrentPlan && (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>ACTIVE</Text>
+                  <View style={styles.priceRow}>
+                    {plan.price === 0 ? (
+                      <Text style={styles.priceFree}>Free</Text>
+                    ) : (
+                      <>
+                        <Text style={styles.priceCurrency}>{currency}</Text>
+                        <Text style={styles.priceValue}>{plan.price}</Text>
+                        <Text style={styles.pricePeriod}>/month</Text>
+                      </>
+                    )}
+                  </View>
+
+                  <View style={styles.limitsContainer}>
+                    <Text style={styles.limitsTitle}>Monthly limits</Text>
+                    <View style={styles.limitRow}>
+                      <Text style={styles.limitLabel}>Practice</Text>
+                      <Text style={styles.limitValue}>
+                        {formatLimit(plan.limits?.practice)}
+                      </Text>
                     </View>
+                    <View style={styles.limitRow}>
+                      <Text style={styles.limitLabel}>Simulations</Text>
+                      <Text style={styles.limitValue}>
+                        {formatLimit(plan.limits?.simulation)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {features.length ? (
+                    <View style={styles.featuresList}>
+                      {features.map((feature) => (
+                        <View key={feature} style={styles.featureRow}>
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={18}
+                            color={colors.success}
+                          />
+                          <Text style={styles.featureText}>{feature}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {!isCurrentPlan && (
+                    <TouchableOpacity
+                      style={[styles.selectButton, { backgroundColor: colors.primary }]}
+                      onPress={() =>
+                        onSelectPlan(plan, {
+                          couponCode: couponCode.trim() || undefined,
+                        })
+                      }
+                    >
+                      <Text style={[styles.selectButtonText, { color: colors.primaryOn }]}>
+                        {plan.price === 0 ? "Switch to plan" : "Upgrade to plan"}
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
-
-                {/* Price */}
-                <View style={styles.priceContainer}>
-                  {plan.price === 0 ? (
-                    <Text style={styles.priceText}>Free</Text>
-                  ) : (
-                    <>
-                      <Text style={styles.priceSymbol}>$</Text>
-                      <Text style={styles.priceText}>{plan.price}</Text>
-                      <Text style={styles.pricePeriod}>/month</Text>
-                    </>
-                  )}
-                </View>
-
-                {/* Features */}
-                <View style={styles.featuresContainer}>
-                  {plan.features.map((feature, index) => (
-                    <View key={index} style={styles.featureRow}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#10b981"
-                      />
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Usage Limits */}
-                <View style={styles.limitsContainer}>
-                  <Text style={styles.limitsTitle}>Monthly Limits:</Text>
-                  <Text style={styles.limitText}>
-                    Practice:{" "}
-                    {plan.limits.practiceSessionsPerMonth === -1
-                      ? "Unlimited"
-                      : `${plan.limits.practiceSessionsPerMonth} sessions`}
-                  </Text>
-                  <Text style={styles.limitText}>
-                    Simulation:{" "}
-                    {plan.limits.simulationSessionsPerMonth === -1
-                      ? "Unlimited"
-                      : plan.limits.simulationSessionsPerMonth === 0
-                      ? "Not included"
-                      : `${plan.limits.simulationSessionsPerMonth} tests`}
-                  </Text>
-                </View>
-
-                {/* Action Button */}
-                {!isCurrentPlan && (
-                  <TouchableOpacity
-                    style={[
-                      styles.selectButton,
-                      { backgroundColor: tierColor },
-                    ]}
-                    onPress={() => onSelectPlan(plan.tier)}
-                  >
-                    <Text style={styles.selectButtonText}>
-                      {plan.tier === "free" ? "Downgrade to " : "Upgrade to "}
-                      {plan.name}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </ScrollView>
       </View>
     </Modal>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.1)",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  closeButton: {
-    padding: 8,
-  },
-  scrollView: {
-    flex: 1,
-    padding: 20,
-  },
-  currentPlanBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(16, 185, 129, 0.1)",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  currentPlanText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#10b981",
-  },
-  planCard: {
-    backgroundColor: "#1e293b",
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 2,
-  },
-  planCardActive: {
-    backgroundColor: "rgba(59, 130, 246, 0.05)",
-  },
-  planHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  planTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  planName: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  activeBadge: {
-    backgroundColor: "#10b981",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  activeBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  priceContainer: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 20,
-  },
-  priceSymbol: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#d4a745",
-  },
-  priceText: {
-    fontSize: 48,
-    fontWeight: "700",
-    color: "#d4a745",
-  },
-  pricePeriod: {
-    fontSize: 18,
-    color: "#94a3b8",
-    marginLeft: 4,
-  },
-  featuresContainer: {
-    marginBottom: 20,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  featureText: {
-    fontSize: 15,
-    color: "#e2e8f0",
-    flex: 1,
-  },
-  limitsContainer: {
-    backgroundColor: "rgba(100, 116, 139, 0.1)",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  limitsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#94a3b8",
-    marginBottom: 8,
-  },
-  limitText: {
-    fontSize: 14,
-    color: "#cbd5e1",
-    marginBottom: 4,
-  },
-  selectButton: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  selectButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.xl,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    closeButton: {
+      padding: spacing.xs,
+      borderRadius: spacing.md,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xxl * 2,
+    },
+    currentPlanBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      backgroundColor: colors.successSoft,
+      padding: spacing.sm,
+      borderRadius: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    currentPlanText: {
+      fontWeight: "600",
+      color: colors.success,
+    },
+    couponCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: spacing.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.xl,
+      backgroundColor: colors.surface,
+    },
+    couponLabel: {
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    couponInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      color: colors.textPrimary,
+      fontWeight: "600",
+      letterSpacing: 1,
+    },
+    couponHint: {
+      marginTop: spacing.xs,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    loadingContainer: {
+      paddingVertical: spacing.xl,
+      alignItems: "center",
+    },
+    planCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: spacing.xl,
+      padding: spacing.lg,
+      backgroundColor: colors.surface,
+      marginBottom: spacing.lg,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowOffset: { width: 0, height: 4 },
+      shadowRadius: 12,
+      elevation: 2,
+    },
+    planHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.md,
+    },
+    planTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    planName: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    planDescription: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    statusPill: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: spacing.lg,
+    },
+    statusPillText: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    priceRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 2,
+      marginBottom: spacing.md,
+    },
+    priceFree: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    priceCurrency: {
+      fontSize: 18,
+      color: colors.textSecondary,
+    },
+    priceValue: {
+      fontSize: 32,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    pricePeriod: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    limitsContainer: {
+      marginBottom: spacing.md,
+      borderTopWidth: 1,
+      borderColor: colors.border,
+      paddingTop: spacing.sm,
+    },
+    limitsTitle: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    limitRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: spacing.xs,
+    },
+    limitLabel: {
+      color: colors.textSecondary,
+    },
+    limitValue: {
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    featuresList: {
+      marginBottom: spacing.lg,
+      gap: spacing.xs,
+    },
+    featureRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+    },
+    featureText: {
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    selectButton: {
+      paddingVertical: spacing.md,
+      borderRadius: spacing.lg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    selectButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });
+

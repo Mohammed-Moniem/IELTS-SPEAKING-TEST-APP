@@ -8,17 +8,25 @@ import React, {
   useRef,
   useState,
 } from "react";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 
 import { attachAuthHandlers } from "../api/client";
-import { authApi, userApi } from "../api/services";
-import { AuthResponse, User } from "../types/api";
-import { clearAuth, loadAuth, persistAuth } from "./storage";
+import { userApi } from "../api/services";
+import firebaseAnalyticsService from "../services/firebaseAnalyticsService";
+import monitoringService from "../services/monitoringService";
+import notificationService from "../services/notificationService";
+import { User } from "../types/api";
+import { logger } from "../utils/logger";
+import { supabase } from "../lib/supabase";
 
 type AuthContextValue = {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
   initializing: boolean;
+
+  startGuestSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (payload: {
     email: string;
@@ -26,20 +34,61 @@ type AuthContextValue = {
     firstName: string;
     lastName: string;
     phone?: string;
+    referralCode?: string;
   }) => Promise<void>;
-  logout: (options?: { skipServer?: boolean }) => Promise<void>;
+  upgradeGuest: (payload: {
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    referralCode?: string;
+  }) => Promise<void>;
+  continueWithGoogle: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (_token: string, newPassword: string) => Promise<void>;
+  logout: () => Promise<void>;
+
   refreshProfile: () => Promise<User | null>;
   setUser: (user: User) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const extractTokens = (
-  payload: Pick<AuthResponse, "accessToken" | "refreshToken">
-) => ({
-  accessToken: payload.accessToken,
-  refreshToken: payload.refreshToken,
-});
+const buildPlaceholderUser = (params: {
+  id: string;
+  email?: string | null;
+  isGuest?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  userMetadata?: Record<string, any> | null;
+}): User => {
+  const meta = params.userMetadata || {};
+  const firstName =
+    (typeof meta.firstName === "string" && meta.firstName.trim()) ||
+    (typeof meta.first_name === "string" && meta.first_name.trim()) ||
+    "Guest";
+  const lastName =
+    (typeof meta.lastName === "string" && meta.lastName.trim()) ||
+    (typeof meta.last_name === "string" && meta.last_name.trim()) ||
+    "User";
+  const email =
+    params.email || `guest+${params.id}@anon.spokio.local`;
+
+  const now = new Date().toISOString();
+  return {
+    _id: params.id,
+    email,
+    firstName,
+    lastName,
+    phone: undefined,
+    emailVerified: false,
+    subscriptionPlan: "free",
+    createdAt: params.createdAt || now,
+    updatedAt: params.updatedAt || now,
+    isGuest: Boolean(params.isGuest),
+  };
+};
 
 export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null);
@@ -47,18 +96,14 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
 
-  const tokensRef = useRef<{
-    accessToken: string | null;
-    refreshToken: string | null;
-  } | null>(null);
+  const tokensRef = useRef<{ accessToken: string | null; refreshToken: string | null }>({
+    accessToken: null,
+    refreshToken: null,
+  });
 
-  const setSession = useCallback(async (payload: AuthResponse) => {
-    const tokens = extractTokens(payload);
-    setAccessToken(tokens.accessToken);
-    setRefreshToken(tokens.refreshToken);
-    tokensRef.current = tokens;
-    setUserState(payload.user);
-    await persistAuth(tokens);
+  const setUser = useCallback((updatedUser: User) => {
+    setUserState(updatedUser);
+    monitoringService.setUser(updatedUser);
   }, []);
 
   const clearSession = useCallback(async () => {
@@ -66,96 +111,170 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     setAccessToken(null);
     setRefreshToken(null);
     setUserState(null);
-    await clearAuth();
+    monitoringService.trackEvent("auth_session_cleared");
+    monitoringService.setUser(null);
+    void firebaseAnalyticsService.setUserId(null);
   }, []);
 
-  const logout = useCallback(
-    async (options?: { skipServer?: boolean }) => {
-      const refresh = tokensRef.current?.refreshToken;
-      if (!options?.skipServer && refresh) {
-        try {
-          await authApi.logout(refresh);
-        } catch (error) {
-          console.warn("Logout request failed", error);
-        }
+  const refreshProfile = useCallback(async () => {
+    try {
+      const profile = await userApi.me();
+      setUser(profile);
+      return profile;
+    } catch (error) {
+      logger.warn("⚠️", "Failed to fetch /users/me", error);
+      return null;
+    }
+  }, [setUser]);
+
+  const applySupabaseSession = useCallback(
+    async (session: any | null) => {
+      if (!session) {
+        await clearSession();
+        return;
       }
-      await clearSession();
+
+      const authUser = session.user;
+      const isGuest =
+        typeof (authUser as any)?.is_anonymous === "boolean"
+          ? Boolean((authUser as any).is_anonymous)
+          : !authUser?.email;
+
+      const nextTokens = {
+        accessToken: session.access_token as string,
+        refreshToken: (session.refresh_token as string) || null,
+      };
+
+      tokensRef.current = nextTokens;
+      setAccessToken(nextTokens.accessToken);
+      setRefreshToken(nextTokens.refreshToken);
+
+      // Allow the app to transition to "authenticated" UI immediately.
+      const placeholder = buildPlaceholderUser({
+        id: authUser.id,
+        email: authUser.email,
+        isGuest,
+        createdAt: authUser.created_at,
+        updatedAt: authUser.updated_at,
+        userMetadata: authUser.user_metadata,
+      });
+      setUserState(placeholder);
+
+      // Observability.
+      monitoringService.setUser(placeholder);
+      void firebaseAnalyticsService.setUserId(placeholder._id);
+
+      // Fetch canonical profile from backend (subscription plan, isGuest, etc).
+      const profile = await refreshProfile();
+      const effectiveUser = profile || placeholder;
+
+      monitoringService.trackEvent("auth_session_established", {
+        userId: effectiveUser._id,
+        plan: effectiveUser.subscriptionPlan,
+        mode: effectiveUser.isGuest ? "guest" : "standard",
+      });
+
+      void notificationService.syncPushTokenWithServer();
     },
-    [clearSession]
+    [clearSession, refreshProfile]
   );
 
-  const refreshTokens = useCallback(async () => {
-    const storedRefresh = tokensRef.current?.refreshToken;
-    if (!storedRefresh) {
-      await logout({ skipServer: true });
-      return null;
-    }
-
+  const refreshTokensFn = useCallback(async () => {
     try {
-      const refreshed = await authApi.refresh(storedRefresh);
-      await setSession(refreshed);
-      return extractTokens(refreshed);
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        return null;
+      }
+
+      await applySupabaseSession(data.session);
+      return {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+      };
     } catch (error) {
-      console.warn("Unable to refresh token, clearing session", error);
-      await logout({ skipServer: true });
+      logger.warn("⚠️", "Supabase refreshSession failed", error);
       return null;
     }
-  }, [logout, setSession]);
+  }, [applySupabaseSession]);
 
   useEffect(() => {
     attachAuthHandlers({
-      getAccessToken: () => tokensRef.current?.accessToken || null,
-      getRefreshToken: () => tokensRef.current?.refreshToken || null,
-      refreshTokens,
+      getAccessToken: () => tokensRef.current.accessToken,
+      getRefreshToken: () => tokensRef.current.refreshToken,
+      refreshTokens: refreshTokensFn,
       onUnauthorized: () => {
-        void logout({ skipServer: true });
+        void supabase.auth.signOut();
       },
     });
 
     return () => attachAuthHandlers(null);
-  }, [logout, refreshTokens]);
-
-  useEffect(() => {
-    tokensRef.current = { accessToken, refreshToken };
-  }, [accessToken, refreshToken]);
+  }, [refreshTokensFn]);
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const init = async () => {
       try {
-        const stored = await loadAuth();
-        if (stored && mounted) {
-          tokensRef.current = stored;
-          setAccessToken(stored.accessToken);
-          setRefreshToken(stored.refreshToken);
-          try {
-            const profile = await userApi.me();
-            if (mounted) {
-              setUserState(profile);
-            }
-          } catch (error) {
-            console.warn("Failed to fetch profile during restore", error);
-            await logout({ skipServer: true });
-          }
-        }
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        await applySupabaseSession(data.session);
       } finally {
-        if (mounted) {
-          setInitializing(false);
-        }
+        if (mounted) setInitializing(false);
       }
-    })();
+    };
+
+    init().catch((error) => {
+      logger.warn("⚠️", "Failed to initialize Supabase session", error);
+      setInitializing(false);
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!mounted) return;
+        await applySupabaseSession(session);
+      }
+    );
 
     return () => {
       mounted = false;
+      subscription.subscription.unsubscribe();
     };
-  }, [logout]);
+  }, [applySupabaseSession]);
+
+  const startGuestSession = useCallback(async () => {
+    const { data: existing } = await supabase.auth.getSession();
+    if (existing.session?.user) {
+      const isAnon =
+        typeof (existing.session.user as any)?.is_anonymous === "boolean"
+          ? Boolean((existing.session.user as any).is_anonymous)
+          : !existing.session.user.email;
+      if (isAnon) {
+        return;
+      }
+    }
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.session) {
+      throw new Error(error?.message || "Unable to start guest session");
+    }
+
+    await applySupabaseSession(data.session);
+  }, [applySupabaseSession]);
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const response = await authApi.login({ email, password });
-      await setSession(response);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (data.session) {
+        await applySupabaseSession(data.session);
+      }
     },
-    [setSession]
+    [applySupabaseSession]
   );
 
   const register = useCallback(
@@ -165,23 +284,164 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       firstName: string;
       lastName: string;
       phone?: string;
+      referralCode?: string;
     }) => {
-      const response = await authApi.register(payload);
-      await setSession(response);
+      // If the user is currently a guest, upgrading preserves their user id + history.
+      const { data: existing } = await supabase.auth.getSession();
+      const isAnon =
+        typeof (existing.session?.user as any)?.is_anonymous === "boolean"
+          ? Boolean((existing.session?.user as any).is_anonymous)
+          : !existing.session?.user?.email;
+
+      if (existing.session?.user && isAnon) {
+        const { error } = await supabase.auth.updateUser({
+          email: payload.email,
+          password: payload.password,
+          data: {
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            phone: payload.phone,
+            referralCode: payload.referralCode,
+          },
+        });
+        if (error) {
+          throw new Error(error.message);
+        }
+        await refreshProfile();
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          data: {
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            phone: payload.phone,
+            referralCode: payload.referralCode,
+          },
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // If email confirmation is enabled, session can be null here.
+      if (data.session) {
+        await applySupabaseSession(data.session);
+      }
     },
-    [setSession]
+    [applySupabaseSession, refreshProfile]
   );
 
-  const refreshProfile = useCallback(async () => {
-    try {
-      const profile = await userApi.me();
-      setUserState(profile);
-      return profile;
-    } catch (error) {
-      console.warn("Failed to refresh profile", error);
-      return null;
+  const upgradeGuest = useCallback(
+    async (payload: {
+      email: string;
+      password: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      referralCode?: string;
+    }) => {
+      const { data: existing } = await supabase.auth.getSession();
+      const authUser = existing.session?.user;
+      const isAnon =
+        typeof (authUser as any)?.is_anonymous === "boolean"
+          ? Boolean((authUser as any).is_anonymous)
+          : !authUser?.email;
+
+      if (!authUser || !isAnon) {
+        throw new Error("Guest session required to upgrade");
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        email: payload.email,
+        password: payload.password,
+        data: {
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          phone: payload.phone,
+          referralCode: payload.referralCode,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await refreshProfile();
+    },
+    [refreshProfile]
+  );
+
+  const continueWithGoogle = useCallback(async () => {
+    const redirectTo = Linking.createURL("auth/callback");
+
+    const { data: existing } = await supabase.auth.getSession();
+    const isAnon =
+      typeof (existing.session?.user as any)?.is_anonymous === "boolean"
+        ? Boolean((existing.session?.user as any).is_anonymous)
+        : !existing.session?.user?.email;
+
+    const oauth =
+      existing.session?.user && isAnon
+        ? await supabase.auth.linkIdentity({
+            provider: "google",
+            options: { redirectTo, skipBrowserRedirect: true },
+          } as any)
+        : await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo, skipBrowserRedirect: true },
+          } as any);
+
+    if (oauth.error) {
+      throw new Error(oauth.error.message);
+    }
+
+    const url = (oauth.data as any)?.url as string | undefined;
+    if (!url) {
+      throw new Error("Unable to start Google sign-in");
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
+    if (result.type !== "success" || !("url" in result) || !result.url) {
+      throw new Error("Google sign-in cancelled");
+    }
+
+    const { error } = await supabase.auth.exchangeCodeForSession(result.url);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    await refreshProfile();
+  }, [refreshProfile]);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const redirectTo = Linking.createURL("auth/reset");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+    if (error) {
+      throw new Error(error.message);
     }
   }, []);
+
+  const confirmPasswordReset = useCallback(async (_token: string, newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      void notificationService.unregisterPushTokenFromServer();
+    } catch {}
+    await supabase.auth.signOut();
+    await clearSession();
+  }, [clearSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -189,21 +449,32 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       accessToken,
       refreshToken,
       initializing,
+      startGuestSession,
       login,
       register,
+      upgradeGuest,
+      continueWithGoogle,
+      requestPasswordReset,
+      confirmPasswordReset,
       logout,
       refreshProfile,
-      setUser: setUserState,
+      setUser,
     }),
     [
       user,
       accessToken,
       refreshToken,
       initializing,
+      startGuestSession,
       login,
       register,
+      upgradeGuest,
+      continueWithGoogle,
+      requestPasswordReset,
+      confirmPasswordReset,
       logout,
       refreshProfile,
+      setUser,
     ]
   );
 

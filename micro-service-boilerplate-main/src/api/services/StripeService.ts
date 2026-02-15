@@ -5,7 +5,8 @@ import { env } from '@env';
 import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { Logger } from '@lib/logger';
-import { SubscriptionPlan } from '@models/UserModel';
+
+type SubscriptionPlan = 'free' | 'premium' | 'pro';
 
 interface CheckoutSessionParams {
   userId: string;
@@ -22,6 +23,11 @@ export class StripeService {
   private stripeClient?: Stripe;
 
   constructor() {
+    if (env.payments?.disabled) {
+      this.log.warn('Payments are disabled via PAYMENTS_DISABLED. Stripe features are disabled.');
+      return;
+    }
+
     if (env.payments?.stripe?.secretKey) {
       this.stripeClient = new Stripe(env.payments.stripe.secretKey);
     } else {
@@ -30,6 +36,9 @@ export class StripeService {
   }
 
   public isConfigured(): boolean {
+    if (env.payments?.disabled) {
+      return false;
+    }
     return Boolean(this.stripeClient && env.payments?.stripe?.secretKey);
   }
 

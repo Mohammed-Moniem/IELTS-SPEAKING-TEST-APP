@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface Achievement {
   _id: string;
@@ -33,18 +31,6 @@ export type AchievementCategory =
   | "MILESTONE"
   | "all";
 
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
-
 class AchievementService {
   /**
    * Get all achievements with user progress
@@ -52,9 +38,7 @@ class AchievementService {
   async getAchievements(
     category?: AchievementCategory
   ): Promise<UserAchievement[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/achievements`, {
-      headers,
+    const response = await apiClient.get(`/achievements`, {
       params: category && category !== "all" ? { category } : undefined,
     });
     return response.data.data;
@@ -64,11 +48,10 @@ class AchievementService {
    * Get user's unlocked achievements
    */
   async getUserAchievements(userId?: string): Promise<UserAchievement[]> {
-    const headers = await getAuthHeaders();
     const endpoint = userId
-      ? `${API_BASE_URL}/achievements/user/${userId}`
-      : `${API_BASE_URL}/achievements/me`;
-    const response = await axios.get(endpoint, { headers });
+      ? `/achievements/user/${userId}`
+      : `/achievements/me`;
+    const response = await apiClient.get(endpoint);
     return response.data.data;
   }
 
@@ -76,11 +59,7 @@ class AchievementService {
    * Get achievements with progress for current user
    */
   async getAchievementsProgress(): Promise<UserAchievement[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(
-      `${API_BASE_URL}/achievements/progress`,
-      { headers }
-    );
+    const response = await apiClient.get(`/achievements/progress`);
     return response.data.data;
   }
 }

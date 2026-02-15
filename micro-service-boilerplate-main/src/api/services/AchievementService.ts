@@ -1,466 +1,352 @@
-import { Types } from 'mongoose';
-import { Logger } from '../../lib/logger';
-import {
-  Achievement,
-  AchievementCategory,
-  IAchievement,
-  IUserAchievement,
-  UserAchievement,
-  UserStats
-} from '../models/AchievementModel';
+/**
+ * Achievement Service (Supabase/Postgres)
+ *
+ * Achievements are defined in `public.achievements`.
+ * Per-user progress/unlocks are stored in `public.user_achievements`.
+ * Some counters come from `public.user_stats` (updated via Analytics).
+ */
+
+import { getSupabaseAdmin } from '@lib/supabaseClient';
+import { Logger } from '@lib/logger';
 
 const log = new Logger(__filename);
 
+type AchievementRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  points: number;
+  requirement: any;
+  is_premium: boolean;
+  sort_order: number;
+  is_active: boolean;
+};
+
+type UserAchievementRow = {
+  id: string;
+  user_id: string;
+  achievement_key: string;
+  progress: number;
+  is_unlocked: boolean;
+  unlocked_at: string | null;
+};
+
+type UserStatsRow = {
+  user_id: string;
+  total_practice_sessions: number;
+  total_simulations: number;
+  average_score: number;
+  highest_score: number;
+  current_streak: number;
+  longest_streak: number;
+  total_achievements: number;
+  achievement_points: number;
+  last_practice_at?: string | null;
+};
+
+export type AchievementCategory = 'PRACTICE' | 'IMPROVEMENT' | 'STREAK' | 'SOCIAL' | 'MILESTONE' | 'all';
+
 export class AchievementService {
-  /**
-   * Initialize default achievements (run once on server startup)
-   */
-  async initializeAchievements(): Promise<void> {
-    const existingCount = await Achievement.countDocuments();
+  private async getOrCreateUserStats(userId: string): Promise<UserStatsRow> {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select(
+        'user_id, total_practice_sessions, total_simulations, average_score, highest_score, current_streak, longest_streak, total_achievements, achievement_points, last_practice_at'
+      )
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (existingCount > 0) {
-      log.info('Achievements already initialized');
-      return;
+    if (error) {
+      log.warn('Failed to load user_stats', { userId, error: error.message });
     }
 
-    const achievements: Partial<IAchievement>[] = [
-      // Practice Achievements
-      {
-        key: 'first_practice',
-        name: 'First Steps',
-        description: 'Complete your first practice session',
-        category: AchievementCategory.PRACTICE,
-        icon: '🎯',
-        points: 10,
-        requirement: { type: 'practice_count', value: 1 },
-        isPremium: false,
-        isActive: true,
-        order: 1
-      },
-      {
-        key: 'practice_10',
-        name: 'Getting Started',
-        description: 'Complete 10 practice sessions',
-        category: AchievementCategory.PRACTICE,
-        icon: '💪',
-        points: 25,
-        requirement: { type: 'practice_count', value: 10 },
-        isPremium: false,
-        isActive: true,
-        order: 2
-      },
-      {
-        key: 'practice_50',
-        name: 'Dedicated Learner',
-        description: 'Complete 50 practice sessions',
-        category: AchievementCategory.PRACTICE,
-        icon: '🏆',
-        points: 50,
-        requirement: { type: 'practice_count', value: 50 },
-        isPremium: false,
-        isActive: true,
-        order: 3
-      },
-      {
-        key: 'practice_100',
-        name: 'Century Club',
-        description: 'Complete 100 practice sessions',
-        category: AchievementCategory.PRACTICE,
-        icon: '💯',
-        points: 100,
-        requirement: { type: 'practice_count', value: 100 },
-        isPremium: true,
-        isActive: true,
-        order: 4
-      },
-
-      // Improvement Achievements
-      {
-        key: 'first_band_6',
-        name: 'Band 6 Achiever',
-        description: 'Score 6.0 or higher',
-        category: AchievementCategory.IMPROVEMENT,
-        icon: '⭐',
-        points: 20,
-        requirement: { type: 'score_threshold', value: 6.0 },
-        isPremium: false,
-        isActive: true,
-        order: 10
-      },
-      {
-        key: 'first_band_7',
-        name: 'Band 7 Achiever',
-        description: 'Score 7.0 or higher',
-        category: AchievementCategory.IMPROVEMENT,
-        icon: '🌟',
-        points: 40,
-        requirement: { type: 'score_threshold', value: 7.0 },
-        isPremium: false,
-        isActive: true,
-        order: 11
-      },
-      {
-        key: 'first_band_8',
-        name: 'Band 8 Achiever',
-        description: 'Score 8.0 or higher - Excellent!',
-        category: AchievementCategory.IMPROVEMENT,
-        icon: '✨',
-        points: 75,
-        requirement: { type: 'score_threshold', value: 8.0 },
-        isPremium: false,
-        isActive: true,
-        order: 12
-      },
-      {
-        key: 'improvement_2_bands',
-        name: 'Great Progress',
-        description: 'Improve your score by 2 bands',
-        category: AchievementCategory.IMPROVEMENT,
-        icon: '📈',
-        points: 60,
-        requirement: { type: 'score_improvement', value: 2 },
-        isPremium: true,
-        isActive: true,
-        order: 13
-      },
-
-      // Streak Achievements
-      {
-        key: 'streak_3',
-        name: '3-Day Streak',
-        description: 'Practice for 3 consecutive days',
-        category: AchievementCategory.STREAK,
-        icon: '🔥',
-        points: 15,
-        requirement: { type: 'streak_days', value: 3 },
-        isPremium: false,
-        isActive: true,
-        order: 20
-      },
-      {
-        key: 'streak_7',
-        name: 'Week Warrior',
-        description: 'Practice for 7 consecutive days',
-        category: AchievementCategory.STREAK,
-        icon: '🔥🔥',
-        points: 35,
-        requirement: { type: 'streak_days', value: 7 },
-        isPremium: false,
-        isActive: true,
-        order: 21
-      },
-      {
-        key: 'streak_30',
-        name: 'Month Master',
-        description: 'Practice for 30 consecutive days',
-        category: AchievementCategory.STREAK,
-        icon: '🔥🔥🔥',
-        points: 100,
-        requirement: { type: 'streak_days', value: 30 },
-        isPremium: true,
-        isActive: true,
-        order: 22
-      },
-
-      // Social Achievements
-      {
-        key: 'first_friend',
-        name: 'Social Butterfly',
-        description: 'Add your first friend',
-        category: AchievementCategory.SOCIAL,
-        icon: '👥',
-        points: 10,
-        requirement: { type: 'friend_count', value: 1 },
-        isPremium: false,
-        isActive: true,
-        order: 30
-      },
-      {
-        key: 'friend_10',
-        name: 'Popular',
-        description: 'Have 10 friends',
-        category: AchievementCategory.SOCIAL,
-        icon: '🎉',
-        points: 30,
-        requirement: { type: 'friend_count', value: 10 },
-        isPremium: true,
-        isActive: true,
-        order: 31
-      },
-      {
-        key: 'first_group',
-        name: 'Team Player',
-        description: 'Join your first study group',
-        category: AchievementCategory.SOCIAL,
-        icon: '👨‍👩‍👧‍👦',
-        points: 20,
-        requirement: { type: 'group_count', value: 1 },
-        isPremium: true,
-        isActive: true,
-        order: 32
-      },
-      {
-        key: 'referral_5',
-        name: 'Influencer',
-        description: 'Successfully refer 5 friends',
-        category: AchievementCategory.SOCIAL,
-        icon: '📣',
-        points: 50,
-        requirement: { type: 'referral_count', value: 5 },
-        isPremium: false,
-        isActive: true,
-        order: 33
-      },
-
-      // Milestone Achievements
-      {
-        key: 'profile_complete',
-        name: 'Complete Profile',
-        description: 'Fill out your complete profile',
-        category: AchievementCategory.MILESTONE,
-        icon: '📋',
-        points: 15,
-        requirement: { type: 'profile_complete', value: 1 },
-        isPremium: false,
-        isActive: true,
-        order: 40
-      },
-      {
-        key: 'leaderboard_top_10',
-        name: 'Top 10 Finisher',
-        description: 'Reach top 10 on the leaderboard',
-        category: AchievementCategory.MILESTONE,
-        icon: '🏅',
-        points: 75,
-        requirement: { type: 'leaderboard_rank', value: 10 },
-        isPremium: true,
-        isActive: true,
-        order: 41
-      },
-      {
-        key: 'leaderboard_top_3',
-        name: 'Podium Finish',
-        description: 'Reach top 3 on the leaderboard',
-        category: AchievementCategory.MILESTONE,
-        icon: '🥇',
-        points: 150,
-        requirement: { type: 'leaderboard_rank', value: 3 },
-        isPremium: true,
-        isActive: true,
-        order: 42
-      }
-    ];
-
-    await Achievement.insertMany(achievements);
-    log.info(`Initialized ${achievements.length} achievements`);
-  }
-
-  /**
-   * Check and unlock achievements for user
-   */
-  async checkAchievements(
-    userId: string,
-    context: {
-      practiceCount?: number;
-      score?: number;
-      streak?: number;
-      friendCount?: number;
-      groupCount?: number;
-      referralCount?: number;
-      leaderboardRank?: number;
-    }
-  ): Promise<IUserAchievement[]> {
-    const unlockedAchievements: IUserAchievement[] = [];
-
-    // Get all active achievements
-    const achievements = await Achievement.find({ isActive: true });
-
-    for (const achievement of achievements) {
-      // Check if already unlocked
-      const existing = await UserAchievement.findOne({
-        userId: new Types.ObjectId(userId),
-        achievementId: achievement._id
-      });
-
-      if (existing?.isUnlocked) {
-        continue; // Already unlocked
-      }
-
-      // Check if requirement is met
-      const isMet = this.checkRequirement(achievement.requirement, context);
-
-      if (isMet) {
-        // Unlock achievement
-        if (existing) {
-          existing.isUnlocked = true;
-          existing.unlockedAt = new Date();
-          existing.progress = achievement.requirement.value;
-          await existing.save();
-          unlockedAchievements.push(existing);
-        } else {
-          const newAchievement = new UserAchievement({
-            userId: new Types.ObjectId(userId),
-            achievementId: achievement._id,
-            achievementKey: achievement.key,
-            progress: achievement.requirement.value,
-            isUnlocked: true,
-            unlockedAt: new Date()
-          });
-          await newAchievement.save();
-          unlockedAchievements.push(newAchievement);
-        }
-
-        // Update user stats
-        await this.updateUserAchievementStats(userId, achievement.points);
-
-        log.info(`Achievement unlocked: ${achievement.key} for user ${userId}`);
-      } else if (!existing) {
-        // Create progress record
-        const progress = this.calculateProgress(achievement.requirement, context);
-        const userAchievement = new UserAchievement({
-          userId: new Types.ObjectId(userId),
-          achievementId: achievement._id,
-          achievementKey: achievement.key,
-          progress,
-          isUnlocked: false
-        });
-        await userAchievement.save();
-      } else {
-        // Update progress
-        const progress = this.calculateProgress(achievement.requirement, context);
-        existing.progress = progress;
-        await existing.save();
-      }
+    if (data) {
+      return data as UserStatsRow;
     }
 
-    return unlockedAchievements;
-  }
+    const insert = await supabase.from('user_stats').insert({ user_id: userId }).select(
+      'user_id, total_practice_sessions, total_simulations, average_score, highest_score, current_streak, longest_streak, total_achievements, achievement_points, last_practice_at'
+    );
 
-  /**
-   * Get user's achievements
-   */
-  async getUserAchievements(userId: string): Promise<any[]> {
-    const userAchievements = await UserAchievement.find({
-      userId: new Types.ObjectId(userId)
-    })
-      .populate('achievementId')
-      .sort({ unlockedAt: -1 });
-
-    return userAchievements.map(ua => ({
-      ...ua.toObject(),
-      achievement: ua.achievementId
-    }));
-  }
-
-  /**
-   * Get all achievements with user progress
-   */
-  async getAllAchievementsWithProgress(userId: string): Promise<any[]> {
-    const allAchievements = await Achievement.find({ isActive: true }).sort({ category: 1, order: 1 });
-    const userAchievements = await UserAchievement.find({ userId: new Types.ObjectId(userId) });
-
-    const achievementMap = new Map(userAchievements.map(ua => [ua.achievementKey, ua]));
-
-    return allAchievements.map(achievement => {
-      const userProgress = achievementMap.get(achievement.key);
+    if (insert.error) {
+      log.warn('Failed to provision user_stats row', { userId, error: insert.error.message });
       return {
-        ...achievement.toObject(),
-        userProgress: {
-          progress: userProgress?.progress || 0,
-          isUnlocked: userProgress?.isUnlocked || false,
-          unlockedAt: userProgress?.unlockedAt
-        }
+        user_id: userId,
+        total_practice_sessions: 0,
+        total_simulations: 0,
+        average_score: 0,
+        highest_score: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        total_achievements: 0,
+        achievement_points: 0,
+        last_practice_at: null
       };
-    });
-  }
-
-  /**
-   * Get achievements by category
-   */
-  async getAchievementsByCategory(category: AchievementCategory): Promise<IAchievement[]> {
-    return await Achievement.find({
-      category,
-      isActive: true
-    }).sort({ order: 1 });
-  }
-
-  /**
-   * Check if requirement is met
-   */
-  private checkRequirement(requirement: any, context: any): boolean {
-    switch (requirement.type) {
-      case 'practice_count':
-        return (context.practiceCount || 0) >= requirement.value;
-
-      case 'score_threshold':
-        return (context.score || 0) >= requirement.value;
-
-      case 'streak_days':
-        return (context.streak || 0) >= requirement.value;
-
-      case 'friend_count':
-        return (context.friendCount || 0) >= requirement.value;
-
-      case 'group_count':
-        return (context.groupCount || 0) >= requirement.value;
-
-      case 'referral_count':
-        return (context.referralCount || 0) >= requirement.value;
-
-      case 'leaderboard_rank':
-        return (context.leaderboardRank || Infinity) <= requirement.value;
-
-      case 'profile_complete':
-        return true; // Checked separately
-
-      default:
-        return false;
     }
+
+    const row = (insert.data?.[0] || null) as any;
+    if (!row) {
+      return {
+        user_id: userId,
+        total_practice_sessions: 0,
+        total_simulations: 0,
+        average_score: 0,
+        highest_score: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        total_achievements: 0,
+        achievement_points: 0,
+        last_practice_at: null
+      };
+    }
+
+    return row as UserStatsRow;
   }
 
-  /**
-   * Calculate progress towards achievement
-   */
-  private calculateProgress(requirement: any, context: any): number {
-    switch (requirement.type) {
+  private computeProgressForRequirement(requirement: any, stats: UserStatsRow): number {
+    const type = String(requirement?.type || '').trim();
+    const target = Number(requirement?.value || 0);
+
+    switch (type) {
       case 'practice_count':
-        return Math.min(context.practiceCount || 0, requirement.value);
-
+        return Math.min(Number(stats.total_practice_sessions || 0), target || Number(stats.total_practice_sessions || 0));
+      case 'simulation_count':
+        return Math.min(Number(stats.total_simulations || 0), target || Number(stats.total_simulations || 0));
       case 'streak_days':
-        return Math.min(context.streak || 0, requirement.value);
-
-      case 'friend_count':
-        return Math.min(context.friendCount || 0, requirement.value);
-
-      case 'group_count':
-        return Math.min(context.groupCount || 0, requirement.value);
-
-      case 'referral_count':
-        return Math.min(context.referralCount || 0, requirement.value);
-
+        return Math.min(Number(stats.current_streak || 0), target || Number(stats.current_streak || 0));
+      case 'score_threshold':
+        // Track best score so far.
+        return Math.min(Number(stats.highest_score || 0), target || Number(stats.highest_score || 0));
       default:
         return 0;
     }
   }
 
-  /**
-   * Update user's achievement statistics
-   */
-  private async updateUserAchievementStats(userId: string, points: number): Promise<void> {
-    let stats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
+  private calcProgressPercentage(progress: number, requirement: any): number {
+    const target = Number(requirement?.value || 0);
+    if (!Number.isFinite(target) || target <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round((Number(progress || 0) / target) * 100)));
+  }
 
-    if (!stats) {
-      stats = new UserStats({
-        userId: new Types.ObjectId(userId),
-        totalAchievements: 0,
-        achievementPoints: 0
+  private mapAchievementWithUserProgress(a: AchievementRow, ua: UserAchievementRow | null, computedProgress: number) {
+    const progress = ua ? Number(ua.progress || 0) : Number(computedProgress || 0);
+    const isUnlocked = ua ? Boolean(ua.is_unlocked) : computedProgress >= Number(a.requirement?.value || 0);
+    const unlockedAt = ua?.unlocked_at || undefined;
+
+    return {
+      _id: a.id,
+      key: a.key,
+      name: a.name,
+      description: a.description,
+      category: a.category,
+      icon: a.icon,
+      points: Number(a.points || 0),
+      requirement: a.requirement,
+      isPremium: Boolean(a.is_premium),
+      order: Number(a.sort_order || 0),
+      progress,
+      isUnlocked,
+      unlockedAt,
+      progressPercentage: this.calcProgressPercentage(progress, a.requirement)
+    };
+  }
+
+  /**
+   * Get all achievements (optionally filtered by category) with per-user progress.
+   */
+  async getAllAchievementsWithProgress(userId: string, category?: AchievementCategory): Promise<any[]> {
+    const supabase = getSupabaseAdmin();
+
+    let query = supabase
+      .from('achievements')
+      .select('id, key, name, description, category, icon, points, requirement, is_premium, sort_order, is_active')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (category && category !== 'all') {
+      query = query.eq('category', category);
+    }
+
+    const { data: achievements, error } = await query;
+    if (error) {
+      log.error('Failed to load achievements', { error: error.message });
+      throw new Error('Failed to load achievements');
+    }
+
+    const rows = (achievements || []) as AchievementRow[];
+    if (!rows.length) return [];
+
+    const stats = await this.getOrCreateUserStats(userId);
+    const keys = rows.map(a => a.key);
+
+    const { data: userRows, error: userError } = await supabase
+      .from('user_achievements')
+      .select('id, user_id, achievement_key, progress, is_unlocked, unlocked_at')
+      .eq('user_id', userId)
+      .in('achievement_key', keys);
+
+    if (userError) {
+      log.warn('Failed to load user achievements', { userId, error: userError.message });
+    }
+
+    const byKey = new Map<string, UserAchievementRow>();
+    (userRows || []).forEach((r: any) => {
+      byKey.set(String(r.achievement_key), r as UserAchievementRow);
+    });
+
+    // Upsert progress/unlocks for basic requirement types.
+    const upserts: Array<{
+      user_id: string;
+      achievement_key: string;
+      progress: number;
+      is_unlocked: boolean;
+      unlocked_at?: string | null;
+    }> = [];
+
+    const nowIso = new Date().toISOString();
+    for (const a of rows) {
+      const computedProgress = this.computeProgressForRequirement(a.requirement, stats);
+      const requiredValue = Number(a.requirement?.value || 0);
+      const computedUnlocked = requiredValue > 0 ? computedProgress >= requiredValue : false;
+      const existing = byKey.get(a.key);
+
+      const nextProgress = Math.max(Number(existing?.progress || 0), Number(computedProgress || 0));
+      const nextUnlocked = Boolean(existing?.is_unlocked) || computedUnlocked;
+      const shouldSetUnlockedAt = !existing?.is_unlocked && computedUnlocked;
+
+      upserts.push({
+        user_id: userId,
+        achievement_key: a.key,
+        progress: nextProgress,
+        is_unlocked: nextUnlocked,
+        unlocked_at: shouldSetUnlockedAt ? nowIso : existing?.unlocked_at || null
       });
     }
 
-    stats.totalAchievements += 1;
-    stats.achievementPoints += points;
-    await stats.save();
+    if (upserts.length) {
+      const upsertResult = await supabase.from('user_achievements').upsert(upserts, {
+        onConflict: 'user_id,achievement_key'
+      });
+      if (upsertResult.error) {
+        log.warn('Failed to upsert achievement progress', { userId, error: upsertResult.error.message });
+      } else {
+        // Reload updated rows so response reflects unlocking.
+        const { data: updatedUserRows } = await supabase
+          .from('user_achievements')
+          .select('id, user_id, achievement_key, progress, is_unlocked, unlocked_at')
+          .eq('user_id', userId)
+          .in('achievement_key', keys);
+        (updatedUserRows || []).forEach((r: any) => {
+          byKey.set(String(r.achievement_key), r as UserAchievementRow);
+        });
+      }
+    }
+
+    const mapped = rows.map(a => {
+      const ua = byKey.get(a.key) || null;
+      const computedProgress = this.computeProgressForRequirement(a.requirement, stats);
+      return this.mapAchievementWithUserProgress(a, ua, computedProgress);
+    });
+
+    // Update aggregate stats (best-effort).
+    const unlocked = mapped.filter(m => m.isUnlocked);
+    const achievementPoints = unlocked.reduce((sum, a) => sum + Number(a.points || 0), 0);
+    await supabase
+      .from('user_stats')
+      .upsert(
+        {
+          user_id: userId,
+          total_achievements: unlocked.length,
+          achievement_points: achievementPoints
+        },
+        { onConflict: 'user_id' }
+      )
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          log.warn('Failed to update user_stats achievement aggregates', { userId, error: updateError.message });
+        }
+      });
+
+    return mapped;
+  }
+
+  /**
+   * Get only unlocked achievements for the user.
+   */
+  async getUserAchievements(userId: string): Promise<any[]> {
+    const supabase = getSupabaseAdmin();
+
+    const { data: unlockedRows, error } = await supabase
+      .from('user_achievements')
+      .select('achievement_key, progress, is_unlocked, unlocked_at')
+      .eq('user_id', userId)
+      .eq('is_unlocked', true);
+
+    if (error) {
+      log.warn('Failed to load unlocked achievements', { userId, error: error.message });
+      return [];
+    }
+
+    const keys = (unlockedRows || []).map((r: any) => String(r.achievement_key));
+    if (!keys.length) return [];
+
+    const { data: achievements, error: aError } = await supabase
+      .from('achievements')
+      .select('id, key, name, description, category, icon, points, requirement, is_premium, sort_order, is_active')
+      .in('key', keys)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (aError) {
+      log.warn('Failed to load achievement definitions', { error: aError.message });
+      return [];
+    }
+
+    const byKey = new Map<string, any>();
+    (unlockedRows || []).forEach((r: any) => byKey.set(String(r.achievement_key), r));
+
+    return (achievements || []).map((a: any) => {
+      const ua = byKey.get(String(a.key)) || null;
+      return this.mapAchievementWithUserProgress(a as AchievementRow, ua as UserAchievementRow, Number(ua?.progress || 0));
+    });
+  }
+
+  /**
+   * Backwards-compatible helper for old controller path.
+   */
+  async getAchievementsByCategory(category: AchievementCategory): Promise<any[]> {
+    // Without a userId, we cannot compute progress; return definitions only.
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('achievements')
+      .select('id, key, name, description, category, icon, points, requirement, is_premium, sort_order, is_active')
+      .eq('is_active', true)
+      .eq('category', category)
+      .order('sort_order', { ascending: true });
+    if (error) {
+      throw new Error('Failed to load achievements');
+    }
+    return (data || []).map((a: any) => ({
+      _id: a.id,
+      key: a.key,
+      name: a.name,
+      description: a.description,
+      category: a.category,
+      icon: a.icon,
+      points: a.points,
+      requirement: a.requirement,
+      isPremium: Boolean(a.is_premium),
+      order: Number(a.sort_order || 0),
+      progress: 0,
+      isUnlocked: false,
+      progressPercentage: 0
+    }));
   }
 }
 
 export const achievementService = new AchievementService();
+

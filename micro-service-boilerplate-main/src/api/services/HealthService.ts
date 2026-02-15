@@ -2,12 +2,12 @@ import { env } from '@env';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage, isEmptyOrNull } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import mongoose from 'mongoose';
 import os from 'os';
 import { performance } from 'perf_hooks';
 import { Service } from 'typedi';
 
 import { isConnected as isRabbitConnected } from '@loaders/RabbitMQLoader';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
 
 type DiagnosticsMemoryUsage = ReturnType<typeof process.memoryUsage>;
 type DiagnosticsCPUUsage = ReturnType<typeof process.cpuUsage>;
@@ -122,7 +122,7 @@ export class HealthService {
       this.log.debug(`${logMessage} :: Dependency checks disabled via configuration`);
       const skippedDependencies: IHealthDependencyCheck[] = [
         {
-          name: 'mongo',
+          name: 'supabase',
           status: 'skipped',
           message: 'Dependency checks disabled',
           lastUpdated: new Date().toISOString()
@@ -148,7 +148,7 @@ export class HealthService {
     }
 
     const dependencyResults = await Promise.all([
-      this.checkMongo(headers),
+      this.checkSupabase(headers),
       this.checkRabbitMQ(headers),
       this.checkCache(headers)
     ]);
@@ -175,45 +175,37 @@ export class HealthService {
     };
   }
 
-  private async checkMongo(headers: IRequestHeaders): Promise<IHealthDependencyCheck> {
-    const logMessage = constructLogMessage(__filename, 'checkMongo', headers);
+  private async checkSupabase(headers: IRequestHeaders): Promise<IHealthDependencyCheck> {
+    const logMessage = constructLogMessage(__filename, 'checkSupabase', headers);
     const start = process.hrtime();
 
     try {
-      const state = mongoose.connection.readyState;
-      let status: DependencyStatus = 'fail';
-      let message = 'MongoDB connection is not established';
+      const supabase = getSupabaseAdmin();
+      const { error } = await supabase.from('topics').select('id').limit(1);
 
-      switch (state) {
-        case 1:
-          status = 'pass';
-          message = 'MongoDB connection established';
-          break;
-        case 2:
-          status = 'warn';
-          message = 'MongoDB connection is in progress';
-          break;
-        default:
-          status = 'fail';
-          message = 'MongoDB connection is not established';
+      let status: DependencyStatus = 'pass';
+      let message = 'Supabase reachable';
+      if (error) {
+        status = 'fail';
+        message = 'Supabase query failed';
       }
 
       const latency = toMilliseconds(process.hrtime(start));
-      this.log.debug(`${logMessage} :: MongoDB readiness status: ${status}`);
+      this.log.debug(`${logMessage} :: Supabase readiness status: ${status}`);
 
       return {
-        name: 'mongo',
+        name: 'supabase',
         status,
         message,
         latencyMs: latency,
         lastUpdated: new Date().toISOString()
       };
     } catch (error) {
-      this.log.error(`${logMessage} :: MongoDB readiness check failed`, { error });
+      this.log.error(`${logMessage} :: Supabase readiness check failed`, { error });
       return {
-        name: 'mongo',
+        name: 'supabase',
         status: 'fail',
-        message: 'Unexpected error while checking MongoDB',
+        message: 'Unexpected error while checking Supabase',
         lastUpdated: new Date().toISOString()
       };
     }

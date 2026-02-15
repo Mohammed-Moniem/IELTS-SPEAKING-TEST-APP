@@ -22,8 +22,7 @@ describe('connectDB', () => {
     const mockConnect = jest.fn().mockRejectedValue(new Error('Connection error'));
     mongoose.connect = mockConnect;
 
-    await connectDB();
-
+    await expect(connectDB()).rejects.toThrow('Connection error');
     expect(mockConnect).toHaveBeenCalledWith(expect.any(String));
   });
 });

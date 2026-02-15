@@ -16,10 +16,14 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { DetailedFeedbackView } from "../../components/DetailedFeedbackView";
 import { EmptyState } from "../../components/EmptyState";
+import { NextBestActionsCard, type NextBestAction } from "../../components/NextBestActionsCard";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { PracticeStackParamList } from "../../navigation/PracticeNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { formatDateTime } from "../../utils/date";
 import { extractErrorMessage } from "../../utils/errors";
 
@@ -33,6 +37,8 @@ export const PracticeResultDetailScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<PracticeStackParamList>>();
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const { sessionId } = route.params;
 
@@ -92,6 +98,78 @@ export const PracticeResultDetailScreen: React.FC = () => {
 
   const session = sessionQuery.data;
   const isCompleted = session.status === "completed";
+  const isVoice = session.source === "voice";
+
+  const goToSimulations = () => {
+    const rootNav = navigation.getParent?.()?.getParent?.() as any;
+    rootNav?.navigate?.("Simulations");
+  };
+
+  const actions: NextBestAction[] = isVoice
+    ? [
+        {
+          id: "voice-again",
+          title: "Try voice again",
+          subtitle: "Redo the same prompt and compare your feedback.",
+          icon: "mic",
+          onPress: () => {
+            const tabNav = navigation.getParent?.() as any;
+            tabNav?.navigate?.("VoiceTest", {
+              retryData: {
+                part: session.part as 1 | 2 | 3,
+                topic: session.topicTitle,
+                question: session.question,
+              },
+            });
+          },
+        },
+        {
+          id: "pick-topic",
+          title: "Pick another topic",
+          subtitle: "Browse more topics and start a new session.",
+          icon: "compass-outline",
+          onPress: () => navigation.navigate("PracticeHome"),
+        },
+        {
+          id: "new-sim",
+          title: "Start a new simulation",
+          subtitle: "Run a full mock test across Parts 1–3.",
+          icon: "trophy-outline",
+          onPress: goToSimulations,
+        },
+      ]
+    : [
+        {
+          id: "speak-prompt",
+          title: "Speak this prompt",
+          subtitle: "Try it in voice mode and get instant feedback.",
+          icon: "mic",
+          onPress: () => {
+            const tabNav = navigation.getParent?.() as any;
+            tabNav?.navigate?.("VoiceTest", {
+              retryData: {
+                part: session.part as 1 | 2 | 3,
+                topic: session.topicTitle,
+                question: session.question,
+              },
+            });
+          },
+        },
+        {
+          id: "retry-topic",
+          title: "Retry this topic",
+          subtitle: "Start a fresh practice session for this topic.",
+          icon: "refresh",
+          onPress: () => retryMutation.mutate(session.topicId),
+        },
+        {
+          id: "new-sim",
+          title: "Start a new simulation",
+          subtitle: "Run a full mock test across Parts 1–3.",
+          icon: "trophy-outline",
+          onPress: goToSimulations,
+        },
+      ];
 
   return (
     <ScreenContainer>
@@ -144,11 +222,26 @@ export const PracticeResultDetailScreen: React.FC = () => {
           </Card>
         )}
 
+        <NextBestActionsCard actions={actions} />
+
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <Button
-            title="Retry this topic"
-            onPress={() => retryMutation.mutate(session.topicId)}
+            title={isVoice ? "Try voice again" : "Retry this topic"}
+            onPress={() => {
+              if (isVoice) {
+                const tabNav = navigation.getParent?.() as any;
+                tabNav?.navigate?.("VoiceTest", {
+                  retryData: {
+                    part: session.part as 1 | 2 | 3,
+                    topic: session.topicTitle,
+                    question: session.question,
+                  },
+                });
+                return;
+              }
+              retryMutation.mutate(session.topicId);
+            }}
             loading={retryMutation.isPending}
             variant="secondary"
             style={styles.actionButton}
@@ -164,7 +257,8 @@ export const PracticeResultDetailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   centerContainer: {
     flex: 1,
     justifyContent: "center",
@@ -243,4 +337,4 @@ const styles = StyleSheet.create({
   actionButton: {
     width: "100%",
   },
-});
+  });

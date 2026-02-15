@@ -4,9 +4,11 @@ import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { GeneratedQuestionModel, IGeneratedQuestion } from '@models/GeneratedQuestionModel';
 import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
 import { Service } from 'typedi';
+
+import { IELTSQuestionService } from './IELTSQuestionService';
 
 interface Part1Question {
   topic: string;
@@ -42,14 +44,18 @@ export class QuestionGenerationService {
   private log = new Logger(__filename);
   private client?: OpenAI;
 
-  constructor() {
+  constructor(private readonly questionBankService: IELTSQuestionService) {
     if (env.openai.apiKey) {
-      this.client = new OpenAI({ apiKey: env.openai.apiKey });
+      this.client = new OpenAI({ apiKey: env.openai.apiKey, baseURL: process.env.OPENAI_BASE_URL });
     }
   }
 
   /**
-   * Generate a complete IELTS Speaking test (all 3 parts)
+   * Generate a complete IELTS Speaking test (all 3 parts).
+   *
+   * Preference order:
+   * 1. Serve from the seeded question bank (Postgres).
+   * 2. Fall back to OpenAI generation if configured.
    */
   public async generateCompleteTest(
     userId: string,
@@ -57,18 +63,76 @@ export class QuestionGenerationService {
     headers: IRequestHeaders
   ): Promise<GeneratedTestStructure> {
     const logMessage = constructLogMessage(__filename, 'generateCompleteTest', headers);
+    this.log.info(`${logMessage} :: Generating ${difficulty} test for user ${userId}`);
 
+    const questionBankResult = await this.generateFromQuestionBank(userId, difficulty, headers, logMessage);
+    if (questionBankResult) {
+      return questionBankResult;
+    }
+
+    this.log.warn(`${logMessage} :: Falling back to AI question generation`);
+
+    if (!this.client) {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.GenericErrorMessage,
+        'Question bank unavailable and AI generation disabled'
+      );
+    }
+
+    return this.generateViaOpenAI(userId, difficulty, headers, logMessage);
+  }
+
+  private async generateFromQuestionBank(
+    userId: string,
+    difficulty: 'beginner' | 'intermediate' | 'advanced',
+    headers: IRequestHeaders,
+    logMessage: string
+  ): Promise<GeneratedTestStructure | null> {
+    try {
+      const selection = await this.questionBankService.buildFullTestFromBank(userId, difficulty, headers);
+      if (!selection || !selection.part2) {
+        return null;
+      }
+
+      const part1 = this.mapPart1(selection.part1);
+      const part2 = this.mapPart2(selection.part2);
+      const part3 = this.mapPart3(selection.part3);
+
+      const now = new Date();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      this.log.info(`${logMessage} :: Test served from question bank`);
+
+      return {
+        testId: randomUUID(),
+        part1,
+        part2,
+        part3,
+        generatedAt: now,
+        expiresAt
+      };
+    } catch (error: any) {
+      this.log.warn(`${logMessage} :: Question bank lookup failed`, { error: error?.message || error });
+      return null;
+    }
+  }
+
+  private async generateViaOpenAI(
+    _userId: string,
+    difficulty: 'beginner' | 'intermediate' | 'advanced',
+    headers: IRequestHeaders,
+    logMessage: string
+  ): Promise<GeneratedTestStructure> {
     if (!this.client) {
       throw new CSError(HTTP_STATUS_CODES.SERVICE_UNAVAILABLE, CODES.GenericErrorMessage, 'AI service unavailable');
     }
-
-    this.log.info(`${logMessage} :: Generating ${difficulty} test for user ${userId}`);
 
     try {
       const prompt = this.buildCompleteTestPrompt(difficulty);
 
       const completion = await this.client.chat.completions.create({
-        model: env.openai.model || 'gpt-4',
+        model: env.openai.model || 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -80,7 +144,7 @@ export class QuestionGenerationService {
             content: prompt
           }
         ],
-        temperature: 0.8, // Higher creativity for varied questions
+        temperature: 0.8,
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
@@ -92,26 +156,18 @@ export class QuestionGenerationService {
 
       const parsed = JSON.parse(content);
 
-      // Store in database for future reference
-      const questionDoc = await GeneratedQuestionModel.create({
-        userId,
-        difficulty,
-        part1: parsed.part1,
-        part2: parsed.part2,
-        part3: parsed.part3,
-        generatedAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-      });
+      const now = new Date();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-      this.log.info(`${logMessage} :: Test generated successfully, ID: ${questionDoc._id}`);
+      this.log.info(`${logMessage} :: Test generated via AI`);
 
       return {
-        testId: questionDoc._id.toString(),
+        testId: randomUUID(),
         part1: parsed.part1,
         part2: parsed.part2,
         part3: parsed.part3,
-        generatedAt: questionDoc.generatedAt,
-        expiresAt: questionDoc.expiresAt
+        generatedAt: now,
+        expiresAt
       };
     } catch (error: any) {
       this.log.error(`${logMessage} :: Failed to generate test`, { error: error.message });
@@ -123,100 +179,95 @@ export class QuestionGenerationService {
     }
   }
 
-  /**
-   * Generate practice questions for a specific topic
-   */
-  public async generatePracticeQuestions(
-    topicSlug: string,
-    part: 1 | 2 | 3,
-    count: number,
-    headers: IRequestHeaders
-  ): Promise<string[]> {
-    const logMessage = constructLogMessage(__filename, 'generatePracticeQuestions', headers);
-
-    if (!this.client) {
-      return this.getFallbackQuestions(topicSlug, part, count);
+  private mapPart1(part1Rows: Array<{ question: string; topic: string }>): Part1Question {
+    const questions = part1Rows.map(row => row.question).filter(Boolean);
+    if (!questions.length) {
+      questions.push('Tell me about yourself.');
     }
 
-    try {
-      const prompt = this.buildPracticePrompt(topicSlug, part, count);
-
-      const completion = await this.client.chat.completions.create({
-        model: env.openai.model || 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an IELTS examiner creating practice questions.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-        response_format: { type: 'json_object' }
-      });
-
-      const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        return this.getFallbackQuestions(topicSlug, part, count);
-      }
-
-      const parsed = JSON.parse(content);
-      return parsed.questions || this.getFallbackQuestions(topicSlug, part, count);
-    } catch (error: any) {
-      this.log.warn(`${logMessage} :: Failed to generate questions, using fallback`, { error: error.message });
-      return this.getFallbackQuestions(topicSlug, part, count);
-    }
+    return {
+      topic: part1Rows[0]?.topic || 'Part 1 Warm-up',
+      questions,
+      timeLimit: 60
+    };
   }
 
-  /**
-   * Retrieve previously generated test
-   */
-  public async getGeneratedTest(testId: string, userId: string): Promise<IGeneratedQuestion | null> {
-    return GeneratedQuestionModel.findOne({
-      _id: testId,
-      userId,
-      expiresAt: { $gt: new Date() }
-    });
+  private mapPart2(part2Row: { question: string; topic: string; cue_card?: any | null }): Part2CueCard {
+    const cueCard = (part2Row as any).cue_card || {};
+    const mainPrompt = part2Row.question || cueCard.mainTopic || 'Describe an experience that was important to you.';
+    const bulletPoints = Array.isArray(cueCard.bulletPoints) && cueCard.bulletPoints.length
+      ? cueCard.bulletPoints
+      : this.buildFallbackCueCardBulletPoints(mainPrompt);
+
+    const responseTime = Number(cueCard.responseTime ?? cueCard.timeToSpeak ?? 120);
+
+    return {
+      topic: part2Row.topic || cueCard.mainTopic || 'Part 2 Topic',
+      mainPrompt,
+      bulletPoints,
+      preparationTime: Number(cueCard.preparationTime ?? 60),
+      responseTime
+    };
+  }
+
+  private mapPart3(part3Rows: Array<{ question: string; topic: string }>): Part3Question {
+    const questions = part3Rows.map(row => row.question).filter(Boolean);
+    if (!questions.length) {
+      questions.push('What are the wider implications of this topic?');
+    }
+
+    return {
+      topic: part3Rows[0]?.topic || 'Part 3 Discussion',
+      questions,
+      timeLimit: 90
+    };
+  }
+
+  private buildFallbackCueCardBulletPoints(mainPrompt: string): string[] {
+    const prompt = mainPrompt.trim().replace(/\.$/, '');
+    return [
+      `What ${prompt.toLowerCase().startsWith('describe') ? 'it is about' : 'happened'}`,
+      'When it happened',
+      'Who was involved',
+      'Why it is significant to you'
+    ];
   }
 
   private buildCompleteTestPrompt(difficulty: string): string {
     return `Generate a complete IELTS Speaking test for ${difficulty} level. Return ONLY valid JSON with this exact structure:
 
 {
-  "part1": {
-    "topic": "Work and Career",
-    "questions": [
-      "Do you work or are you a student?",
-      "What do you enjoy most about your job/studies?",
-      "How do you usually spend your weekends?",
-      "Is there anything you would like to change about your current situation?"
+  \"part1\": {
+    \"topic\": \"Work and Career\",
+    \"questions\": [
+      \"Do you work or are you a student?\",
+      \"What do you enjoy most about your job/studies?\",
+      \"How do you usually spend your weekends?\",
+      \"Is there anything you would like to change about your current situation?\"
     ],
-    "timeLimit": 60
+    \"timeLimit\": 60
   },
-  "part2": {
-    "topic": "A memorable journey",
-    "mainPrompt": "Describe a memorable journey you have taken",
-    "bulletPoints": [
-      "Where you went",
-      "Who you went with",
-      "What you did there",
-      "And explain why this journey was memorable"
+  \"part2\": {
+    \"topic\": \"A memorable journey\",
+    \"mainPrompt\": \"Describe a memorable journey you have taken\",
+    \"bulletPoints\": [
+      \"Where you went\",
+      \"Who you went with\",
+      \"What you did there\",
+      \"And explain why this journey was memorable\"
     ],
-    "preparationTime": 60,
-    "responseTime": 120
+    \"preparationTime\": 60,
+    \"responseTime\": 120
   },
-  "part3": {
-    "topic": "Travel and Tourism",
-    "questions": [
-      "How has tourism changed in your country over the past few decades?",
-      "What are the positive and negative impacts of tourism on local communities?",
-      "Do you think traveling abroad is essential for education? Why or why not?",
-      "How might technology change the way people travel in the future?"
+  \"part3\": {
+    \"topic\": \"Travel and Tourism\",
+    \"questions\": [
+      \"How has tourism changed in your country over the past few decades?\",
+      \"What are the positive and negative impacts of tourism on local communities?\",
+      \"Do you think traveling abroad is essential for education? Why or why not?\",
+      \"How might technology change the way people travel in the future?\"
     ],
-    "timeLimit": 90
+    \"timeLimit\": 90
   }
 }
 
@@ -228,38 +279,5 @@ Guidelines:
 - ${difficulty === 'beginner' ? 'Use simpler vocabulary and straightforward questions' : ''}
 - ${difficulty === 'advanced' ? 'Use complex structures and thought-provoking questions' : ''}`;
   }
-
-  private buildPracticePrompt(topicSlug: string, part: number, count: number): string {
-    const partDescriptions = {
-      1: 'simple, familiar questions about daily life, work, hobbies, or family',
-      2: 'a cue card with a clear topic and 4 bullet points for a 2-minute speech',
-      3: 'abstract, analytical discussion questions requiring in-depth answers'
-    };
-
-    return `Generate ${count} IELTS Speaking Part ${part} questions about "${topicSlug}".
-Part ${part} focuses on: ${partDescriptions[part as keyof typeof partDescriptions]}
-
-Return ONLY valid JSON:
-{
-  "questions": ["Question 1", "Question 2", ...]
-}`;
-  }
-
-  private getFallbackQuestions(topicSlug: string, part: number, count: number): string[] {
-    const fallbacks: Record<string, string[]> = {
-      hometown: [
-        'Where are you from?',
-        'What do you like most about your hometown?',
-        'Has your hometown changed much in recent years?'
-      ],
-      work: ['Do you work or are you a student?', 'What do you enjoy about your job?', 'What are your career goals?'],
-      hobbies: [
-        'What do you do in your free time?',
-        'Do you have any hobbies?',
-        'How did you become interested in them?'
-      ]
-    };
-
-    return fallbacks[topicSlug]?.slice(0, count) || [`Tell me about ${topicSlug}`];
-  }
 }
+

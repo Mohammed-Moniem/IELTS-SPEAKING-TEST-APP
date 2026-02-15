@@ -5,7 +5,9 @@ import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestCo
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { topicGenerationRateLimiter } from '@middlewares/rateLimitMiddleware';
+import { AuthMiddleware } from '@middlewares/AuthMiddleware';
 import { StandardResponse } from '@responses/StandardResponse';
+import { IELTSQuestionService } from '@services/IELTSQuestionService';
 import { TopicGenerationService } from '@services/TopicGenerationService';
 import { TopicService } from '@services/TopicService';
 import { Container } from 'typedi';
@@ -13,9 +15,31 @@ import { Container } from 'typedi';
 @JsonController('/topics')
 export class TopicController {
   private topicGenerationService: TopicGenerationService;
+  private questionBankService: IELTSQuestionService;
 
   constructor(private readonly topicService: TopicService) {
     this.topicGenerationService = Container.get(TopicGenerationService);
+    this.questionBankService = Container.get(IELTSQuestionService);
+  }
+
+  private parseCategory(raw?: string): 'part1' | 'part2' | 'part3' | undefined {
+    const value = (raw || '').trim();
+    if (!value) return undefined;
+    if (value === 'part1' || value === 'part2' || value === 'part3') return value;
+    return undefined;
+  }
+
+  private parseDifficulty(raw?: string): 'easy' | 'medium' | 'hard' {
+    const value = (raw || '').trim();
+    if (value === 'easy' || value === 'medium' || value === 'hard') return value;
+    return 'medium';
+  }
+
+  private parseTopicDifficulty(raw?: string): 'beginner' | 'intermediate' | 'advanced' | undefined {
+    const value = (raw || '').trim();
+    if (!value) return undefined;
+    if (value === 'beginner' || value === 'intermediate' || value === 'advanced') return value;
+    return undefined;
   }
 
   @Get('/')
@@ -26,8 +50,7 @@ export class TopicController {
 
     try {
       const topics = await this.topicService.listTopics(headers);
-      const serialized = topics.map(topic => topic.toObject());
-      return StandardResponse.success(res, serialized, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
+      return StandardResponse.success(res, topics, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }
@@ -43,7 +66,9 @@ export class TopicController {
     @QueryParam('limit') limit: number = 10,
     @QueryParam('offset') offset: number = 0,
     @QueryParam('excludeCompleted') excludeCompleted: boolean = true,
-    @QueryParam('category') category: 'part1' | 'part2' | 'part3' | undefined,
+    @QueryParam('category') category?: string,
+    @QueryParam('difficulty') difficulty?: string,
+    @QueryParam('q') q?: string,
     @Req() req: Request,
     @Res() res: Response
   ) {
@@ -60,19 +85,37 @@ export class TopicController {
         });
       }
 
+      const parsedCategory = this.parseCategory(category);
+      if (category && !parsedCategory) {
+        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid category. Must be part1, part2, or part3'
+        });
+      }
+
+      const parsedDifficulty = this.parseTopicDifficulty(difficulty);
+      if (difficulty && !parsedDifficulty) {
+        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid difficulty. Must be beginner, intermediate, or advanced'
+        });
+      }
+
       const result = await this.topicService.getTopicsWithPagination(
         userId,
         Math.min(limit, 50), // Cap at 50
         Math.max(offset, 0), // Ensure non-negative
         excludeCompleted,
-        category,
+        parsedCategory,
+        parsedDifficulty,
+        q,
         headers
       );
 
       return StandardResponse.success(
         res,
         {
-          topics: result.topics.map(t => t.toObject()),
+          topics: result.topics,
           total: result.total,
           hasMore: result.hasMore,
           limit,
@@ -91,12 +134,13 @@ export class TopicController {
    * Get a single random topic
    * GET /api/v1/topics/get-random?category=part1&difficulty=medium
    * Note: Using /get-random instead of /random to avoid conflicts with /:slug route
-   */
+  */
   @Get('/get-random')
   @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  @UseBefore(AuthMiddleware)
   public async getRandomTopic(
-    @QueryParam('category') category: 'part1' | 'part2' | 'part3',
-    @QueryParam('difficulty') difficulty: 'easy' | 'medium' | 'hard' = 'medium',
+    @QueryParam('category') category?: string,
+    @QueryParam('difficulty') difficulty: string = 'medium',
     @Req() req: Request,
     @Res() res: Response
   ) {
@@ -105,20 +149,86 @@ export class TopicController {
 
     try {
       // Validate category
-      if (!category || !['part1', 'part2', 'part3'].includes(category)) {
+      const parsedCategory = this.parseCategory(category);
+      if (!parsedCategory) {
         return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({
           success: false,
           message: 'Invalid or missing category. Must be part1, part2, or part3'
         });
       }
 
-      // Generate single random topic
-      const topic = await this.topicGenerationService.generateRandomTopic(category, difficulty || 'medium');
+      const userId = (req as any).currentUser?.id;
+      const parsedDifficulty = this.parseDifficulty(difficulty);
+
+      // Try pulling from question bank first for authentic content
+      const bankTopic = await this.questionBankService.getRandomTopicFromBank(
+        parsedCategory,
+        parsedDifficulty,
+        userId,
+        headers
+      );
+
+      if (bankTopic) {
+        return StandardResponse.success(
+          res,
+          bankTopic,
+          'Random topic retrieved from question bank',
+          HTTP_STATUS_CODES.SUCCESS,
+          headers
+        );
+      }
+
+      // Fall back to AI generation if bank has no data
+      const generatedTopic = await this.topicGenerationService.generateRandomTopic(parsedCategory, parsedDifficulty);
 
       return StandardResponse.success(
         res,
-        topic,
+        generatedTopic,
         'Random topic generated successfully',
+        HTTP_STATUS_CODES.SUCCESS,
+        headers
+      );
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  /**
+   * Get list of common IELTS topics
+   * GET /api/v1/topics/common?category=part1
+   *
+   * NOTE: This must be registered before `/:slug` so it doesn't get treated as a slug.
+   */
+  @Get('/common')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async getCommonTopics(
+    @QueryParam('category') category?: string,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'topics-common');
+    ensureResponseHeaders(res, headers);
+
+    try {
+      // Validate category
+      const parsedCategory = this.parseCategory(category);
+      if (!parsedCategory) {
+        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({
+          success: false,
+          message: 'Invalid or missing category. Must be part1, part2, or part3'
+        });
+      }
+
+      const topics = this.topicGenerationService.getCommonTopics(parsedCategory);
+
+      return StandardResponse.success(
+        res,
+        {
+          category: parsedCategory,
+          topics,
+          count: topics.length
+        },
+        'Common topics retrieved successfully',
         HTTP_STATUS_CODES.SUCCESS,
         headers
       );
@@ -138,7 +248,7 @@ export class TopicController {
       if (!topic) {
         return StandardResponse.notFound(res, 'Topic', headers);
       }
-      return StandardResponse.success(res, topic.toObject(), undefined, HTTP_STATUS_CODES.SUCCESS, headers);
+      return StandardResponse.success(res, topic, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }
@@ -201,47 +311,6 @@ export class TopicController {
           generated: finalTopics.length
         },
         'Topics generated successfully',
-        HTTP_STATUS_CODES.SUCCESS,
-        headers
-      );
-    } catch (error) {
-      return StandardResponse.error(res, error as Error, headers);
-    }
-  }
-
-  /**
-   * Get list of common IELTS topics
-   * GET /api/v1/topics/common?category=part1
-   */
-  @Get('/common')
-  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
-  public async getCommonTopics(
-    @QueryParam('category') category: 'part1' | 'part2' | 'part3',
-    @Req() req: Request,
-    @Res() res: Response
-  ) {
-    const headers: IRequestHeaders = buildRequestHeaders(req, 'topics-common');
-    ensureResponseHeaders(res, headers);
-
-    try {
-      // Validate category
-      if (!category || !['part1', 'part2', 'part3'].includes(category)) {
-        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({
-          success: false,
-          message: 'Invalid or missing category. Must be part1, part2, or part3'
-        });
-      }
-
-      const topics = this.topicGenerationService.getCommonTopics(category);
-
-      return StandardResponse.success(
-        res,
-        {
-          category,
-          topics,
-          count: topics.length
-        },
-        'Common topics retrieved successfully',
         HTTP_STATUS_CODES.SUCCESS,
         headers
       );

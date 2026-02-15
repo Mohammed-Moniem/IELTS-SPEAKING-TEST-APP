@@ -5,7 +5,6 @@ import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestCo
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
-import { SubscriptionPlan } from '@models/UserModel';
 import { StandardResponse } from '@responses/StandardResponse';
 import { UsageService } from '@services/UsageService';
 
@@ -25,7 +24,7 @@ export class UsageController {
     }
 
     try {
-      const plan = (req.currentUser.plan as SubscriptionPlan) || 'free';
+      const plan = (req.currentUser.plan as 'free' | 'premium' | 'pro') || 'free';
       const summary = await this.usageService.getUsageSummary(req.currentUser.id, plan, headers);
       return StandardResponse.success(res, summary, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {

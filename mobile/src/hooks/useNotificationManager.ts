@@ -6,7 +6,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef } from "react";
 
+import { DEFAULT_NOTIFICATION_SETTINGS } from "../constants/notifications";
 import notificationService from "../services/notificationService";
+import { NotificationSettings } from "../types/api";
 
 interface UserActivity {
   lastPracticeDate: string | null;
@@ -47,7 +49,7 @@ export const useNotificationManager = () => {
 
       // Set up daily reminder if enabled
       const settings = await getNotificationSettings();
-      if (settings?.dailyReminderEnabled) {
+      if (settings.dailyReminderEnabled) {
         await notificationService.scheduleDailyReminder(
           settings.dailyReminderHour || 19,
           settings.dailyReminderMinute || 0,
@@ -57,14 +59,21 @@ export const useNotificationManager = () => {
     }
   };
 
-  const getNotificationSettings = async () => {
+  const getNotificationSettings = async (): Promise<NotificationSettings> => {
     try {
       const stored = await AsyncStorage.getItem(NOTIFICATION_SETTINGS_KEY);
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          ...DEFAULT_NOTIFICATION_SETTINGS,
+          ...parsed,
+        };
+      }
     } catch (error) {
       console.error("Failed to get notification settings:", error);
-      return null;
     }
+
+    return DEFAULT_NOTIFICATION_SETTINGS;
   };
 
   const getUserActivity = async (): Promise<UserActivity> => {
@@ -88,8 +97,6 @@ export const useNotificationManager = () => {
     try {
       const activity = await getUserActivity();
       const settings = await getNotificationSettings();
-
-      if (!settings) return;
 
       const now = new Date();
       const lastPractice = activity.lastPracticeDate
@@ -192,7 +199,7 @@ export const useNotificationManager = () => {
 
   const notifyFeedbackReady = async (sessionTitle: string) => {
     const settings = await getNotificationSettings();
-    if (settings?.feedbackNotificationsEnabled) {
+    if (settings.feedbackNotificationsEnabled) {
       await notificationService.sendFeedbackReadyNotification(sessionTitle);
     }
   };
@@ -202,7 +209,7 @@ export const useNotificationManager = () => {
     description: string
   ) => {
     const settings = await getNotificationSettings();
-    if (settings?.achievementsEnabled) {
+    if (settings.achievementsEnabled) {
       await notificationService.sendAchievementNotification(
         achievementName,
         description

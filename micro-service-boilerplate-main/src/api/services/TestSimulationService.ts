@@ -1,17 +1,19 @@
 import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
+import { env } from '@env';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { IPracticeFeedback } from '@models/PracticeSessionModel';
-import { TestPreferenceModel } from '@models/TestPreferenceModel';
-import { TestSimulationDocument, TestSimulationModel } from '@models/TestSimulationModel';
-import { UserModel } from '@models/UserModel';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
 import { Service } from 'typedi';
 
 import { FeedbackService } from './FeedbackService';
+import { AnalyticsService } from './AnalyticsService';
 import { QuestionGenerationService } from './QuestionGenerationService';
 import { UsageService } from './UsageService';
+import { TestType } from '../models/TestHistory';
+
+type SubscriptionPlan = 'free' | 'premium' | 'pro';
 
 interface SimulationPartDefinition {
   part: number;
@@ -27,6 +29,19 @@ interface SimulationListOptions {
   offset: number;
 }
 
+type SimulationRow = {
+  id: string;
+  user_id: string;
+  status: 'in_progress' | 'completed';
+  parts: any[];
+  overall_feedback: any | null;
+  overall_band: number | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 @Service()
 export class TestSimulationService {
   private log = new Logger(__filename);
@@ -34,45 +49,74 @@ export class TestSimulationService {
   constructor(
     private readonly usageService: UsageService,
     private readonly feedbackService: FeedbackService,
-    private readonly questionGenerationService: QuestionGenerationService
+    private readonly questionGenerationService: QuestionGenerationService,
+    private readonly analyticsService: AnalyticsService
   ) {}
+
+  public paginateOptions(limit?: number, offset?: number) {
+    return {
+      limit: typeof limit === 'number' && limit > 0 ? Math.min(limit, 50) : 10,
+      offset: typeof offset === 'number' && offset >= 0 ? offset : 0
+    };
+  }
+
+  private mapSimulation(row: SimulationRow) {
+    return {
+      _id: row.id,
+      status: row.status,
+      parts: Array.isArray(row.parts) ? row.parts : [],
+      overallFeedback: row.overall_feedback || undefined,
+      overallBand: row.overall_band ?? undefined,
+      startedAt: row.started_at,
+      completedAt: row.completed_at || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
 
   public async startSimulation(userId: string, headers: IRequestHeaders) {
     const logMessage = constructLogMessage(__filename, 'startSimulation', headers);
+    const supabase = getSupabaseAdmin();
 
-    const user = await UserModel.findById(userId);
-    if (!user) {
-      throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'User not found');
-    }
+    const { data: profile } = await supabase.from('profiles').select('subscription_plan').eq('id', userId).maybeSingle();
+    const plan = ((profile as any)?.subscription_plan as SubscriptionPlan | undefined) || 'free';
+    const effectivePlan: SubscriptionPlan = env.payments?.disabled ? 'pro' : plan;
 
-    await this.usageService.assertTestAllowance(userId, user.subscriptionPlan, headers);
-
-    // Increment usage counter IMMEDIATELY after passing allowance check
-    // This prevents race conditions where multiple simulations can be started simultaneously
+    await this.usageService.assertTestAllowance(userId, effectivePlan, headers);
     await this.usageService.incrementTest(userId);
 
     const parts = await this.buildSimulationParts(userId, headers);
-    const simulation = (await TestSimulationModel.create({
-      user: userId,
-      status: 'in_progress',
-      parts: parts.map(part => ({
-        part: part.part,
-        question: part.question,
-        topicId: part.topicId,
-        topicTitle: part.topicTitle,
-        timeLimit: part.timeLimit,
-        tips: part.tips,
-        response: undefined,
-        timeSpent: undefined,
-        feedback: undefined
-      })),
-      startedAt: new Date()
-    })) as TestSimulationDocument;
 
-    this.log.info(`${logMessage} :: Started simulation ${simulation._id}`);
+    const { data: inserted, error } = await supabase
+      .from('test_simulations')
+      .insert({
+        user_id: userId,
+        status: 'in_progress',
+        parts: parts.map(part => ({
+          part: part.part,
+          question: part.question,
+          topicId: part.topicId,
+          topicTitle: part.topicTitle,
+          timeLimit: part.timeLimit,
+          tips: part.tips,
+          response: undefined,
+          timeSpent: undefined,
+          feedback: undefined
+        })),
+        started_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+
+    if (error || !inserted) {
+      this.log.error(`${logMessage} :: Failed to start simulation`, { error: error?.message || error });
+      throw new CSError(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR, CODES.GenericErrorMessage, 'Failed to start simulation');
+    }
+
+    this.log.info(`${logMessage} :: Started simulation ${inserted.id}`);
 
     return {
-      simulationId: simulation._id,
+      simulationId: inserted.id,
       parts
     };
   }
@@ -89,25 +133,33 @@ export class TestSimulationService {
     headers: IRequestHeaders
   ) {
     const logMessage = constructLogMessage(__filename, 'completeSimulation', headers);
+    const supabase = getSupabaseAdmin();
 
-    const simulation = (await TestSimulationModel.findOne({
-      _id: simulationId,
-      user: userId
-    })) as TestSimulationDocument | null;
+    const { data: simulation, error } = await supabase
+      .from('test_simulations')
+      .select(
+        'id, user_id, status, parts, overall_feedback, overall_band, started_at, completed_at, created_at, updated_at'
+      )
+      .eq('id', simulationId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (!simulation) {
+    if (error || !simulation) {
       throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'Simulation not found');
     }
 
-    if (simulation.status === 'completed') {
-      return simulation;
+    const row = simulation as SimulationRow;
+    if (row.status === 'completed') {
+      return this.mapSimulation(row);
     }
 
-    const preferences = await TestPreferenceModel.findOne({ user: userId }).lean<{ targetBand?: string }>();
+    const { data: pref } = await supabase.from('preferences').select('target_band').eq('user_id', userId).maybeSingle();
+    const targetBand = (pref as any)?.target_band as string | undefined;
 
-    const partMap = new Map(simulation.parts.map(part => [part.part, part] as const));
+    const existingParts = Array.isArray(row.parts) ? [...row.parts] : [];
+    const partMap = new Map<number, any>(existingParts.map((p: any) => [p.part, p]));
 
-    const feedbackResults: IPracticeFeedback[] = [];
+    const feedbackResults: any[] = [];
     for (const payload of partsPayload) {
       const part = partMap.get(payload.part);
       if (!part) {
@@ -120,7 +172,7 @@ export class TestSimulationService {
       const feedback = await this.feedbackService.generatePracticeFeedback(
         part.question,
         payload.response || '',
-        preferences?.targetBand,
+        targetBand,
         headers
       );
 
@@ -135,8 +187,13 @@ export class TestSimulationService {
         summary: feedback.summary,
         strengths: feedback.strengths,
         improvements: feedback.improvements,
-        generatedAt: new Date(),
-        model: feedback.model
+        generatedAt: new Date().toISOString(),
+        model: feedback.model,
+        fluencyAnalysis: feedback.fluencyAnalysis,
+        pronunciationAnalysis: feedback.pronunciationAnalysis,
+        lexicalAnalysis: feedback.lexicalAnalysis,
+        grammaticalAnalysis: feedback.grammaticalAnalysis,
+        coherenceCohesion: feedback.coherenceCohesion
       };
 
       feedbackResults.push(part.feedback);
@@ -144,42 +201,123 @@ export class TestSimulationService {
 
     const aggregated = this.aggregateFeedback(feedbackResults);
 
-    simulation.status = 'completed';
-    simulation.completedAt = new Date();
-    simulation.overallFeedback = aggregated;
-    simulation.overallBand = aggregated.overallBand;
+    const { data: updated, error: updateError } = await supabase
+      .from('test_simulations')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        parts: existingParts,
+        overall_feedback: aggregated,
+        overall_band: aggregated.overallBand ?? null
+      })
+      .eq('id', simulationId)
+      .eq('user_id', userId)
+      .select(
+        'id, user_id, status, parts, overall_feedback, overall_band, started_at, completed_at, created_at, updated_at'
+      )
+      .single();
 
-    await simulation.save();
-
-    // Usage was already incremented at simulation start to prevent race conditions
+    if (updateError || !updated) {
+      this.log.error(`${logMessage} :: Failed to complete simulation ${simulationId}`, {
+        error: updateError?.message || updateError
+      });
+      throw new CSError(
+        HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR,
+        CODES.GenericErrorMessage,
+        'Failed to complete simulation'
+      );
+    }
 
     this.log.info(`${logMessage} :: Completed simulation ${simulationId}`);
+    // Best-effort persist to analytics history for progress snapshot + trends.
+    try {
+      const breakdown = aggregated?.bandBreakdown || {};
+      const criteria = {
+        fluencyCoherence: { band: Number(breakdown.fluency || 0), feedback: '', strengths: [], improvements: [] },
+        lexicalResource: { band: Number(breakdown.lexicalResource || 0), feedback: '', strengths: [], improvements: [] },
+        grammaticalRange: { band: Number(breakdown.grammaticalRange || 0), feedback: '', strengths: [], improvements: [] },
+        pronunciation: { band: Number(breakdown.pronunciation || 0), feedback: '', strengths: [], improvements: [] }
+      };
 
-    return simulation;
+      const durationSeconds = existingParts
+        .map((p: any) => Number(p?.timeSpent || 0))
+        .reduce((sum: number, n: number) => sum + (Number.isFinite(n) ? n : 0), 0);
+
+      const topics = existingParts
+        .map((p: any) => (typeof p?.topicTitle === 'string' ? p.topicTitle : undefined))
+        .filter(Boolean);
+
+      await this.analyticsService.saveTestResult({
+        userId,
+        sessionId: simulationId,
+        testType: TestType.SIMULATION,
+        topic: 'Full Simulation',
+        testPart: 'full',
+        durationSeconds: Math.max(0, Math.round(durationSeconds)),
+        completedAt: new Date(),
+        overallBand: Number(aggregated?.overallBand || 0),
+        criteria,
+        corrections: [],
+        suggestions: Array.isArray(aggregated?.improvements) ? aggregated.improvements : [],
+        metadata: {
+          source: 'test_simulation',
+          topics
+        }
+      });
+    } catch (analyticsError: any) {
+      this.log.warn(`${logMessage} :: Failed to persist analytics for simulation`, {
+        simulationId,
+        error: analyticsError?.message || analyticsError
+      });
+    }
+
+    return this.mapSimulation(updated as SimulationRow);
   }
 
   public async listSimulations(userId: string, options: SimulationListOptions) {
-    return TestSimulationModel.find({ user: userId }).sort({ createdAt: -1 }).skip(options.offset).limit(options.limit);
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('test_simulations')
+      .select('id, user_id, status, parts, overall_feedback, overall_band, started_at, completed_at, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(Math.max(0, options.offset), Math.max(0, options.offset) + Math.max(1, options.limit) - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    return ((data || []) as SimulationRow[]).map(row => this.mapSimulation(row));
   }
 
   public async getSimulation(userId: string, simulationId: string) {
-    return TestSimulationModel.findOne({ _id: simulationId, user: userId });
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('test_simulations')
+      .select('id, user_id, status, parts, overall_feedback, overall_band, started_at, completed_at, created_at, updated_at')
+      .eq('id', simulationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return this.mapSimulation(data as SimulationRow);
   }
 
   private async buildSimulationParts(userId: string, headers: IRequestHeaders): Promise<SimulationPartDefinition[]> {
     const logMessage = constructLogMessage(__filename, 'buildSimulationParts', headers);
+    const supabase = getSupabaseAdmin();
 
     try {
-      // Get user's target band to determine difficulty
-      const preferences = await TestPreferenceModel.findOne({ user: userId }).lean<{ targetBand?: string }>();
-      const difficulty = this.determineDifficulty(preferences?.targetBand);
+      const { data: preferences } = await supabase.from('preferences').select('target_band').eq('user_id', userId).maybeSingle();
+      const difficulty = this.determineDifficulty((preferences as any)?.target_band as string | undefined);
 
-      // Generate AI-powered test questions
       const generatedTest = await this.questionGenerationService.generateCompleteTest(userId, difficulty, headers);
 
       const parts: SimulationPartDefinition[] = [];
 
-      // Part 1: Warm-up questions
       parts.push({
         part: 1,
         topicId: generatedTest.part1.topic,
@@ -189,8 +327,9 @@ export class TestSimulationService {
         tips: ['Keep answers brief (30-60 seconds)', 'Give specific examples', 'Speak naturally and confidently']
       });
 
-      // Part 2: Cue card
-      const cueCardText = `${generatedTest.part2.mainPrompt}\n\nYou should say:\n${generatedTest.part2.bulletPoints.map(bp => `• ${bp}`).join('\n')}`;
+      const cueCardText = `${generatedTest.part2.mainPrompt}\n\nYou should say:\n${generatedTest.part2.bulletPoints
+        .map(bp => `• ${bp}`)
+        .join('\n')}`;
       parts.push({
         part: 2,
         topicId: generatedTest.part2.topic,
@@ -205,7 +344,6 @@ export class TestSimulationService {
         ]
       });
 
-      // Part 3: Discussion
       parts.push({
         part: 3,
         topicId: generatedTest.part3.topic,
@@ -268,7 +406,7 @@ export class TestSimulationService {
     ];
   }
 
-  private aggregateFeedback(feedbackList: IPracticeFeedback[]): IPracticeFeedback {
+  private aggregateFeedback(feedbackList: any[]): any {
     if (!feedbackList.length) {
       return {
         overallBand: undefined,
@@ -318,26 +456,21 @@ export class TestSimulationService {
       }
     );
 
-    const average = (value: number) => (sums.count ? Number((value / sums.count).toFixed(1)) : undefined);
+    const avg = (value: number) => (sums.count ? Math.round((value / sums.count) * 10) / 10 : 0);
 
+    const overallBand = avg(sums.overall);
     return {
-      overallBand: average(sums.overall),
+      overallBand,
       bandBreakdown: {
-        pronunciation: average(sums.pronunciation),
-        fluency: average(sums.fluency),
-        lexicalResource: average(sums.lexical),
-        grammaticalRange: average(sums.grammar)
+        pronunciation: avg(sums.pronunciation),
+        fluency: avg(sums.fluency),
+        lexicalResource: avg(sums.lexical),
+        grammaticalRange: avg(sums.grammar)
       },
-      summary: 'Completed IELTS speaking simulation with aggregated insights from all parts.',
-      strengths: Array.from(sums.strengths),
-      improvements: Array.from(sums.improvements)
-    };
-  }
-
-  public paginateOptions(limit?: number, offset?: number): SimulationListOptions {
-    return {
-      limit: limit ?? 10,
-      offset: offset ?? 0
+      summary: `Overall band estimate: ${overallBand}.`,
+      strengths: Array.from(sums.strengths).slice(0, 8),
+      improvements: Array.from(sums.improvements).slice(0, 8),
+      generatedAt: new Date().toISOString()
     };
   }
 }

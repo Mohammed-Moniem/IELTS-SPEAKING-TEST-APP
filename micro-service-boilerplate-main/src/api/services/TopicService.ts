@@ -2,180 +2,172 @@ import { defaultTopics } from '@api/data/topics';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { PracticeSessionModel } from '@models/PracticeSessionModel';
-import { TopicDocument, TopicModel } from '@models/TopicModel';
-import { Container, Service } from 'typedi';
-import { TopicGenerationService } from './TopicGenerationService';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
+import { Service } from 'typedi';
+
+type TopicRow = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  part: number;
+  category: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  is_premium: boolean;
+};
+
+type TopicDto = {
+  _id: string;
+  slug: string;
+  title: string;
+  description: string;
+  part: number;
+  category: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  isPremium: boolean;
+};
+
+function mapTopic(row: TopicRow): TopicDto {
+  return {
+    _id: row.id,
+    slug: row.slug,
+    title: row.title,
+    description: row.description,
+    part: row.part,
+    category: row.category,
+    difficulty: row.difficulty,
+    isPremium: row.is_premium
+  };
+}
 
 @Service()
 export class TopicService {
   private log = new Logger(__filename);
-  private topicGenerationService: TopicGenerationService;
 
-  constructor() {
-    this.topicGenerationService = Container.get(TopicGenerationService);
-  }
-
-  public async listTopics(headers: IRequestHeaders): Promise<TopicDocument[]> {
+  public async listTopics(headers: IRequestHeaders): Promise<TopicDto[]> {
     const logMessage = constructLogMessage(__filename, 'listTopics', headers);
+    const supabase = getSupabaseAdmin();
 
-    let topics = (await TopicModel.find({}).sort({ part: 1, difficulty: 1 })) as TopicDocument[];
-    if (!topics.length) {
-      this.log.info(`${logMessage} :: Seeding default topics`);
-      await TopicModel.insertMany(defaultTopics, { ordered: false }).catch(error => {
-        this.log.warn(`${logMessage} :: Topic seeding encountered issues`, { error: error.message });
-      });
-      topics = (await TopicModel.find({}).sort({ part: 1, difficulty: 1 })) as TopicDocument[];
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id, slug, title, description, part, category, difficulty, is_premium')
+      .order('part', { ascending: true })
+      .order('difficulty', { ascending: true });
+
+    if (error) {
+      this.log.error(`${logMessage} :: Failed to list topics`, { error: error.message });
+      return [];
     }
 
-    return topics;
+    if (!data || data.length === 0) {
+      this.log.info(`${logMessage} :: Seeding default topics into Supabase`);
+      const seedPayload = defaultTopics.map(t => ({
+        slug: t.slug,
+        title: t.title,
+        description: t.description,
+        part: t.part,
+        category: t.category,
+        difficulty: t.difficulty,
+        is_premium: t.isPremium
+      }));
+      await supabase.from('topics').upsert(seedPayload, { onConflict: 'slug' });
+      const { data: seeded } = await supabase
+        .from('topics')
+        .select('id, slug, title, description, part, category, difficulty, is_premium')
+        .order('part', { ascending: true })
+        .order('difficulty', { ascending: true });
+      return (seeded || []).map(mapTopic);
+    }
+
+    return (data as TopicRow[]).map(mapTopic);
   }
 
-  public async getTopicBySlug(slug: string, headers: IRequestHeaders): Promise<TopicDocument | null> {
+  public async getTopicBySlug(slug: string, headers: IRequestHeaders): Promise<TopicDto | null> {
     const logMessage = constructLogMessage(__filename, 'getTopicBySlug', headers);
-    const topic = await TopicModel.findOne({ slug });
-    if (!topic) {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('topics')
+      .select('id, slug, title, description, part, category, difficulty, is_premium')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error || !data) {
       this.log.warn(`${logMessage} :: Topic ${slug} not found`);
+      return null;
     }
-    return topic as TopicDocument | null;
+
+    return mapTopic(data as TopicRow);
   }
 
-  /**
-   * Get topics with pagination and exclude completed ones
-   */
   public async getTopicsWithPagination(
     userId: string,
     limit: number = 10,
     offset: number = 0,
     excludeCompleted: boolean = true,
     category?: 'part1' | 'part2' | 'part3',
+    difficulty?: 'beginner' | 'intermediate' | 'advanced',
+    q?: string,
     headers?: IRequestHeaders
-  ): Promise<{ topics: TopicDocument[]; total: number; hasMore: boolean }> {
+  ): Promise<{ topics: TopicDto[]; total: number; hasMore: boolean }> {
     const logMessage = constructLogMessage(__filename, 'getTopicsWithPagination', headers);
+    const supabase = getSupabaseAdmin();
 
-    // Get completed topic slugs for this user if we need to exclude them
-    let excludedTopicSlugs: string[] = [];
+    let excludedIds: string[] = [];
     if (excludeCompleted) {
-      const completedSessions = await PracticeSessionModel.find({
-        user: userId,
-        status: 'completed'
-      }).select('topicId');
-      excludedTopicSlugs = completedSessions.map((session: any) => session.topicId).filter(Boolean) as string[];
+      const { data: completed } = await supabase
+        .from('practice_sessions')
+        .select('topic_id')
+        .eq('user_id', userId)
+        .eq('status', 'completed');
+      excludedIds = (completed || [])
+        .map((row: any) => row.topic_id as string | null)
+        .filter((id: any): id is string => Boolean(id));
     }
 
-    // Build query
-    const query: any = {};
-    if (excludedTopicSlugs.length > 0) {
-      query.slug = { $nin: excludedTopicSlugs };
+    let query = supabase
+      .from('topics')
+      .select('id, slug, title, description, part, category, difficulty, is_premium', { count: 'exact' });
+
+    if (excludedIds.length > 0) {
+      // PostgREST expects `in.(...)` value list.
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
     }
+
     if (category) {
-      // Map category to part number
-      const partNumber = parseInt(category.replace('part', ''));
-      query.part = partNumber;
-    }
-
-    // Get total count
-    const total = await TopicModel.countDocuments(query);
-
-    // If we don't have enough unpracticed topics for the user, generate more
-    if (total < 10 && excludeCompleted) {
-      const needed = 10 - total;
-      this.log.info(`${logMessage} :: User has only ${total} unpracticed topics, generating ${needed} more`);
-
-      // Generate topics across all parts to provide variety
-      const partsCount = Math.ceil(needed / 3);
-      for (const part of ['part1', 'part2', 'part3'] as const) {
-        await this.generateAndSaveTopics(part, partsCount, headers);
+      const partNumber = parseInt(category.replace('part', ''), 10);
+      if (!Number.isNaN(partNumber)) {
+        query = query.eq('part', partNumber);
       }
-
-      // Recalculate total after generation
-      const newTotal = await TopicModel.countDocuments(query);
-      this.log.info(`${logMessage} :: After generation, user now has ${newTotal} unpracticed topics`);
     }
 
-    // Fetch topics with pagination
-    const topics = (await TopicModel.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit)) as TopicDocument[];
+    if (difficulty) {
+      query = query.eq('difficulty', difficulty);
+    }
 
+    const qNormalized = typeof q === 'string' ? q.trim() : '';
+    if (qNormalized) {
+      // PostgREST `.or()` uses commas to separate conditions; strip commas from input.
+      const safe = qNormalized.replace(/%/g, '').replace(/,/g, ' ').slice(0, 80);
+      const pattern = `%${safe}%`;
+      query = query.or(`title.ilike.${pattern},description.ilike.${pattern}`);
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(Math.max(0, offset), Math.max(0, offset) + Math.min(limit, 50) - 1);
+
+    if (error) {
+      this.log.error(`${logMessage} :: Failed to fetch topics`, { error: error.message });
+      return { topics: [], total: 0, hasMore: false };
+    }
+
+    const total = typeof count === 'number' ? count : (data || []).length;
     const hasMore = total > offset + limit;
 
     return {
-      topics,
+      topics: ((data || []) as TopicRow[]).map(mapTopic),
       total,
       hasMore
     };
-  }
-
-  /**
-   * Generate and save new topics to database
-   */
-  private async generateAndSaveTopics(
-    category: 'part1' | 'part2' | 'part3',
-    count: number = 10,
-    headers?: IRequestHeaders
-  ): Promise<any[]> {
-    const logMessage = constructLogMessage(__filename, 'generateAndSaveTopics', headers);
-
-    try {
-      // Generate topics using AI
-      const generatedTopics = await this.topicGenerationService.generateTopics({
-        category,
-        count,
-        difficulty: 'medium'
-      });
-
-      // Transform AI-generated topics to match database schema
-      const topicsToSave = generatedTopics.map((topic: any) => {
-        // Convert part category to number
-        const partNumber = category === 'part1' ? 1 : category === 'part2' ? 2 : 3;
-
-        // Convert difficulty
-        const difficultyMap: any = {
-          easy: 'beginner',
-          medium: 'intermediate',
-          hard: 'advanced'
-        };
-        const difficulty = difficultyMap[topic.difficulty] || 'intermediate';
-
-        // Generate slug from question
-        const slug = this.generateSlug(topic.question);
-
-        // Determine if premium (Part 3 = advanced topics are premium)
-        const isPremium = partNumber === 3 || difficulty === 'advanced';
-
-        return {
-          slug,
-          title: topic.question.substring(0, 100), // First 100 chars as title
-          description: topic.question, // Full question as description
-          part: partNumber,
-          category: topic.keywords?.[0] || 'general', // Use first keyword as category
-          difficulty,
-          isPremium
-        };
-      });
-
-      // Save to database
-      const savedTopics = await TopicModel.insertMany(topicsToSave);
-      this.log.info(`${logMessage} :: Generated and saved ${savedTopics.length} new topics for ${category}`);
-
-      return savedTopics;
-    } catch (error) {
-      this.log.error(`${logMessage} :: Failed to generate topics`, { error });
-      return [];
-    }
-  }
-
-  /**
-   * Generate a URL-friendly slug from text
-   */
-  private generateSlug(text: string): string {
-    return (
-      text
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
-        .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
-        .substring(0, 50) + // Limit length
-      '-' +
-      Date.now()
-    ); // Add timestamp for uniqueness
   }
 }

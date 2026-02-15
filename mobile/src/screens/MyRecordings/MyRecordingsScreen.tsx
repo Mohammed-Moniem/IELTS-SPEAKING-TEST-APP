@@ -4,9 +4,10 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Audio } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,26 +18,85 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import {
   AudioRecording,
   deleteRecording,
   getAudioUrl,
   listUserRecordings,
 } from "../../api/audioApi";
-
-const DEMO_USER_ID = "demo-user-123";
+import { favoritesApi } from "../../api/services";
+import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 
 export const MyRecordingsScreen: React.FC = () => {
-  const [recordings, setRecordings] = useState<AudioRecording[]>([]);
+  const { user, initializing: authInitializing } = useAuth();
+  const queryClient = useQueryClient();
+  const { isOffline } = useNetworkStatus();
+  const [allRecordings, setAllRecordings] = useState<AudioRecording[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [filter, setFilter] = useState<"all" | "practice" | "simulation">(
+  const [filter, setFilter] = useState<
+    "all" | "practice" | "simulation" | "favorites"
+  >(
     "all"
   );
+  const userId = user?._id ?? null;
+
+  const favoriteRecordingsQuery = useQuery({
+    queryKey: ["favorites", "audio_recording"],
+    queryFn: () => favoritesApi.list("audio_recording"),
+    enabled: Boolean(userId) && !isOffline,
+  });
+
+  const favoriteRecordingIds = useMemo(
+    () => new Set<string>(favoriteRecordingsQuery.data ?? []),
+    [favoriteRecordingsQuery.data]
+  );
+
+  const recordings = useMemo(() => {
+    let filtered = [...allRecordings];
+    if (filter === "practice" || filter === "simulation") {
+      filtered = filtered.filter((r) => r.recordingType === filter);
+    } else if (filter === "favorites") {
+      filtered = filtered.filter((r) => favoriteRecordingIds.has(r.id));
+    }
+    return filtered;
+  }, [allRecordings, favoriteRecordingIds, filter]);
+
+  const toggleRecordingFavorite = useMutation({
+    mutationFn: async (payload: { recordingId: string; isFavorite: boolean }) => {
+      if (payload.isFavorite) {
+        await favoritesApi.remove("audio_recording", payload.recordingId);
+        return;
+      }
+      await favoritesApi.add({
+        entityType: "audio_recording",
+        entityId: payload.recordingId,
+      });
+    },
+    onSuccess: () => {
+      queryClient
+        .invalidateQueries({ queryKey: ["favorites", "audio_recording"] })
+        .catch(() => undefined);
+    },
+    onError: (error) => {
+      Alert.alert("Unable to update favorite", (error as any)?.message || "Please try again.");
+    },
+  });
 
   useEffect(() => {
+    if (authInitializing) {
+      return;
+    }
+
+    if (!userId) {
+      setAllRecordings([]);
+      setLoading(false);
+      return;
+    }
+
     loadRecordings();
 
     return () => {
@@ -44,16 +104,20 @@ export const MyRecordingsScreen: React.FC = () => {
         sound.unloadAsync();
       }
     };
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, authInitializing]);
 
   const loadRecordings = async () => {
+    if (!userId) {
+      return;
+    }
+
     try {
       setLoading(true);
-      const result = await listUserRecordings(DEMO_USER_ID, {
+      const result = await listUserRecordings(userId, {
         limit: 50,
-        recordingType: filter === "all" ? undefined : filter,
       });
-      setRecordings(result.recordings);
+      setAllRecordings(result.recordings);
     } catch (error) {
       console.error("Failed to load recordings:", error);
       Alert.alert("Error", "Failed to load recordings");
@@ -63,6 +127,9 @@ export const MyRecordingsScreen: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    if (!userId) {
+      return;
+    }
     setRefreshing(true);
     await loadRecordings();
     setRefreshing(false);
@@ -115,9 +182,15 @@ export const MyRecordingsScreen: React.FC = () => {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const success = await deleteRecording(recording.id, DEMO_USER_ID);
+            if (!userId) {
+              Alert.alert("Sign in required", "Log in to manage recordings.");
+              return;
+            }
+            const success = await deleteRecording(recording.id, userId);
             if (success) {
-              setRecordings(recordings.filter((r) => r.id !== recording.id));
+              setAllRecordings((prev) =>
+                prev.filter((r) => r.id !== recording.id)
+              );
               Alert.alert("Success", "Recording deleted");
             } else {
               Alert.alert("Error", "Failed to delete recording");
@@ -157,6 +230,7 @@ export const MyRecordingsScreen: React.FC = () => {
 
   const renderRecordingCard = (recording: AudioRecording) => {
     const isPlaying = playingId === recording.id;
+    const isFavorite = favoriteRecordingIds.has(recording.id);
 
     return (
       <View key={recording.id} style={styles.recordingCard}>
@@ -170,24 +244,51 @@ export const MyRecordingsScreen: React.FC = () => {
               size={14}
               color="#ffffff"
             />
-            <Text style={styles.typeBadgeText}>
-              {recording.recordingType === "practice"
-                ? "Practice"
-                : "Simulation"}
-            </Text>
-          </View>
-          {recording.overallBand && (
-            <View
-              style={[
-                styles.bandBadge,
-                { backgroundColor: getBandColor(recording.overallBand) },
-              ]}
-            >
-              <Text style={styles.bandBadgeText}>
-                {recording.overallBand.toFixed(1)}
+              <Text style={styles.typeBadgeText}>
+                {recording.recordingType === "practice"
+                  ? "Practice"
+                  : "Simulation"}
               </Text>
-            </View>
-          )}
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => {
+                if (isOffline) {
+                  Alert.alert(
+                    "Offline",
+                    "Favorites require an internet connection."
+                  );
+                  return;
+                }
+                toggleRecordingFavorite.mutate({
+                  recordingId: recording.id,
+                  isFavorite,
+                });
+              }}
+              disabled={isOffline || toggleRecordingFavorite.isPending}
+              style={styles.starButton}
+            >
+              <Ionicons
+                name={isFavorite ? "star" : "star-outline"}
+                size={18}
+                color={isFavorite ? "#F59E0B" : "#D1D5DB"}
+              />
+            </TouchableOpacity>
+
+            {recording.overallBand ? (
+              <View
+                style={[
+                  styles.bandBadge,
+                  { backgroundColor: getBandColor(recording.overallBand) },
+                ]}
+              >
+                <Text style={styles.bandBadgeText}>
+                  {recording.overallBand.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {/* Topic */}
@@ -295,6 +396,37 @@ export const MyRecordingsScreen: React.FC = () => {
     );
   };
 
+  if (authInitializing) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>My Recordings</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Loading recordings...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>My Recordings</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Text style={styles.emptyTitle}>Sign in to access recordings</Text>
+          <Text style={styles.emptySubtitle}>
+            Log in to sync your practice audio and feedback
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -350,6 +482,22 @@ export const MyRecordingsScreen: React.FC = () => {
             ]}
           >
             Simulation
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === "favorites" && styles.filterTabActive,
+          ]}
+          onPress={() => setFilter("favorites")}
+        >
+          <Text
+            style={[
+              styles.filterTabText,
+              filter === "favorites" && styles.filterTabTextActive,
+            ]}
+          >
+            Favorites
           </Text>
         </TouchableOpacity>
       </View>
@@ -454,6 +602,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  starButton: {
+    padding: 6,
+    borderRadius: 999,
   },
   typeBadge: {
     flexDirection: "row",

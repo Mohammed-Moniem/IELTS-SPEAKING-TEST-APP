@@ -38,10 +38,13 @@ export class FriendController {
         timestamp: new Date()
       });
 
+      // Serialize the Mongoose document
+      const cleanRequest = JSON.parse(JSON.stringify(request));
+
       return {
         success: true,
         message: 'Friend request sent',
-        data: request
+        data: cleanRequest
       };
     } catch (error: any) {
       log.error('Error sending friend request:', error);

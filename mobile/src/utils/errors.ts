@@ -11,11 +11,29 @@ export const extractErrorMessage = (
   const axiosError = error as AxiosError<any>;
   const data = axiosError?.response?.data;
   if (data) {
-    if (data.error?.message) return data.error.message;
-    if (data.message)
+    // StandardResponse-style error: { error: { message } }
+    if (typeof data.error?.message === "string" && data.error.message.trim()) {
+      return data.error.message;
+    }
+    // Legacy: { error: "string" }
+    if (typeof data.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    // Middleware validation: { errors: [{ message }] }
+    if (Array.isArray(data.errors) && data.errors.length > 0) {
+      const messages = data.errors
+        .map((e: any) => (typeof e?.message === "string" ? e.message.trim() : ""))
+        .filter((m: string) => m.length > 0);
+      if (messages.length) {
+        return messages.join(", ");
+      }
+    }
+    // StandardResponse success=false message: { message: string | string[] }
+    if (data.message) {
       return Array.isArray(data.message)
         ? data.message.join(", ")
-        : data.message;
+        : String(data.message);
+    }
   }
 
   return fallback;

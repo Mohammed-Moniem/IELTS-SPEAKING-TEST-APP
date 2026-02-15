@@ -1,4 +1,3 @@
-import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
@@ -11,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-import { subscriptionApi, usageApi } from "../../api/services";
+import { analyticsApi, profileApi, subscriptionApi, usageApi } from "../../api/services";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -19,13 +18,19 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { StatCard } from "../../components/StatCard";
 import { Tag } from "../../components/Tag";
-import { AppTabParamList } from "../../navigation/AppNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { formatDate } from "../../utils/date";
 
 export const HomeScreen: React.FC = () => {
-  const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
+  const navigation = useNavigation<any>();
   const { user, refreshProfile } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
+  const userId = user?._id;
 
   const usageQuery = useQuery({
     queryKey: ["usage-summary"],
@@ -37,14 +42,39 @@ export const HomeScreen: React.FC = () => {
     queryFn: subscriptionApi.current,
   });
 
-  const refreshing = usageQuery.isRefetching || subscriptionQuery.isRefetching;
+  const profileStatsQuery = useQuery({
+    queryKey: ["profile-stats", userId],
+    queryFn: () => profileApi.stats(userId as string),
+    enabled: Boolean(userId),
+  });
+
+  const progressQuery = useQuery({
+    queryKey: ["analytics-progress", userId],
+    queryFn: () => analyticsApi.progress(userId as string, { daysBack: 30, includeTests: 3 }),
+    enabled: Boolean(userId),
+  });
+
+  const refreshing =
+    usageQuery.isRefetching ||
+    subscriptionQuery.isRefetching ||
+    profileStatsQuery.isRefetching ||
+    progressQuery.isRefetching;
 
   const handleRefresh = async () => {
     await Promise.all([
       usageQuery.refetch(),
       subscriptionQuery.refetch(),
+      profileStatsQuery.refetch(),
+      progressQuery.refetch(),
       refreshProfile(),
     ]);
+  };
+
+  const trendLabel = (trend?: string): { label: string; tone: "info" | "success" | "warning" } => {
+    if (trend === "improving") return { label: "Improving", tone: "success" };
+    if (trend === "declining") return { label: "Declining", tone: "warning" };
+    if (trend === "stable") return { label: "Stable", tone: "info" };
+    return { label: "New", tone: "info" };
   };
 
   return (
@@ -72,11 +102,60 @@ export const HomeScreen: React.FC = () => {
           />
           <Button
             title="Run simulation"
-            onPress={() => navigation.navigate("Simulations")}
+            onPress={() =>
+              navigation.getParent?.()?.navigate?.("Simulations") ??
+              navigation.navigate("Simulations")
+            }
             style={styles.actionButton}
             variant="secondary"
           />
         </View>
+
+        <Card>
+          <SectionHeading title="Progress snapshot" />
+          {profileStatsQuery.isLoading || progressQuery.isLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <>
+              <View style={styles.statsRow}>
+                <StatCard
+                  label="Streak"
+                  value={`${profileStatsQuery.data?.statistics?.currentStreak ?? 0}`}
+                  hint="Days"
+                />
+                <StatCard
+                  label="Avg band"
+                  value={`${progressQuery.data?.averageBand ?? 0}`}
+                  hint="Last 30 days"
+                />
+              </View>
+
+              <View style={styles.snapshotRow}>
+                <Tag
+                  label={trendLabel(progressQuery.data?.bandTrend).label}
+                  tone={trendLabel(progressQuery.data?.bandTrend).tone}
+                />
+                <Text style={styles.snapshotMeta}>
+                  {progressQuery.data?.totalTests
+                    ? `${progressQuery.data.totalTests} tests tracked`
+                    : "Complete a session to start tracking"}
+                </Text>
+              </View>
+
+              {Array.isArray(progressQuery.data?.weaknesses) &&
+              progressQuery.data.weaknesses.length > 0 ? (
+                <View style={styles.weaknessList}>
+                  <Text style={styles.weaknessTitle}>Focus next on</Text>
+                  {progressQuery.data.weaknesses.slice(0, 2).map((w: string) => (
+                    <Text key={w} style={styles.weaknessItem}>
+                      • {w}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          )}
+        </Card>
 
         {usageQuery.isLoading ? (
           <ActivityIndicator color={colors.primary} />
@@ -146,7 +225,10 @@ export const HomeScreen: React.FC = () => {
                     ? "Upgrade plan"
                     : "Manage subscription"
                 }
-                onPress={() => navigation.navigate("Profile")}
+                onPress={() =>
+                  navigation.getParent?.()?.navigate?.("Profile") ??
+                  navigation.navigate("Profile")
+                }
                 variant="ghost"
               />
             ) : null}
@@ -157,9 +239,10 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  content: {
-    paddingBottom: spacing.xxl + spacing.sm,
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    content: {
+      paddingBottom: spacing.xxl + spacing.sm,
   },
   hero: {
     marginBottom: spacing.xl,
@@ -186,6 +269,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
   },
+  snapshotRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.md,
+  },
+  snapshotMeta: {
+    color: colors.textMuted,
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  weaknessList: {
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  weaknessTitle: {
+    color: colors.textSecondary,
+    fontWeight: "800",
+  },
+  weaknessItem: {
+    color: colors.textMuted,
+  },
   resetHint: {
     marginTop: spacing.sm,
     color: colors.textMuted,
@@ -211,4 +316,4 @@ const styles = StyleSheet.create({
   featureItem: {
     color: colors.textSecondary,
   },
-});
+  });

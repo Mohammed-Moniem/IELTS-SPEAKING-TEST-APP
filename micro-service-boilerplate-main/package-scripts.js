@@ -21,13 +21,13 @@ module.exports = {
       inspector: {
         script: series(
           'nps banner.serve',
-          'nodemon --watch src --watch .env --inspect --exec "ts-node --transpile-only -r tsconfig-paths/register src/app.ts"'
+          'nodemon --watch src --watch .env --ext ts,js,json --inspect --exec "ts-node --transpile-only -r tsconfig-paths/register src/app.ts"'
         ),
         description: 'Serves the current app and watches for changes to restart it, you may attach inspector to it.'
       },
       script: series(
         'nps banner.serve',
-        'nodemon --watch src --watch .env --exec "ts-node --transpile-only -r tsconfig-paths/register src/app.ts"'
+        'nodemon --watch src --watch .env --ext ts,js,json --exec "ts-node --transpile-only -r tsconfig-paths/register src/app.ts"'
       ),
       description: 'Serves the current app and watches for changes to restart it'
     },
@@ -42,7 +42,9 @@ module.exports = {
      * Creates the needed configuration files
      */
     config: {
-      script: series(runFast('./commands/tsconfig.ts'), runFast('./commands/ormconfig.ts')),
+      // `ormconfig.json` was used for the legacy Mongo/TypeORM setup. The Supabase
+      // migration doesn't use it, but we still generate `tsconfig.build.json` for `tsc`.
+      script: series(runFast('./commands/tsconfig.ts')),
       hiddenFromHelp: true
     },
     /**
@@ -63,7 +65,7 @@ module.exports = {
      * Runs TSLint over your project
      */
     lint: {
-      script: tslint(`./src/**/*.ts`),
+      script: 'eslint .',
       hiddenFromHelp: true
     },
     /**
@@ -91,9 +93,8 @@ module.exports = {
      */
     copy: {
       default: {
-        script:
-          series(),
-          // `nps copy.public`
+        script: series(),
+        // `nps copy.public`
         hiddenFromHelp: true
       },
       public: {
@@ -140,7 +141,7 @@ module.exports = {
           description: 'Runs the unit tests'
         },
         pretest: {
-          script: tslint(`./test/unit/**.ts`),
+          script: 'nps lint',
           hiddenFromHelp: true
         },
         run: {
@@ -162,7 +163,7 @@ module.exports = {
           description: 'Runs the integration tests'
         },
         pretest: {
-          script: tslint(`./test/integration/**.ts`),
+          script: 'nps lint',
           hiddenFromHelp: true
         },
         run: {
@@ -185,7 +186,7 @@ module.exports = {
           description: 'Runs the e2e tests'
         },
         pretest: {
-          script: tslint(`./test/e2e/**.ts`),
+          script: 'nps lint',
           hiddenFromHelp: true
         },
         run: {
@@ -242,7 +243,8 @@ function run(path) {
 }
 
 function runFast(path) {
-  return `ts-node --transpile-only ${path}`;
+  // Ensure TS path aliases (tsconfig "paths") work for ts-node scripts/commands.
+  return `ts-node --transpile-only -r tsconfig-paths/register ${path}`;
 }
 
 function tslint(path) {

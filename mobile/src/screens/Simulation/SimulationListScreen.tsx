@@ -15,12 +15,16 @@ import { simulationApi } from "../../api/services";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
-import { OfflineBanner } from "../../components/OfflineBanner";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { Tag } from "../../components/Tag";
+import { UsageLimitModal } from "../../components/UsageLimitModal";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import { useUsageGuard } from "../../hooks";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { TestSimulation } from "../../types/api";
 import { formatDateTime } from "../../utils/date";
 import { extractErrorMessage } from "../../utils/errors";
@@ -29,6 +33,10 @@ export const SimulationListScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<SimulationStackParamList>>();
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const { ensureCanStart, limitState, dismissLimit, refreshUsage, subscriptionInfo } =
+    useUsageGuard();
 
   const simulationsQuery = useQuery({
     queryKey: ["test-simulations"],
@@ -41,6 +49,7 @@ export const SimulationListScreen: React.FC = () => {
       queryClient
         .invalidateQueries({ queryKey: ["test-simulations"] })
         .catch(() => undefined);
+      void refreshUsage();
       navigation.navigate("SimulationSession", {
         simulationId: simulation.simulationId,
         parts: simulation.parts.map((part) => ({
@@ -103,14 +112,18 @@ export const SimulationListScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable>
-      <OfflineBanner showQueueCount />
       <SectionHeading title="Practice full simulations">
         Build exam stamina across all three IELTS speaking parts.
       </SectionHeading>
 
       <Button
         title="Start a new simulation"
-        onPress={() => startSimulationMutation.mutate()}
+        onPress={() => {
+          if (!ensureCanStart("simulation")) {
+            return;
+          }
+          startSimulationMutation.mutate();
+        }}
         loading={startSimulationMutation.isPending}
       />
 
@@ -129,11 +142,29 @@ export const SimulationListScreen: React.FC = () => {
           description="Run your first full test to unlock detailed feedback."
         />
       )}
+
+      {limitState && (
+        <UsageLimitModal
+          visible
+          sessionType={limitState.sessionType}
+          currentTier={limitState.currentTier}
+          used={limitState.used}
+          limit={limitState.limit}
+          resetDate={limitState.resetDate}
+          onClose={dismissLimit}
+          upgradeEnabled={!!subscriptionInfo?.stripe?.enabled}
+          onUpgrade={() => {
+            dismissLimit();
+            navigation.getParent()?.navigate("Profile" as never);
+          }}
+        />
+      )}
     </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -152,4 +183,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     color: colors.textSecondary,
   },
-});
+  });

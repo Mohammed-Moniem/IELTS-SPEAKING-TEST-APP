@@ -1,30 +1,40 @@
+import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
+import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
+import { FullTestEvaluationRequestDto } from '@dto/TestEvaluationDto';
+import { IRequestHeaders } from '@interfaces/IRequestHeaders';
+import { Logger } from '@lib/logger';
+import { getSupabaseAdmin } from '@lib/supabaseClient';
+import { FullTestEvaluationPayload } from '@interfaces/ITestEvaluation';
+import { StandardResponse } from '@responses/StandardResponse';
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 import { Service } from 'typedi';
-import { Logger } from '../../lib/logger';
-import { SpeechService } from '../services/SpeechService';
 
-// Configure multer storage to preserve file extensions
+import { SpeechService } from '../services/SpeechService';
+import { AudioStorageService } from '../services/AudioStorageService';
+import { RecordingType } from '../models/AudioRecording';
+import { env } from '@env';
+
+// Configure multer storage to preserve file extensions.
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     const uploadDir = 'uploads/audio/';
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
-    // Get file extension from original filename or mimetype
+  filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname) || getExtensionFromMimetype(file.mimetype);
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}${ext}`;
     cb(null, uniqueName);
   }
 });
 
-// Helper function to get extension from mimetype
 function getExtensionFromMimetype(mimetype: string): string {
   const mimeMap: Record<string, string> = {
     'audio/mpeg': '.mp3',
@@ -36,16 +46,13 @@ function getExtensionFromMimetype(mimetype: string): string {
     'audio/ogg': '.ogg',
     'audio/flac': '.flac'
   };
-  return mimeMap[mimetype] || '.m4a'; // Default to .m4a
+  return mimeMap[mimetype] || '.m4a';
 }
 
-// Configure multer for file uploads
 const upload = multer({
   storage,
-  limits: {
-    fileSize: 25 * 1024 * 1024 // 25MB limit
-  },
-  fileFilter: (req, file, cb) => {
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
     const allowedMimes = ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/m4a', 'audio/ogg', 'audio/flac'];
     if (allowedMimes.includes(file.mimetype) || file.originalname.match(/\.(mp3|mp4|wav|webm|m4a|ogg|flac)$/)) {
       cb(null, true);
@@ -60,11 +67,14 @@ const upload = multer({
 export class SpeechController {
   private log = new Logger(__filename);
 
-  constructor(private speechService: SpeechService) {}
+  constructor(
+    private speechService: SpeechService,
+    private audioStorageService: AudioStorageService
+  ) {}
 
   @Post('/transcribe')
   public async transcribe(@Req() req: Request, @Res() res: Response): Promise<any> {
-    return new Promise((resolve, reject) => {
+    return new Promise((_resolve, _reject) => {
       upload.single('audio')(req, res, async err => {
         if (err) {
           this.log.error('File upload error:', err);
@@ -84,20 +94,51 @@ export class SpeechController {
         }
 
         try {
+          const userId = (req as any)?.currentUser?.id as string | undefined;
+          if (!userId) {
+            if (file.path && fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+            return res.status(401).json({
+              success: false,
+              message: 'Authentication required'
+            });
+          }
+
           const language = (req.body.language as string) || 'en';
+          const sessionId = String((req.body.sessionId as string) || '').trim() || randomUUID();
+          const topic = typeof req.body.topic === 'string' ? req.body.topic.trim() : undefined;
+          const testPart = typeof req.body.testPart === 'string' ? req.body.testPart.trim() : undefined;
+
           const result = await this.speechService.transcribe(file.path, language);
 
-          // Clean up uploaded file
+          const audioBuffer = fs.readFileSync(file.path);
+          const recording = await this.audioStorageService.uploadAudio({
+            userId,
+            sessionId,
+            audioBuffer,
+            fileName: file.originalname || file.filename,
+            mimeType: file.mimetype,
+            recordingType: RecordingType.PRACTICE,
+            durationSeconds: Math.max(0, Number(result.duration || 0)),
+            topic,
+            testPart,
+            userTier: env.payments?.disabled ? 'pro' : ((req as any).currentUser?.plan as any)
+          });
+
           fs.unlinkSync(file.path);
 
           return res.json({
             success: true,
-            data: result
+            data: {
+              ...result,
+              sessionId,
+              audioRecordingId: recording._id
+            }
           });
         } catch (error: any) {
           this.log.error('Transcription error:', error);
 
-          // Clean up uploaded file on error
           if (file.path && fs.existsSync(file.path)) {
             fs.unlinkSync(file.path);
           }
@@ -200,11 +241,7 @@ export class SpeechController {
 
       this.log.info(`Generating examiner response for Part ${testPart}`);
 
-      const response = await this.speechService.generateExaminerResponse(
-        conversationHistory,
-        testPart as 1 | 2 | 3,
-        context
-      );
+      const response = await this.speechService.generateExaminerResponse(conversationHistory, testPart as 1 | 2 | 3, context);
 
       return {
         success: true,
@@ -264,6 +301,164 @@ export class SpeechController {
         message: 'Failed to evaluate response',
         error: error?.message || 'Unknown error'
       };
+    }
+  }
+
+  @Post('/evaluate-full-test')
+  public async evaluateFullTest(
+    @Body() body: FullTestEvaluationRequestDto,
+    @Req() req: Request,
+    @Res() res: Response
+  ): Promise<Response> {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'speech-evaluate-full');
+    ensureResponseHeaders(res, headers);
+
+    const userId = (req as any)?.currentUser?.id as string | undefined;
+    if (!userId) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const durationSeconds = Math.max(0, Math.round(body.durationSeconds || 0));
+      const sessionId = (body.testSessionId || '').trim() || randomUUID();
+      const fullTranscript = (body.fullTranscript || '').trim() || this.buildFullTranscript(body.recordings || []);
+
+      if (!fullTranscript) {
+        return StandardResponse.validationError(res, [], 'Full transcript is required to evaluate the test', headers);
+      }
+
+      const parts = this.buildEvaluationParts(body.questions || [], body.recordings || []);
+
+      const evaluationPayload: FullTestEvaluationPayload = {
+        userId,
+        fullTranscript,
+        durationSeconds,
+        metadata: body.metadata,
+        parts
+      };
+
+      const evaluation = await this.speechService.evaluateFullTest(evaluationPayload);
+
+      // Persist to analytics history so the Results/Analytics screens have something to show.
+      const topic =
+        body.questions?.find(q => q.category === 'part2' && q.topic)?.topic ||
+        body.questions?.find(q => q.topic)?.topic ||
+        'Full Test';
+
+      const supabase = getSupabaseAdmin();
+      await supabase.from('test_history').insert({
+        user_id: userId,
+        session_id: sessionId,
+        test_type: 'simulation',
+        topic,
+        test_part: 'full',
+        duration_seconds: durationSeconds,
+        completed_at: body.metadata?.testCompletedAt || new Date().toISOString(),
+        overall_band: evaluation.overallBand,
+        criteria: evaluation.criteria,
+        corrections: evaluation.corrections || [],
+        suggestions: evaluation.suggestions || [],
+        audio_recording_id: null,
+        metadata: body.metadata || {}
+      });
+
+      const evaluationDoc = {
+        _id: randomUUID(),
+        testSessionId: sessionId,
+        userId,
+        overallBand: evaluation.overallBand,
+        criteria: evaluation.criteria,
+        spokenSummary: evaluation.spokenSummary,
+        detailedFeedback: evaluation.detailedFeedback,
+        corrections: evaluation.corrections,
+        suggestions: evaluation.suggestions,
+        partScores: evaluation.partScores,
+        evaluatedAt: new Date().toISOString(),
+        evaluatedBy: 'ai',
+        evaluatorModel: evaluation.evaluatorModel
+      };
+
+      return StandardResponse.success(
+        res,
+        {
+          evaluation: evaluationDoc,
+          overallBand: evaluation.overallBand,
+          partScores: evaluation.partScores,
+          spokenSummary: evaluation.spokenSummary,
+          testSessionId: sessionId
+        },
+        undefined,
+        HTTP_STATUS_CODES.SUCCESS,
+        headers
+      );
+    } catch (error: any) {
+      this.log.error('Full test evaluation error:', error);
+      return StandardResponse.error(res, error instanceof Error ? error : new Error(String(error || 'Unknown error')), headers);
+    }
+  }
+
+  private buildFullTranscript(recordings: Array<{ transcript: string }>): string {
+    return recordings
+      .map(recording => (recording.transcript || '').trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private buildEvaluationParts(
+    questions: Array<{
+      questionId?: string;
+      question: string;
+      category: 'part1' | 'part2' | 'part3';
+      difficulty?: 'easy' | 'medium' | 'hard';
+      topic?: string;
+    }>,
+    recordings: Array<{
+      partNumber: 1 | 2 | 3;
+      questionIndex: number;
+      transcript: string;
+      durationSeconds: number;
+      recordingUrl?: string;
+    }>
+  ): FullTestEvaluationPayload['parts'] {
+    const parts: FullTestEvaluationPayload['parts'] = [];
+
+    for (const partNumber of [1, 2, 3] as const) {
+      const partQuestions = questions
+        .filter(q => this.categoryToPartNumber(q.category) === partNumber)
+        .map(q => ({
+          questionId: q.questionId,
+          question: q.question,
+          category: q.category,
+          topic: q.topic,
+          difficulty: q.difficulty || 'medium'
+        }));
+
+      const partResponses = recordings
+        .filter(r => r.partNumber === partNumber)
+        .map(r => ({
+          transcript: r.transcript?.trim() || '',
+          questionIndex: r.questionIndex,
+          durationSeconds: Math.max(0, Math.round(r.durationSeconds || 0)),
+          recordingUrl: r.recordingUrl
+        }));
+
+      if (partQuestions.length || partResponses.length) {
+        parts.push({ partNumber, questions: partQuestions, responses: partResponses });
+      }
+    }
+
+    return parts;
+  }
+
+  private categoryToPartNumber(category: 'part1' | 'part2' | 'part3'): 1 | 2 | 3 {
+    switch (category) {
+      case 'part1':
+        return 1;
+      case 'part2':
+        return 2;
+      case 'part3':
+      default:
+        return 3;
     }
   }
 }
