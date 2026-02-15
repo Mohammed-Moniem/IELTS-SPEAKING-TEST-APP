@@ -13,7 +13,28 @@ set -e  # Exit on error
 BACKEND_DIR="micro-service-boilerplate-main"
 MOBILE_DIR="mobile"
 BACKEND_PORT=4000
-SUPABASE_PROJECT_REF="nhgdjnqfqpjiavkdosfx"
+SUPABASE_PROJECT_REF_DEFAULT="nhgdjnqfqpjiavkdosfx"
+SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF_DEFAULT}"
+
+# Prefer the repo link file (non-secret) when available so forks/new projects
+# don't have to edit this script.
+if [ -f ".supabase-admin.json" ]; then
+    DETECTED_REF=$(python3 - <<'PY'
+import json
+try:
+    data = json.load(open(".supabase-admin.json"))
+    ref = str(data.get("project_ref", "")).strip()
+    if ref:
+        print(ref)
+except Exception:
+    pass
+PY
+)
+    if [ ! -z "$DETECTED_REF" ]; then
+        SUPABASE_PROJECT_REF="$DETECTED_REF"
+    fi
+fi
+
 SUPABASE_URL="https://${SUPABASE_PROJECT_REF}.supabase.co"
 SUPABASE_KEYS_FILE=".secrets/supabase_api_keys.json"
 

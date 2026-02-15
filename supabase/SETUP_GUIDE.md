@@ -2,47 +2,66 @@
 
 This repo is configured to use **Supabase Postgres + Auth + Storage**.
 
-## Project
+## Project (Dev)
 
-Project ref (dev): `nhgdjnqfqpjiavkdosfx`
+Project ref: `nhgdjnqfqpjiavkdosfx`
+
+Repo link file (non-secret): `.supabase-admin.json`
 
 Buckets (private):
 - `audio`
 - `chat-files`
 - `avatars`
 
-## Apply Migrations
+## One-Time Setup (Local)
 
-Run from anywhere (uses your Supabase PAT via Keychain/env):
-
-```bash
-python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py platform-db-query \
-  --ref nhgdjnqfqpjiavkdosfx \
-  --sql-file supabase/migrations/0001_init.sql
-```
-
-Seed minimal dev data:
+1. Save Supabase PAT to Keychain (recommended; avoids shell history):
 
 ```bash
-python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py platform-db-query \
-  --ref nhgdjnqfqpjiavkdosfx \
-  --sql-file supabase/seed.sql
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py platform-keychain-save-token
 ```
 
-## Auth Settings (Dashboard)
+2. Fetch project API keys into the local secrets file used by `start-backend-and-mobile-local.sh` (never commit):
 
-In Supabase Dashboard:
-- Auth providers: enable **Email**, **Anonymous**, **Google**
-- URL configuration:
-  - Add Redirect URLs:
-    - `spokio://auth/callback`
-    - `spokio://auth/reset`
+```bash
+mkdir -p .secrets
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py platform-api-keys \
+  --ref nhgdjnqfqpjiavkdosfx \
+  --reveal \
+  --out .secrets/supabase_api_keys.json
+```
 
-### Auth Settings (CLI via supabase-admin)
+3. Ensure Storage buckets exist (private):
 
-You can also enable the critical Auth flags via Supabase Management API (no secrets printed):
+```bash
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py storage-create-bucket --ref nhgdjnqfqpjiavkdosfx --name audio --private
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py storage-create-bucket --ref nhgdjnqfqpjiavkdosfx --name chat-files --private
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py storage-create-bucket --ref nhgdjnqfqpjiavkdosfx --name avatars --private
+```
 
-Enable anonymous sign-ins + manual identity linking + deep-link allow list:
+4. Apply DB migrations (fresh projects only):
+
+```bash
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py repo-apply-migrations \
+  --repo . \
+  --ref nhgdjnqfqpjiavkdosfx \
+  --mode mgmt
+```
+
+5. Seed minimal dev data:
+
+```bash
+python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py repo-apply-seed \
+  --repo . \
+  --ref nhgdjnqfqpjiavkdosfx \
+  --seed-file supabase/seed.sql \
+  --mode mgmt \
+  --yes
+```
+
+## Auth Settings (CLI via supabase-admin)
+
+Ensure guest mode + identity linking + deep-link allow-list:
 
 ```bash
 python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin.py platform-request \
@@ -52,7 +71,7 @@ python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin
   --yes
 ```
 
-Enable Google OAuth (requires credentials). Do NOT paste secrets into the shell; use a JSON file:
+Optional: enable Google OAuth (requires credentials). Do NOT paste secrets into the shell; use a JSON file:
 
 ```bash
 cat > /tmp/spokio_google_auth.json <<'JSON'
@@ -70,15 +89,17 @@ python3 /Users/mohammedosman/.codex/skills/supabase-admin/scripts/supabase_admin
   --yes
 ```
 
-## Local Env Files
+## Run Locally
 
-Do not commit secrets.
+- Backend needs `OPENAI_API_KEY` (set in `micro-service-boilerplate-main/.env` or exported in your shell).
+- Start everything (writes `mobile/.env` automatically and injects Supabase env vars into the backend process):
 
-Mobile (`/mobile/.env`):
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+```bash
+./start-backend-and-mobile-local.sh
+```
 
-Backend (`/micro-service-boilerplate-main/.env`):
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+## Notes
+
+- `.secrets/` is git-ignored.
+- Mobile uses `EXPO_PUBLIC_SUPABASE_*` (anon key only).
+- Backend uses `SUPABASE_SERVICE_ROLE_KEY` (server-only).
