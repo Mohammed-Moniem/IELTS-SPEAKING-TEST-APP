@@ -319,7 +319,7 @@ export const ResultsScreen = () => {
         disabled={!hasCompleted}
         onPress={() => {
           if (!hasCompleted) return;
-          navigation.getParent?.()?.navigate?.("Simulations", {
+          navigation.navigate("Simulations", {
             screen: "SimulationDetail",
             params: { simulation: item },
           });

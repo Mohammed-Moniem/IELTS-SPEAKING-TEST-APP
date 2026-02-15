@@ -102,10 +102,7 @@ export const HomeScreen: React.FC = () => {
           />
           <Button
             title="Run simulation"
-            onPress={() =>
-              navigation.getParent?.()?.navigate?.("Simulations") ??
-              navigation.navigate("Simulations")
-            }
+            onPress={() => navigation.navigate("Simulations")}
             style={styles.actionButton}
             variant="secondary"
           />

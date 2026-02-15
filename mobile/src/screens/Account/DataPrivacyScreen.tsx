@@ -30,15 +30,10 @@ export const DataPrivacyScreen: React.FC = () => {
       const data = await accountApi.export();
       const json = JSON.stringify(data, null, 2);
       const fileName = `spokio-export-${Date.now()}.json`;
-      const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-      if (!baseDir) {
-        throw new Error("No writable directory available on this device.");
-      }
-
-      const fileUri = `${baseDir}${fileName}`;
-      await FileSystem.writeAsStringAsync(fileUri, json, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+      const file = new FileSystem.File(FileSystem.Paths.cache, fileName);
+      file.create({ overwrite: true });
+      file.write(json, { encoding: "utf8" });
+      const fileUri = file.uri;
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {

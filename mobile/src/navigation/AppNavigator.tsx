@@ -40,8 +40,7 @@ import { UsageScreen } from "../screens/Usage/UsageScreen";
 import { VoiceTestScreen } from "../screens/VoiceTest/VoiceTestScreen";
 import monitoringService from "../services/monitoringService";
 import { PracticeNavigator } from "./PracticeNavigator";
-import { SimulationNavigator } from "./SimulationNavigator";
-import { SocialNavigator } from "./SocialNavigator";
+import { SimulationNavigator, type SimulationStackParamList } from "./SimulationNavigator";
 import { navigationRef } from "./navigationRef";
 
 export const ONBOARDING_KEY = "hasSeenOnboarding";
@@ -66,9 +65,9 @@ export type MainTabParamList = {
         };
       }
     | undefined;
+  Simulations: NavigatorScreenParams<SimulationStackParamList> | undefined;
   Home: undefined;
   Results: undefined;
-  Social: undefined;
 };
 
 export type AppStackParamList = {
@@ -81,7 +80,6 @@ export type AppStackParamList = {
   MyRecordings: undefined;
   HelpSupport: undefined;
   DataPrivacy: undefined;
-  Simulations: undefined;
   PointsDetail: undefined;
   RedeemDiscount: undefined;
   OnboardingReplay: { mode?: "replay" } | undefined;
@@ -113,25 +111,6 @@ const SplashScreen = () => {
       <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
-};
-
-const SocialGate = () => {
-  const { user } = useAuth();
-
-  if (user?.isGuest) {
-    return (
-      <GuestLockedScreen
-        title="Social is locked in guest mode"
-        description="Create an account to add friends, join groups, and compare progress."
-        onCta={() => {
-          // Ensure we navigate within App stack.
-          navigationRef.navigate("App", { screen: "UpgradeAccount" } as any);
-        }}
-      />
-    );
-  }
-
-  return <SocialNavigator />;
 };
 
 const AnalyticsGate = () => {
@@ -184,6 +163,11 @@ const MainTabs = () => {
         options={{ headerTitle: "Speak practice" }}
       />
       <Tab.Screen
+        name="Simulations"
+        component={SimulationNavigator}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
@@ -200,11 +184,6 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen name="Results" component={ResultsScreen} />
-      <Tab.Screen
-        name="Social"
-        component={SocialGate}
-        options={{ headerShown: false }}
-      />
     </Tab.Navigator>
   );
 };
@@ -338,11 +317,6 @@ const AppStackNavigator = () => {
         name="DataPrivacy"
         component={DataPrivacyScreen}
         options={{ headerTitle: "Data & privacy" }}
-      />
-      <AppStack.Screen
-        name="Simulations"
-        component={SimulationNavigator}
-        options={{ headerShown: false }}
       />
       <AppStack.Screen
         name="PointsDetail"

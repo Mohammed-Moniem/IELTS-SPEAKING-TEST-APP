@@ -101,8 +101,8 @@ export const PracticeResultDetailScreen: React.FC = () => {
   const isVoice = session.source === "voice";
 
   const goToSimulations = () => {
-    const rootNav = navigation.getParent?.()?.getParent?.() as any;
-    rootNav?.navigate?.("Simulations");
+    const tabNav = navigation.getParent?.() as any;
+    tabNav?.navigate?.("Simulations");
   };
 
   const actions: NextBestAction[] = isVoice

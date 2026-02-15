@@ -505,10 +505,7 @@ export const VoiceTestScreen: React.FC = () => {
           <Button
             title="Start mock test"
             variant="secondary"
-            onPress={() =>
-              navigation.getParent?.()?.navigate?.("Simulations") ??
-              navigation.navigate("Simulations")
-            }
+            onPress={() => navigation.navigate("Simulations")}
           />
         </Card>
       </View>

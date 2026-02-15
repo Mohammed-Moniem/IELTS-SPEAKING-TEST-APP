@@ -30,6 +30,8 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         return focused ? "book" : "book-outline";
       case "VoiceTest":
         return focused ? "microphone" : "microphone-outline";
+      case "Simulations":
+        return focused ? "stopwatch" : "stopwatch-outline";
       case "Home":
         return focused ? "home" : "home-outline";
       case "Results":
@@ -47,6 +49,8 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         return "Speak";
       case "Practice":
         return "Practice";
+      case "Simulations":
+        return "Test";
       case "Home":
         return "Home";
       case "Results":
@@ -84,8 +88,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
           route.name === "Analytics" ||
           route.name === "Settings" ||
           route.name === "Subscription" ||
-          route.name === "Usage" ||
-          route.name === "Simulations"
+          route.name === "Usage"
         ) {
           return null;
         }
