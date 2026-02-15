@@ -101,7 +101,7 @@ export const PracticeResultDetailScreen: React.FC = () => {
   const isVoice = session.source === "voice";
 
   const goToSimulations = () => {
-    const tabNav = navigation.getParent?.() as any;
+    const tabNav = navigation.getParent?.()?.getParent?.() as any;
     tabNav?.navigate?.("Simulations");
   };
 

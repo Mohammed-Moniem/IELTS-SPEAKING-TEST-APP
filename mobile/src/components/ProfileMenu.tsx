@@ -46,6 +46,12 @@ const buildMenuItems = (options: { isGuest: boolean }): MenuItem[] => {
       screen: "Profile",
     },
     {
+      icon: "people",
+      iconFamily: "Ionicons",
+      label: "Social",
+      screen: "Social",
+    },
+    {
       icon: "analytics",
       iconFamily: "Ionicons",
       label: "Analytics",

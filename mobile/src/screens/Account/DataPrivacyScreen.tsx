@@ -31,17 +31,16 @@ export const DataPrivacyScreen: React.FC = () => {
       const json = JSON.stringify(data, null, 2);
       const fileName = `spokio-export-${Date.now()}.json`;
       const file = new FileSystem.File(FileSystem.Paths.cache, fileName);
-      file.create({ overwrite: true });
+      file.create({ intermediates: true, overwrite: true });
       file.write(json, { encoding: "utf8" });
-      const fileUri = file.uri;
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert("Export ready", `Saved to: ${fileUri}`);
+        Alert.alert("Export ready", `Saved to: ${file.uri}`);
         return;
       }
 
-      await Sharing.shareAsync(fileUri, {
+      await Sharing.shareAsync(file.uri, {
         UTI: "public.json",
         mimeType: "application/json",
         dialogTitle: "Spokio export",

@@ -30,14 +30,12 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         return focused ? "book" : "book-outline";
       case "VoiceTest":
         return focused ? "microphone" : "microphone-outline";
-      case "Simulations":
-        return focused ? "stopwatch" : "stopwatch-outline";
       case "Home":
         return focused ? "home" : "home-outline";
+      case "Simulations":
+        return focused ? "clipboard-check" : "clipboard-check-outline";
       case "Results":
         return focused ? "trophy" : "trophy-outline";
-      case "Social":
-        return focused ? "people" : "people-outline";
       default:
         return "help-circle-outline";
     }
@@ -49,14 +47,12 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         return "Speak";
       case "Practice":
         return "Practice";
-      case "Simulations":
-        return "Test";
       case "Home":
         return "Home";
+      case "Simulations":
+        return "Full test";
       case "Results":
         return "Results";
-      case "Social":
-        return "Social";
       default:
         return routeName;
     }
@@ -66,7 +62,11 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
     const iconName = getIconName(routeName, focused);
     const size = 24;
 
-    if (routeName === "VoiceTest" || routeName === "Results") {
+    if (
+      routeName === "VoiceTest" ||
+      routeName === "Results" ||
+      routeName === "Simulations"
+    ) {
       return (
         <MaterialCommunityIcons
           name={iconName as any}
@@ -92,7 +92,6 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         ) {
           return null;
         }
-
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 

@@ -65,8 +65,8 @@ export type MainTabParamList = {
         };
       }
     | undefined;
-  Simulations: NavigatorScreenParams<SimulationStackParamList> | undefined;
   Home: undefined;
+  Simulations: NavigatorScreenParams<SimulationStackParamList> | undefined;
   Results: undefined;
 };
 
@@ -74,6 +74,7 @@ export type AppStackParamList = {
   Tabs: undefined;
   Profile: undefined;
   Analytics: undefined;
+  Social: undefined;
   Settings: undefined;
   NotificationSettings: undefined;
   Usage: undefined;
@@ -163,11 +164,6 @@ const MainTabs = () => {
         options={{ headerTitle: "Speak practice" }}
       />
       <Tab.Screen
-        name="Simulations"
-        component={SimulationNavigator}
-        options={{ headerShown: false }}
-      />
-      <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={{
@@ -182,6 +178,11 @@ const MainTabs = () => {
             </View>
           ),
         }}
+      />
+      <Tab.Screen
+        name="Simulations"
+        component={SimulationNavigator}
+        options={{ headerShown: false }}
       />
       <Tab.Screen name="Results" component={ResultsScreen} />
     </Tab.Navigator>
@@ -295,6 +296,11 @@ const AppStackNavigator = () => {
         name="Analytics"
         component={AnalyticsGate}
         options={{ headerTitle: "Analytics" }}
+      />
+      <AppStack.Screen
+        name="Social"
+        component={SocialGate}
+        options={{ headerShown: false }}
       />
       <AppStack.Screen name="Settings" component={SettingsScreen} />
       <AppStack.Screen

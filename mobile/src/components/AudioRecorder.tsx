@@ -33,6 +33,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const [duration, setDuration] = useState(0);
   const [hasPermission, setHasPermission] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [lastRecordingUri, setLastRecordingUri] = useState<string | null>(null);
 
   // Animation values
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -107,6 +108,17 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
 
     try {
+      // If we're recording again, clean up the previous file to avoid cache bloat.
+      if (recordingStatus === "completed" && lastRecordingUri) {
+        try {
+          await FileSystem.deleteAsync(lastRecordingUri, { idempotent: true });
+        } catch {
+          // Best effort; not fatal.
+        } finally {
+          setLastRecordingUri(null);
+        }
+      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -199,6 +211,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
 
         setRecordingStatus("completed");
+        setLastRecordingUri(uri);
         onRecordingComplete(uri, finalDuration);
       }
 
@@ -320,7 +333,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
       {/* Main Record Button */}
       <View style={styles.buttonContainer}>
-        {recordingStatus === "idle" ? (
+        {recordingStatus === "idle" || recordingStatus === "completed" ? (
           <TouchableOpacity
             style={[styles.recordButton, disabled && styles.disabledButton]}
             onPress={startRecording}
@@ -378,6 +391,12 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       {recordingStatus === "recording" && (
         <Text style={styles.instructionText}>
           Speak clearly into your device microphone
+        </Text>
+      )}
+
+      {recordingStatus === "completed" && (
+        <Text style={styles.instructionText}>
+          Tap the microphone to record again, or continue when you're ready.
         </Text>
       )}
     </View>

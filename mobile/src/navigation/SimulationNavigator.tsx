@@ -4,11 +4,22 @@ import React from "react";
 import { SimulationDetailScreen } from "../screens/Simulation/SimulationDetailScreen";
 import { SimulationListScreen } from "../screens/Simulation/SimulationListScreen";
 import { SimulationSessionScreen } from "../screens/Simulation/SimulationSessionScreen";
+import { SimulationVoiceSessionScreen } from "../screens/Simulation/SimulationVoiceSessionScreen";
 import { TestSimulation } from "../types/api";
 
 export type SimulationStackParamList = {
   SimulationList: undefined;
   SimulationSession: {
+    simulationId: string;
+    parts: Array<{
+      part: number;
+      question: string;
+      topicTitle?: string;
+      timeLimit?: number;
+      tips?: string[];
+    }>;
+  };
+  SimulationVoiceSession: {
     simulationId: string;
     parts: Array<{
       part: number;
@@ -38,6 +49,11 @@ export const SimulationNavigator = () => (
       name="SimulationSession"
       component={SimulationSessionScreen}
       options={{ title: "Simulation in progress" }}
+    />
+    <Stack.Screen
+      name="SimulationVoiceSession"
+      component={SimulationVoiceSessionScreen}
+      options={{ title: "Voice simulation" }}
     />
     <Stack.Screen
       name="SimulationDetail"

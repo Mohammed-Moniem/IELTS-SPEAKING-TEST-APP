@@ -44,13 +44,16 @@ export const SimulationListScreen: React.FC = () => {
   });
 
   const startSimulationMutation = useMutation({
-    mutationFn: () => simulationApi.start(),
-    onSuccess: (simulation) => {
+    mutationFn: async (mode: "voice" | "text") => {
+      const simulation = await simulationApi.start();
+      return { simulation, mode };
+    },
+    onSuccess: ({ simulation, mode }) => {
       queryClient
         .invalidateQueries({ queryKey: ["test-simulations"] })
         .catch(() => undefined);
       void refreshUsage();
-      navigation.navigate("SimulationSession", {
+      navigation.navigate(mode === "voice" ? "SimulationVoiceSession" : "SimulationSession", {
         simulationId: simulation.simulationId,
         parts: simulation.parts.map((part) => ({
           part: part.part,
@@ -65,6 +68,22 @@ export const SimulationListScreen: React.FC = () => {
       Alert.alert("Cannot start simulation", extractErrorMessage(error));
     },
   });
+
+  const navigateToSimulation = (
+    simulation: TestSimulation,
+    mode: "voice" | "text"
+  ) => {
+    navigation.navigate(mode === "voice" ? "SimulationVoiceSession" : "SimulationSession", {
+      simulationId: simulation._id,
+      parts: simulation.parts.map((part) => ({
+        part: part.part,
+        question: part.question,
+        topicTitle: part.topicTitle,
+        timeLimit: part.timeLimit,
+        tips: part.tips,
+      })),
+    });
+  };
 
   const renderItem = ({ item }: { item: TestSimulation }) => (
     <Card>
@@ -95,16 +114,15 @@ export const SimulationListScreen: React.FC = () => {
             navigation.navigate("SimulationDetail", { simulation: item });
             return;
           }
-          navigation.navigate("SimulationSession", {
-            simulationId: item._id,
-            parts: item.parts.map((part) => ({
-              part: part.part,
-              question: part.question,
-              topicTitle: part.topicTitle,
-              timeLimit: part.timeLimit,
-              tips: part.tips,
-            })),
-          });
+          Alert.alert(
+            "Continue simulation",
+            "Choose how you want to continue.",
+            [
+              { text: "Voice mode", onPress: () => navigateToSimulation(item, "voice") },
+              { text: "Text mode", onPress: () => navigateToSimulation(item, "text") },
+              { text: "Cancel", style: "cancel" },
+            ]
+          );
         }}
       />
     </Card>
@@ -117,14 +135,25 @@ export const SimulationListScreen: React.FC = () => {
       </SectionHeading>
 
       <Button
-        title="Start a new simulation"
+        title="Start voice simulation"
         onPress={() => {
           if (!ensureCanStart("simulation")) {
             return;
           }
-          startSimulationMutation.mutate();
+          startSimulationMutation.mutate("voice");
         }}
         loading={startSimulationMutation.isPending}
+      />
+      <Button
+        title="Start text simulation"
+        variant="secondary"
+        onPress={() => {
+          if (!ensureCanStart("simulation")) {
+            return;
+          }
+          startSimulationMutation.mutate("text");
+        }}
+        disabled={startSimulationMutation.isPending}
       />
 
       {simulationsQuery.isLoading ? (

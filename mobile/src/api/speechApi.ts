@@ -124,6 +124,7 @@ export const transcribeAudio = async (
     sessionId?: string;
     topic?: string;
     testPart?: string;
+    recordingType?: "practice" | "simulation";
   }
 ): Promise<TranscriptionResult> => {
   try {
@@ -153,6 +154,9 @@ export const transcribeAudio = async (
     }
     if (options?.testPart) {
       formData.append("testPart", options.testPart);
+    }
+    if (options?.recordingType) {
+      formData.append("recordingType", options.recordingType);
     }
 
     // Use apiClient for authenticated request with FormData

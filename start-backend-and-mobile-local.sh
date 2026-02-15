@@ -45,8 +45,15 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Get local IP address (Mac-specific)
-LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+# Get local IP address (Mac-specific).
+# Prefer Wi-Fi IP (en0) to avoid picking Docker/VM/other interfaces.
+LOCAL_IP="$(ipconfig getifaddr en0 2>/dev/null || true)"
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP="$(ipconfig getifaddr en1 2>/dev/null || true)"
+fi
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+fi
 
 if [ -z "$LOCAL_IP" ]; then
     echo -e "${RED}Error: Could not detect local IP address${NC}"
@@ -219,38 +226,17 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${YELLOW}Make sure your mobile device is on the same WiFi network!${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}\n"
 
-# Choose a free Expo port to avoid interactive prompts.
-EXPO_PORT=8081
-if lsof -Pi :$EXPO_PORT -sTCP:LISTEN -t >/dev/null ; then
-    EXPO_PORT=8083
-fi
-if lsof -Pi :$EXPO_PORT -sTCP:LISTEN -t >/dev/null ; then
-    EXPO_PORT=$(python3 - <<'PY'
-import socket
+# Pick a free Metro port to avoid interactive prompts.
+METRO_PORT=8081
+while lsof -Pi :$METRO_PORT -sTCP:LISTEN -t >/dev/null 2>&1; do
+    METRO_PORT=$((METRO_PORT + 1))
+done
 
-for port in range(8084, 8101):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            s.bind(("0.0.0.0", port))
-        except OSError:
-            continue
-        print(port)
-        break
-else:
-    print(0)
-PY
-)
-    if [ "$EXPO_PORT" -eq 0 ]; then
-        echo -e "${RED}Error: Could not find a free Expo port (8081, 8083, 8084-8100).${NC}"
-        exit 1
-    fi
-fi
+echo -e "Expo URL: ${GREEN}exp://${LOCAL_IP}:${METRO_PORT}${NC}"
+echo "exp://${LOCAL_IP}:${METRO_PORT}" > ../docs/CURRENT-EXPO-URL.txt
 
-echo -e "Expo URL: ${GREEN}exp://${LOCAL_IP}:${EXPO_PORT}${NC}"
-echo "exp://${LOCAL_IP}:${EXPO_PORT}" > ../docs/CURRENT-EXPO-URL.txt
-
-npx expo start --clear --port "$EXPO_PORT"
+echo -e "${GREEN}Starting Expo on port ${METRO_PORT}...${NC}"
+npx expo start --clear --port "$METRO_PORT"
 
 # Keep script running
 wait $BACKEND_PID

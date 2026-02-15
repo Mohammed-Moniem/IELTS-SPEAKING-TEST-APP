@@ -109,6 +109,10 @@ export class SpeechController {
           const sessionId = String((req.body.sessionId as string) || '').trim() || randomUUID();
           const topic = typeof req.body.topic === 'string' ? req.body.topic.trim() : undefined;
           const testPart = typeof req.body.testPart === 'string' ? req.body.testPart.trim() : undefined;
+          const requestedRecordingType =
+            typeof (req.body as any).recordingType === 'string'
+              ? String((req.body as any).recordingType).trim().toLowerCase()
+              : undefined;
 
           const result = await this.speechService.transcribe(file.path, language);
 
@@ -119,7 +123,8 @@ export class SpeechController {
             audioBuffer,
             fileName: file.originalname || file.filename,
             mimeType: file.mimetype,
-            recordingType: RecordingType.PRACTICE,
+            recordingType:
+              requestedRecordingType === RecordingType.SIMULATION ? RecordingType.SIMULATION : RecordingType.PRACTICE,
             durationSeconds: Math.max(0, Number(result.duration || 0)),
             topic,
             testPart,
