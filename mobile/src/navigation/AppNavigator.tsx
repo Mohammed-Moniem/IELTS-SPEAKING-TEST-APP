@@ -41,6 +41,7 @@ import { VoiceTestScreen } from "../screens/VoiceTest/VoiceTestScreen";
 import monitoringService from "../services/monitoringService";
 import { PracticeNavigator } from "./PracticeNavigator";
 import { SimulationNavigator, type SimulationStackParamList } from "./SimulationNavigator";
+import { SocialNavigator } from "./SocialNavigator";
 import { navigationRef } from "./navigationRef";
 
 export const ONBOARDING_KEY = "hasSeenOnboarding";
@@ -112,6 +113,24 @@ const SplashScreen = () => {
       <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
+};
+
+const SocialGate = () => {
+  const { user } = useAuth();
+
+  if (user?.isGuest) {
+    return (
+      <GuestLockedScreen
+        title="Social is locked in guest mode"
+        description="Create an account to add friends, join groups, and compare progress."
+        onCta={() => {
+          navigationRef.navigate("App", { screen: "UpgradeAccount" } as any);
+        }}
+      />
+    );
+  }
+
+  return <SocialNavigator />;
 };
 
 const AnalyticsGate = () => {
