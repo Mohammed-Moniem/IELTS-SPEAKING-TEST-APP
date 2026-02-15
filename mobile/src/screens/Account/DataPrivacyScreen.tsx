@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import React, { useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
-import Share from "react-native-share";
 
 import { accountApi } from "../../api/services";
 import { useAuth } from "../../auth/AuthContext";
@@ -30,18 +30,26 @@ export const DataPrivacyScreen: React.FC = () => {
       const data = await accountApi.export();
       const json = JSON.stringify(data, null, 2);
       const fileName = `spokio-export-${Date.now()}.json`;
-      const file = new FileSystem.File(FileSystem.Paths.cache, fileName);
-      if (!file.exists) {
-        file.create();
+      const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+      if (!baseDir) {
+        throw new Error("No writable directory available on this device.");
       }
-      file.write(json);
-      const fileUri = file.uri;
 
-      await Share.open({
-        url: fileUri,
-        type: "application/json",
-        filename: fileName,
-        failOnCancel: false,
+      const fileUri = `${baseDir}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, json, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Export ready", `Saved to: ${fileUri}`);
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        UTI: "public.json",
+        mimeType: "application/json",
+        dialogTitle: "Spokio export",
       });
     } catch (error) {
       Alert.alert("Export failed", extractErrorMessage(error));
