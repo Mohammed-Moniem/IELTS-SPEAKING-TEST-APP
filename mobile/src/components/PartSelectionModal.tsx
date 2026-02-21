@@ -8,7 +8,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { colors, spacing } from "../theme/tokens";
+
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 
 interface PartSelectionModalProps {
   visible: boolean;
@@ -21,6 +25,8 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
   onClose,
   onSelectPart,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const parts = [
     {
       part: 1 as const,
@@ -144,8 +150,9 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
     flex: 1,
     backgroundColor: colors.background,
   },
@@ -248,4 +255,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginRight: spacing.xs,
   },
-});
+  });

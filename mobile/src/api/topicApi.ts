@@ -1,11 +1,7 @@
-import Constants from "expo-constants";
 import { apiClient } from "./client";
 
-const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl ||
-  "https://ce4be704c8b6.ngrok-free.app/api/v1";
-
 export interface GeneratedTopic {
+  questionId?: string;
   question: string;
   category: "part1" | "part2" | "part3";
   difficulty: "easy" | "medium" | "hard";

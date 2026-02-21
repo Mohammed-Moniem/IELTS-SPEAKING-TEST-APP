@@ -1,11 +1,23 @@
-import { Document, Schema, Types, model } from 'mongoose';
+import { Document, Schema, Types, model } from '@lib/db/mongooseCompat';
 
 export enum AchievementCategory {
   PRACTICE = 'practice',
   IMPROVEMENT = 'improvement',
   STREAK = 'streak',
   SOCIAL = 'social',
-  MILESTONE = 'milestone'
+  MILESTONE = 'milestone',
+  SPEED = 'speed',
+  CONSISTENCY = 'consistency',
+  MASTERY = 'mastery',
+  SEASONAL = 'seasonal'
+}
+
+export enum AchievementTier {
+  BRONZE = 'bronze',
+  SILVER = 'silver',
+  GOLD = 'gold',
+  PLATINUM = 'platinum',
+  DIAMOND = 'diamond'
 }
 
 export interface IAchievement extends Document {
@@ -13,6 +25,7 @@ export interface IAchievement extends Document {
   name: string;
   description: string;
   category: AchievementCategory;
+  tier?: AchievementTier; // Bronze, Silver, Gold, Platinum, Diamond
   icon: string; // Emoji or icon name
   points: number;
   requirement: {
@@ -50,6 +63,11 @@ const AchievementSchema = new Schema<IAchievement>(
       enum: Object.values(AchievementCategory),
       required: true,
       index: true
+    },
+    tier: {
+      type: String,
+      enum: Object.values(AchievementTier),
+      required: false
     },
     icon: {
       type: String,
@@ -166,6 +184,8 @@ export interface IUserStats extends Document {
   longestStreak: number;
   totalAchievements: number;
   achievementPoints: number;
+  totalPoints: number;
+  redeemedPoints: number;
   lastPracticeDate?: Date;
   weeklyScore: number; // This week's average
   monthlyScore: number; // This month's average
@@ -174,6 +194,7 @@ export interface IUserStats extends Document {
   rank?: number; // Global rank (computed)
   leaderboardOptIn: boolean;
   profileVisibility: 'public' | 'private' | 'friends-only';
+  lastPointsUpdate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -230,6 +251,17 @@ const UserStatsSchema = new Schema<IUserStats>(
       min: 0,
       index: true
     },
+    totalPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true
+    },
+    redeemedPoints: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     lastPracticeDate: {
       type: Date
     },
@@ -256,6 +288,9 @@ const UserStatsSchema = new Schema<IUserStats>(
       type: Number,
       default: 0,
       min: 0
+    },
+    lastPointsUpdate: {
+      type: Date
     },
     rank: {
       type: Number,

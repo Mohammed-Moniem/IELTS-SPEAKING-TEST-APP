@@ -5,6 +5,7 @@
 
 import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
 import { useEffect, useState } from "react";
+import { logger } from "../utils/logger";
 
 interface NetworkStatus {
   isConnected: boolean | null;
@@ -53,9 +54,9 @@ export const useNetworkStatus = () => {
 
     // Log connection changes
     if (!isConnected || !isInternetReachable) {
-      console.log("📡 Network: OFFLINE");
+      logger.warn("📡", "Network: OFFLINE");
     } else {
-      console.log("📡 Network: ONLINE", `(${state.type})`);
+      logger.success("📡", "Network: ONLINE", `(${state.type})`);
     }
   };
 

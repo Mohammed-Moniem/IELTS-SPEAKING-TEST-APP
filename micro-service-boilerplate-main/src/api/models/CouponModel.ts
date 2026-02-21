@@ -1,4 +1,4 @@
-import { Document, Schema, Types, model } from 'mongoose';
+import { Document, Schema, Types, model } from '@lib/db/mongooseCompat';
 
 export enum CouponType {
   PERCENTAGE = 'percentage', // e.g., 20% off

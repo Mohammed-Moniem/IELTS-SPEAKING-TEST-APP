@@ -1,11 +1,15 @@
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Speech from "expo-speech";
+import { Alert } from "react-native";
 
 import { synthesizeSpeech } from "../api/speechApi";
+import { audioCacheService } from "./audioCacheService";
 
 /**
  * Text-to-Speech Service for IELTS Speaking Test
  * Provides natural-sounding examiner voice
+ * Now with pre-cached audio for repetitive phrases
  */
 
 interface TTSOptions {
@@ -37,6 +41,10 @@ class TextToSpeechService {
     string,
     { dataUri: string; expiresAt: number }
   >();
+  private remoteSynthesisDisabled = false;
+  private remoteDisableReason: string | null = null;
+  private remoteDisableAlertShown = false;
+  private isUsingSystemSpeech = false;
 
   /**
    * Get part-specific introduction from the examiner
@@ -86,16 +94,42 @@ class TextToSpeechService {
 
       console.log("🔊 Speaking:", trimmed.substring(0, 50) + "...");
 
-      const audioDataUri = await this.getAudioDataUri(trimmed);
+      if (this.remoteSynthesisDisabled) {
+        await this.speakWithSystemVoice(trimmed);
+      } else {
+        const audioDataUri = await this.getAudioDataUri(trimmed);
 
-      if (this.stopRequested) {
-        return;
+        if (this.stopRequested) {
+          return;
+        }
+
+        await this.playDataUri(audioDataUri);
+      }
+    } catch (error: any) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      const isBillingIssue =
+        (error as any)?.code === "ELEVENLABS_BILLING" ||
+        normalizedError.message
+          .toLowerCase()
+          .includes("premium examiner voice");
+
+      if (isBillingIssue) {
+        this.disableRemoteSynthesis(normalizedError.message);
+        try {
+          await this.speakWithSystemVoice(trimmed);
+          playbackError = null;
+        } catch (fallbackError: any) {
+          playbackError =
+            fallbackError instanceof Error
+              ? fallbackError
+              : new Error(String(fallbackError));
+        }
+      } else {
+        playbackError = normalizedError;
       }
 
-      await this.playDataUri(audioDataUri);
-    } catch (error: any) {
-      playbackError = error instanceof Error ? error : new Error(String(error));
-      if (!this.stopRequested) {
+      if (playbackError && !this.stopRequested) {
         console.error("❌ Speech playback error:", playbackError);
       }
     } finally {
@@ -158,6 +192,10 @@ class TextToSpeechService {
     this.stopRequested = true;
 
     if (!this.currentSound) {
+      if (this.isUsingSystemSpeech) {
+        Speech.stop();
+        this.isUsingSystemSpeech = false;
+      }
       this.isSpeaking = false;
       this.currentUtterance = null;
       console.log("🛑 Speech stopped (idle)");
@@ -170,6 +208,11 @@ class TextToSpeechService {
       console.error("Failed to stop speech playback:", error);
     } finally {
       this.playbackCompletion?.resolve();
+    }
+
+    if (this.isUsingSystemSpeech) {
+      Speech.stop();
+      this.isUsingSystemSpeech = false;
     }
   }
 
@@ -238,19 +281,81 @@ class TextToSpeechService {
   }
 
   private async getAudioDataUri(text: string): Promise<string> {
+    // First, try to get pre-cached audio by matching exact text
+    const cachedFileUri = await audioCacheService.getCachedAudioByText(text);
+
+    if (cachedFileUri) {
+      console.log("♻️ Using pre-cached audio file");
+      // Read cached file and convert to data URI
+      try {
+        const base64Audio = await FileSystem.readAsStringAsync(cachedFileUri, {
+          encoding: "base64",
+        });
+        return `data:audio/mpeg;base64,${base64Audio}`;
+      } catch (error) {
+        console.warn(
+          "⚠️ Failed to read cached audio, falling back to live TTS:",
+          error
+        );
+        // Fallback to live TTS if cached file read fails
+      }
+    }
+
+    // Fallback: Check in-memory cache for recently synthesized audio
+    const cacheKey = `tts_${text.substring(0, 50)}`;
+
     this.pruneExpiredCache();
 
-    const cached = this.audioCache.get(text);
+    const cached = this.audioCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
+      console.log("♻️ Using in-memory cached TTS audio");
       return cached.dataUri;
     }
 
+    // Last resort: Synthesize via backend API
+    console.log("🔊 Synthesizing via backend API (no cache available)");
     const dataUri = await synthesizeSpeech(text);
+
     const expiresAt = Date.now() + this.cacheTtlMs;
-    this.audioCache.set(text, { dataUri, expiresAt });
+    this.audioCache.set(cacheKey, { dataUri, expiresAt });
     this.enforceCacheLimit();
 
     return dataUri;
+  }
+
+  private async speakWithSystemVoice(text: string): Promise<void> {
+    this.isUsingSystemSpeech = true;
+    await new Promise<void>((resolve, reject) => {
+      Speech.speak(text, {
+        language: "en-US",
+        rate: 1.0,
+        onDone: () => resolve(),
+        onStopped: () => resolve(),
+        onError: (err) =>
+          reject(
+            err instanceof Error ? err : new Error(String(err ?? "Speech error"))
+          ),
+      });
+    }).finally(() => {
+      this.isUsingSystemSpeech = false;
+    });
+  }
+
+  private disableRemoteSynthesis(reason?: string) {
+    if (this.remoteSynthesisDisabled) {
+      return;
+    }
+    this.remoteSynthesisDisabled = true;
+    this.remoteDisableReason =
+      reason || "Premium voice is temporarily unavailable.";
+    console.warn("⚠️ Remote TTS disabled:", this.remoteDisableReason);
+    if (!this.remoteDisableAlertShown) {
+      Alert.alert(
+        "Voice unavailable",
+        "Our premium examiner voice is temporarily unavailable. We'll continue using the system voice instead."
+      );
+      this.remoteDisableAlertShown = true;
+    }
   }
 
   private enforceCacheLimit(): void {

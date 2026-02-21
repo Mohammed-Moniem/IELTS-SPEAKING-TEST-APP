@@ -19,13 +19,18 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { StatCard } from "../../components/StatCard";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { AppTabParamList } from "../../navigation/AppNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { formatDate } from "../../utils/date";
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
   const { user, refreshProfile } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const usageQuery = useQuery({
     queryKey: ["usage-summary"],
@@ -157,9 +162,10 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  content: {
-    paddingBottom: spacing.xxl + spacing.sm,
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    content: {
+      paddingBottom: spacing.xxl + spacing.sm,
   },
   hero: {
     marginBottom: spacing.xl,
@@ -211,4 +217,4 @@ const styles = StyleSheet.create({
   featureItem: {
     color: colors.textSecondary,
   },
-});
+  });

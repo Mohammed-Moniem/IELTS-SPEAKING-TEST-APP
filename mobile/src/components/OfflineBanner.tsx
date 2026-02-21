@@ -24,7 +24,7 @@ interface OfflineBannerProps {
 export const OfflineBanner: React.FC<OfflineBannerProps> = ({
   showQueueCount = true,
 }) => {
-  const { isOffline, isOnline } = useNetworkStatus();
+  const { isOffline } = useNetworkStatus();
   const [queueCount, setQueueCount] = useState(0);
   const [slideAnim] = useState(new Animated.Value(-100));
   const [shouldShow, setShouldShow] = useState(false);
@@ -44,30 +44,18 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
       if (showQueueCount) {
         updateQueueCount();
       }
-    } else if (isOnline) {
-      // Slide down briefly to show "Back online" message
-      setShouldShow(true);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }).start();
-
-      // Then slide up after 3 seconds
-      const timer = setTimeout(() => {
-        Animated.timing(slideAnim, {
-          toValue: -100,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => {
-          setShouldShow(false);
-        });
-      }, 3000); // Show "Back online" message for 3 seconds
-
-      return () => clearTimeout(timer);
+      return;
     }
-  }, [isOffline, isOnline]);
+
+    // Hide immediately once device is online.
+    Animated.timing(slideAnim, {
+      toValue: -100,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShouldShow(false);
+    });
+  }, [isOffline, showQueueCount, slideAnim]);
 
   const updateQueueCount = async () => {
     const stats = await offlineStorage.getStats();
@@ -75,7 +63,7 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
   };
 
   // Don't render if we're in loading state or if banner should be hidden
-  if ((isOffline === false && isOnline === false) || !shouldShow) {
+  if (!isOffline || !shouldShow) {
     return null;
   }
 
@@ -83,28 +71,21 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
     <Animated.View
       style={[
         styles.banner,
-        isOffline ? styles.offlineBanner : styles.onlineBanner,
+        styles.offlineBanner,
         { transform: [{ translateY: slideAnim }] },
       ]}
     >
       <View style={styles.content}>
-        <Text style={styles.icon}>{isOffline ? "📡" : "✅"}</Text>
+        <Text style={styles.icon}>📡</Text>
         <View style={styles.textContainer}>
-          <Text style={styles.title}>
-            {isOffline ? "You are offline" : "Back online"}
+          <Text style={styles.title}>You are offline</Text>
+          <Text style={styles.subtitle}>
+            {queueCount > 0
+              ? `${queueCount} recording${
+                  queueCount > 1 ? "s" : ""
+                } will sync when online`
+              : "Recordings will be saved locally"}
           </Text>
-          {isOffline && (
-            <Text style={styles.subtitle}>
-              {queueCount > 0
-                ? `${queueCount} recording${
-                    queueCount > 1 ? "s" : ""
-                  } will sync when online`
-                : "Recordings will be saved locally"}
-            </Text>
-          )}
-          {isOnline && (
-            <Text style={styles.subtitle}>Syncing your recordings...</Text>
-          )}
         </View>
       </View>
     </Animated.View>
@@ -130,11 +111,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEF3C7", // Light yellow
     borderLeftWidth: 4,
     borderLeftColor: "#F59E0B", // Amber
-  },
-  onlineBanner: {
-    backgroundColor: "#D1FAE5", // Light green
-    borderLeftWidth: 4,
-    borderLeftColor: "#10B981", // Green
   },
   content: {
     flexDirection: "row",

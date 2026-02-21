@@ -26,11 +26,14 @@ import { OfflineBanner } from "../../components/OfflineBanner";
 import { ProfileMenu } from "../../components/ProfileMenu";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { useNotificationManager } from "../../hooks/useNotificationManager";
+import { useThemedStyles } from "../../hooks";
 import { PracticeStackParamList } from "../../navigation/PracticeNavigator";
 import offlineStorage from "../../services/offlineStorage";
-import { colors, radii, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { radii, spacing } from "../../theme/tokens";
 import { PracticeSessionStart } from "../../types/api";
 import { extractErrorMessage } from "../../utils/errors";
 
@@ -51,6 +54,8 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
   const { session: initialSession } = route.params;
   const queryClient = useQueryClient();
   const { isOffline, isOnline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [response, setResponse] = useState("");
   const [useAudio, setUseAudio] = useState(true); // Default to audio mode
@@ -349,7 +354,8 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "700",
@@ -463,4 +469,4 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 22,
   },
-});
+  });

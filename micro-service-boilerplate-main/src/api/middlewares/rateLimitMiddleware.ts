@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // General API rate limit - 100 requests per 15 minutes
 export const apiRateLimiter = rateLimit({
@@ -28,7 +28,7 @@ export const aiRateLimiter = rateLimit({
   },
   keyGenerator: (req: Request) => {
     // Rate limit per user, not per IP
-    return (req as any).currentUser?.id || req.ip || 'unknown';
+    return (req as any).currentUser?.id || ipKeyGenerator(req);
   }
 });
 
@@ -43,7 +43,7 @@ export const sessionStartRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
-    return (req as any).currentUser?.id || req.ip || 'unknown';
+    return (req as any).currentUser?.id || ipKeyGenerator(req);
   }
 });
 
@@ -59,6 +59,6 @@ export const topicGenerationRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req: Request) => {
-    return (req as any).currentUser?.id || req.ip || 'unknown';
+    return (req as any).currentUser?.id || ipKeyGenerator(req);
   }
 });

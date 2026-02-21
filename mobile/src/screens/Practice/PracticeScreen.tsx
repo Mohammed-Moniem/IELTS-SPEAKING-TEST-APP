@@ -23,11 +23,16 @@ import { OfflineBanner } from "../../components/OfflineBanner";
 import { ProfileMenu } from "../../components/ProfileMenu";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
+import { TopicListSkeleton } from "../../components/skeletons/PracticeSkeletons";
+import { UsageLimitModal } from "../../components/UsageLimitModal";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
+import { useThemedStyles, useUsageGuard } from "../../hooks";
 import { useNetworkStatus } from "../../hooks/useNetworkStatus";
 import { PracticeStackParamList } from "../../navigation/PracticeNavigator";
 import offlineStorage from "../../services/offlineStorage";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { Topic } from "../../types/api";
 import { extractErrorMessage } from "../../utils/errors";
 
@@ -36,6 +41,10 @@ export const PracticeScreen: React.FC = () => {
     useNavigation<NativeStackNavigationProp<PracticeStackParamList>>();
   const queryClient = useQueryClient();
   const { isOnline, isOffline } = useNetworkStatus();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const { ensureCanStart, limitState, dismissLimit, refreshUsage } =
+    useUsageGuard();
   const [cachedTopics, setCachedTopics] = useState<Topic[]>([]);
 
   // Add header with profile icon - ProfileMenu manages its own state
@@ -108,6 +117,7 @@ export const PracticeScreen: React.FC = () => {
         .invalidateQueries({ queryKey: ["practice-sessions"] })
         .catch(() => undefined);
       navigation.navigate("PracticeSession", { session });
+      void refreshUsage();
     },
     onError: (error) => {
       Alert.alert("Cannot start session", extractErrorMessage(error));
@@ -129,7 +139,12 @@ export const PracticeScreen: React.FC = () => {
         <Text style={styles.topicDescription}>{topic.description}</Text>
         <Button
           title="Start practice"
-          onPress={() => startSessionMutation.mutate(topic.slug)}
+          onPress={() => {
+            if (!ensureCanStart("practice")) {
+              return;
+            }
+            startSessionMutation.mutate(topic.slug);
+          }}
           loading={startSessionMutation.isPending}
         />
       </Card>
@@ -156,7 +171,7 @@ export const PracticeScreen: React.FC = () => {
       </SectionHeading>
 
       {topicsQuery.isLoading ? (
-        <ActivityIndicator color={colors.primary} />
+        <TopicListSkeleton count={3} />
       ) : displayTopics.length > 0 ? (
         <>
           {isOffline && cachedTopics.length > 0 && (
@@ -169,7 +184,9 @@ export const PracticeScreen: React.FC = () => {
           <FlatList
             data={displayTopics}
             renderItem={renderTopicItem}
-            keyExtractor={(item) => item.slug}
+            keyExtractor={(item) =>
+              item._id ? `${item._id}` : `${item.slug}-${item.part}`
+            }
             scrollEnabled={false}
             onEndReached={() => {
               if (topicsQuery.hasNextPage && !topicsQuery.isFetchingNextPage) {
@@ -186,11 +203,28 @@ export const PracticeScreen: React.FC = () => {
           description="Check back later for new speaking prompts."
         />
       )}
+
+      {limitState && (
+        <UsageLimitModal
+          visible
+          sessionType={limitState.sessionType}
+          currentTier={limitState.currentTier}
+          used={limitState.used}
+          limit={limitState.limit}
+          resetDate={limitState.resetDate}
+          onClose={dismissLimit}
+          onUpgrade={() => {
+            dismissLimit();
+            navigation.getParent()?.navigate("Profile" as never);
+          }}
+        />
+      )}
     </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   topicTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -234,4 +268,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-});
+  });

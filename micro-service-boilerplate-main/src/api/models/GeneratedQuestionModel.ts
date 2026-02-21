@@ -1,4 +1,4 @@
-import { Document, model, Schema } from 'mongoose';
+import { Document, model, Schema } from '@lib/db/mongooseCompat';
 
 export interface IPart1Question {
   topic: string;

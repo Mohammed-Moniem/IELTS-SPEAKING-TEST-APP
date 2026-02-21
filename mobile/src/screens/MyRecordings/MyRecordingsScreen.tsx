@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import {
   AudioRecording,
   deleteRecording,
@@ -24,9 +25,8 @@ import {
   listUserRecordings,
 } from "../../api/audioApi";
 
-const DEMO_USER_ID = "demo-user-123";
-
 export const MyRecordingsScreen: React.FC = () => {
+  const { user, initializing: authInitializing } = useAuth();
   const [recordings, setRecordings] = useState<AudioRecording[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,8 +35,19 @@ export const MyRecordingsScreen: React.FC = () => {
   const [filter, setFilter] = useState<"all" | "practice" | "simulation">(
     "all"
   );
+  const userId = user?._id ?? null;
 
   useEffect(() => {
+    if (authInitializing) {
+      return;
+    }
+
+    if (!userId) {
+      setRecordings([]);
+      setLoading(false);
+      return;
+    }
+
     loadRecordings();
 
     return () => {
@@ -44,12 +55,17 @@ export const MyRecordingsScreen: React.FC = () => {
         sound.unloadAsync();
       }
     };
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, userId, authInitializing]);
 
   const loadRecordings = async () => {
+    if (!userId) {
+      return;
+    }
+
     try {
       setLoading(true);
-      const result = await listUserRecordings(DEMO_USER_ID, {
+      const result = await listUserRecordings(userId, {
         limit: 50,
         recordingType: filter === "all" ? undefined : filter,
       });
@@ -63,6 +79,9 @@ export const MyRecordingsScreen: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    if (!userId) {
+      return;
+    }
     setRefreshing(true);
     await loadRecordings();
     setRefreshing(false);
@@ -115,9 +134,15 @@ export const MyRecordingsScreen: React.FC = () => {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const success = await deleteRecording(recording.id, DEMO_USER_ID);
+            if (!userId) {
+              Alert.alert("Sign in required", "Log in to manage recordings.");
+              return;
+            }
+            const success = await deleteRecording(recording.id, userId);
             if (success) {
-              setRecordings(recordings.filter((r) => r.id !== recording.id));
+              setRecordings((prev) =>
+                prev.filter((r) => r.id !== recording.id)
+              );
               Alert.alert("Success", "Recording deleted");
             } else {
               Alert.alert("Error", "Failed to delete recording");
@@ -294,6 +319,37 @@ export const MyRecordingsScreen: React.FC = () => {
       </View>
     );
   };
+
+  if (authInitializing) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>My Recordings</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Loading recordings...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>My Recordings</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Text style={styles.emptyTitle}>Sign in to access recordings</Text>
+          <Text style={styles.emptySubtitle}>
+            Log in to sync your practice audio and feedback
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

@@ -3,7 +3,7 @@
  * Handles audio recording upload, retrieval, and management
  */
 
-import { apiClient } from "./client";
+import { API_KEY, apiClient } from "./client";
 
 export interface AudioRecording {
   id: string;
@@ -107,11 +107,17 @@ export async function uploadAudio(
         );
     }
 
+    const apiKeyHeader = apiClient.defaults.headers["x-api-key"];
+    const resolvedApiKey =
+      typeof apiKeyHeader === "string"
+        ? apiKeyHeader
+        : apiKeyHeader != null
+        ? String(apiKeyHeader)
+        : API_KEY;
+
     const response = await fetch(`${apiClient.defaults.baseURL}/audio/upload`, {
       method: "POST",
-      headers: {
-        "x-api-key": apiClient.defaults.headers["x-api-key"],
-      },
+      headers: resolvedApiKey ? { "x-api-key": resolvedApiKey } : undefined,
       body: formData,
     });
 

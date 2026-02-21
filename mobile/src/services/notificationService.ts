@@ -8,6 +8,9 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
+import { notificationsApi } from "../api/services";
+import { logger } from "../utils/logger";
+
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -37,6 +40,7 @@ interface ScheduledNotification {
 class NotificationService {
   private isInitialized = false;
   private expoPushToken: string | null = null;
+  private lastRegisteredToken: string | null = null;
 
   /**
    * Initialize notification service and request permissions
@@ -71,6 +75,9 @@ class NotificationService {
       if (token) {
         this.expoPushToken = token;
         console.log("✅ Push token:", token);
+        this.syncPushTokenWithServer().catch((error) =>
+          logger.warn("⚠️ Failed to sync push token", error)
+        );
       }
 
       this.isInitialized = true;
@@ -132,6 +139,42 @@ class NotificationService {
    */
   getPushToken(): string | null {
     return this.expoPushToken;
+  }
+
+  /**
+   * Register push token with backend (no-op if not logged in)
+   */
+  async syncPushTokenWithServer(force: boolean = false): Promise<void> {
+    if (!this.expoPushToken) return;
+    if (!force && this.lastRegisteredToken === this.expoPushToken) return;
+
+    try {
+      await notificationsApi.registerDevice(this.expoPushToken);
+      this.lastRegisteredToken = this.expoPushToken;
+      logger.info("📬 Registered push token with backend");
+    } catch (error: any) {
+      // Ignore auth errors when user isn't logged in yet
+      if (error?.response?.status === 401) {
+        logger.debug("Push token sync skipped - not authenticated yet");
+        return;
+      }
+      logger.warn("⚠️ Failed to register device token", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove registered token from backend (best effort)
+   */
+  async unregisterPushTokenFromServer(): Promise<void> {
+    if (!this.expoPushToken || !this.lastRegisteredToken) return;
+    try {
+      await notificationsApi.unregisterDevice(this.expoPushToken);
+      this.lastRegisteredToken = null;
+      logger.info("🧹 Removed push token on logout");
+    } catch (error) {
+      logger.warn("⚠️ Failed to remove push token", error);
+    }
   }
 
   /**

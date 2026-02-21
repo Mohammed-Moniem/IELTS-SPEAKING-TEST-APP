@@ -1,4 +1,4 @@
-import { Document, Schema, Types, model } from 'mongoose';
+import { Document, Schema, Types, model } from '@lib/db/mongooseCompat';
 
 export interface IStudyGroup extends Document {
   name: string;
@@ -62,9 +62,9 @@ const StudyGroupSchema = new Schema<IStudyGroup>(
     ],
     maxMembers: {
       type: Number,
-      default: 15,
+      default: 10,
       min: 2,
-      max: 50
+      max: 10
     },
     isPremiumOnly: {
       type: Boolean,
@@ -77,7 +77,7 @@ const StudyGroupSchema = new Schema<IStudyGroup>(
       },
       allowMemberInvites: {
         type: Boolean,
-        default: true
+        default: false
       },
       requireApproval: {
         type: Boolean,

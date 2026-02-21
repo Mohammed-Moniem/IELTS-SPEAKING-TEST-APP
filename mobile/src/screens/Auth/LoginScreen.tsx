@@ -10,12 +10,18 @@ import {
   View,
 } from "react-native";
 
+import { Formik, FormikHelpers } from "formik";
+
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { FormTextInput } from "../../components/FormTextInput";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { AuthStackParamList } from "../../navigation/AppNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { LoginFormValues, loginSchema } from "../../utils/validation";
 
 export type LoginScreenProps = NativeStackScreenProps<
   AuthStackParamList,
@@ -24,19 +30,22 @@ export type LoginScreenProps = NativeStackScreenProps<
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing details", "Please enter your email and password.");
-      return;
-    }
+  const initialValues: LoginFormValues = {
+    email: "",
+    password: "",
+  };
 
+  const handleLogin = async (
+    values: LoginFormValues,
+    { setSubmitting }: FormikHelpers<LoginFormValues>
+  ) => {
     setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
+      await login(values.email.trim().toLowerCase(), values.password);
     } catch (error: any) {
       Alert.alert(
         "Unable to sign in",
@@ -44,6 +53,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       );
     } finally {
       setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -61,25 +71,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           </Text>
         </View>
 
-        <FormTextInput
-          label="Email"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-        />
+        <Formik<LoginFormValues>
+          initialValues={initialValues}
+          validationSchema={loginSchema}
+          onSubmit={handleLogin}
+        >
+          {({
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            errors,
+            touched,
+            isSubmitting,
+            isValid,
+          }) => (
+            <View>
+              <FormTextInput
+                label="Email"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                value={values.email}
+                onChangeText={handleChange("email")}
+                onBlur={handleBlur("email")}
+                placeholder="you@example.com"
+                errorMessage={touched.email ? errors.email : undefined}
+              />
 
-        <FormTextInput
-          label="Password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          placeholder="********"
-        />
+              <FormTextInput
+                label="Password"
+                secureTextEntry
+                value={values.password}
+                onChangeText={handleChange("password")}
+                onBlur={handleBlur("password")}
+                placeholder="********"
+                errorMessage={touched.password ? errors.password : undefined}
+              />
 
-        <Button title="Sign in" onPress={handleLogin} loading={loading} />
+              <Button
+                title="Sign in"
+                onPress={() => handleSubmit()}
+                loading={loading || isSubmitting}
+                disabled={
+                  isSubmitting ||
+                  (!isValid && (touched.email || touched.password))
+                }
+              />
+            </View>
+          )}
+        </Formik>
 
         <TouchableOpacity
           onPress={() => navigation.navigate("Register")}
@@ -92,7 +133,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flexGrow: 1,
     justifyContent: "center",
@@ -118,4 +160,4 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: "600",
   },
-});
+  });

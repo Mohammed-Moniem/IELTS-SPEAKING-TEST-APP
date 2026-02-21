@@ -1,6 +1,7 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
-import { ChatMessage, Conversation, IChatMessage, IConversation } from '../models/ChatMessageModel';
+import { ChatMessage, Conversation, IChatMessage } from '../models/ChatMessageModel';
+import { StudyGroup } from '../models/StudyGroupModel';
 import { encryptionService } from './EncryptionService';
 import { friendService } from './FriendService';
 
@@ -94,27 +95,92 @@ export class ChatService {
     conversationId: string,
     userId: string,
     limit: number = 50,
-    before?: Date
+    before?: string
   ): Promise<IChatMessage[]> {
     const query: any = {
       conversationId,
       isDeleted: false
     };
 
-    // Only return messages for conversations user is part of
-    const conversation = await Conversation.findOne({ conversationId });
-    if (!conversation || !conversation.participants.includes(new Types.ObjectId(userId))) {
-      throw new Error('Unauthorized access to conversation');
+    const userObjectId = new Types.ObjectId(userId);
+
+    // Check authorization based on conversation type
+    if (conversationId.startsWith('group_')) {
+      // Group chat - check group membership
+      const groupId = conversationId.replace('group_', '');
+      const group = await StudyGroup.findById(groupId);
+
+      if (!group) {
+        throw new Error('Group not found');
+      }
+
+      const isMember = group.memberIds.some((memberId: Types.ObjectId) => {
+        return memberId.equals(userObjectId);
+      });
+
+      if (!isMember) {
+        throw new Error('Unauthorized access to group');
+      }
+
+      log.info(`User ${userId} authorized to access group ${groupId} messages`);
+    } else {
+      // Direct message - check conversation participants
+      const conversation = await Conversation.findOne({ conversationId });
+      if (!conversation) {
+        throw new Error('Conversation not found');
+      }
+
+      const isParticipant = conversation.participants.some(participant => {
+        if (!participant) {
+          return false;
+        }
+
+        const candidate: any = participant;
+
+        if (typeof candidate.equals === 'function') {
+          return candidate.equals(userObjectId);
+        }
+
+        if (candidate._id && typeof candidate._id.equals === 'function') {
+          return candidate._id.equals(userObjectId);
+        }
+
+        return candidate.toString() === userId;
+      });
+
+      if (!isParticipant) {
+        throw new Error('Unauthorized access to conversation');
+      }
     }
 
     if (before) {
-      query.createdAt = { $lt: before };
+      const beforeDate = new Date(before);
+      if (!Number.isNaN(beforeDate.getTime())) {
+        query.createdAt = { $lt: beforeDate };
+      }
+    }
+
+    // Support passing a message ID in the "before" parameter (legacy clients)
+    if (!query.createdAt && before) {
+      try {
+        const pivotMessage = await ChatMessage.findById(before);
+        if (pivotMessage) {
+          query.createdAt = { $lt: pivotMessage.createdAt };
+        }
+      } catch (error) {
+        log.warn('Invalid before parameter provided, unable to resolve message pivot', {
+          conversationId,
+          before
+        });
+      }
     }
 
     const messages = await ChatMessage.find(query)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('senderId', 'name email');
+      .populate('senderId', 'firstName lastName email username avatar')
+      .populate('recipientId', 'firstName lastName email username avatar')
+      .populate('groupId', 'name avatar');
 
     return messages.reverse(); // Return in chronological order
   }
@@ -122,15 +188,91 @@ export class ChatService {
   /**
    * Get user's conversations list
    */
-  async getUserConversations(userId: string): Promise<IConversation[]> {
-    const conversations = await Conversation.find({
-      participants: new Types.ObjectId(userId)
-    })
-      .sort({ 'lastMessage.timestamp': -1 })
-      .populate('participants', 'name email')
-      .populate('groupId', 'name avatar');
+  async getUserConversations(userId: string): Promise<any[]> {
+    try {
+      const userObjectId = new Types.ObjectId(userId);
 
-    return conversations;
+      const conversations = await Conversation.find({
+        participants: userObjectId
+      })
+        .sort({ 'lastMessage.timestamp': -1 })
+        .populate('participants', 'firstName lastName email username avatar')
+        .populate('groupId', 'name avatar');
+
+      return conversations.map(conversation => {
+        const unreadCount =
+          typeof conversation.unreadCount?.get === 'function'
+            ? (conversation.unreadCount.get(userId) ?? 0)
+            : // Fallback in case Mongoose has already converted Map -> Object
+              ((conversation.unreadCount as unknown as Record<string, number> | undefined)?.[userId] ?? 0);
+
+        const participants = (conversation.participants || []).map((participant: any) => {
+          if (!participant) {
+            return participant;
+          }
+
+          if (participant._id && participant.firstName !== undefined) {
+            return {
+              _id: participant._id.toString(),
+              email: participant.email,
+              username: participant.username,
+              firstName: participant.firstName,
+              lastName: participant.lastName,
+              avatar: participant.avatar
+            };
+          }
+
+          // Non-populated ObjectId
+          const participantId = participant.toString();
+          return {
+            _id: participantId,
+            email: undefined,
+            username: undefined,
+            firstName: undefined,
+            lastName: undefined,
+            avatar: undefined
+          };
+        });
+
+        const groupData = (() => {
+          if (!conversation.isGroupChat || !conversation.groupId) {
+            return { groupId: undefined, groupName: undefined, groupAvatar: undefined };
+          }
+
+          const group: any = conversation.groupId;
+          return {
+            groupId: group._id ? group._id.toString() : group.toString(),
+            groupName: group.name,
+            groupAvatar: group.avatar
+          };
+        })();
+
+        const lastMessage = conversation.lastMessage
+          ? {
+              preview: conversation.lastMessage.preview,
+              timestamp: conversation.lastMessage.timestamp,
+              senderId: conversation.lastMessage.senderId ? conversation.lastMessage.senderId.toString() : undefined
+            }
+          : undefined;
+
+        return {
+          _id: conversation._id.toString(),
+          conversationId: conversation.conversationId,
+          participants,
+          isGroupChat: conversation.isGroupChat,
+          lastMessage,
+          unreadCount,
+          groupId: groupData.groupId,
+          groupName: groupData.groupName,
+          groupAvatar: groupData.groupAvatar,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt
+        };
+      });
+    } catch (error) {
+      log.error('Error fetching user conversations:', error);
+      throw error;
+    }
   }
 
   /**
@@ -257,10 +399,34 @@ export class ChatService {
    * Search messages in conversation
    */
   async searchMessages(conversationId: string, userId: string, searchTerm: string, limit: number = 20): Promise<any[]> {
-    // Verify user is part of conversation
-    const conversation = await Conversation.findOne({ conversationId });
-    if (!conversation || !conversation.participants.includes(new Types.ObjectId(userId))) {
-      throw new Error('Unauthorized access to conversation');
+    const userObjectId = new Types.ObjectId(userId);
+
+    // Check authorization based on conversation type
+    if (conversationId.startsWith('group_')) {
+      // Group chat - check group membership
+      const groupId = conversationId.replace('group_', '');
+      const group = await StudyGroup.findById(groupId);
+
+      if (!group) {
+        throw new Error('Group not found');
+      }
+
+      const isMember = group.memberIds.some((memberId: Types.ObjectId) => {
+        return memberId.equals(userObjectId);
+      });
+
+      if (!isMember) {
+        throw new Error('Unauthorized access to group');
+      }
+    } else {
+      // Direct message - check conversation participants
+      const conversation = await Conversation.findOne({ conversationId });
+      if (
+        !conversation ||
+        !conversation.participants.some((participant: any) => participant?.toString?.() === userObjectId.toString())
+      ) {
+        throw new Error('Unauthorized access to conversation');
+      }
     }
 
     // Get all messages (we need to decrypt them to search)
@@ -323,10 +489,8 @@ export class ChatService {
     isGroupChat: boolean,
     groupId?: string
   ): Promise<void> {
-    const preview = encryptionService.createPreview(
-      lastMessageContent,
-      '' // Preview doesn't need IV, we just truncate
-    );
+    const safeContent = lastMessageContent ?? '';
+    const preview = safeContent.length > 50 ? `${safeContent.substring(0, 50)}...` : safeContent;
 
     let conversation = await Conversation.findOne({ conversationId });
 
@@ -376,6 +540,157 @@ export class ChatService {
       conversation.unreadCount.set(userId, newCount);
       await conversation.save();
     }
+  }
+
+  /**
+   * Add reaction to a message
+   */
+  async addReaction(messageId: string, userId: string, emoji: string): Promise<IChatMessage> {
+    const message = await ChatMessage.findById(messageId);
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Verify user is a participant
+    const isParticipant =
+      message.senderId.toString() === userId ||
+      message.recipientId?.toString() === userId ||
+      (message.groupId && (await this.isGroupMember(message.groupId.toString(), userId)));
+
+    if (!isParticipant) {
+      throw new Error('Not authorized to react to this message');
+    }
+
+    // Get current reactions for this emoji
+    const userIdObj = new Types.ObjectId(userId);
+    const currentReactions = message.reactions.get(emoji) || [];
+
+    // Check if user already reacted with this emoji
+    const alreadyReacted = currentReactions.some(id => id.toString() === userId);
+
+    if (!alreadyReacted) {
+      currentReactions.push(userIdObj);
+      message.reactions.set(emoji, currentReactions);
+      await message.save();
+    }
+
+    return message;
+  }
+
+  /**
+   * Remove reaction from a message
+   */
+  async removeReaction(messageId: string, userId: string, emoji: string): Promise<IChatMessage> {
+    const message = await ChatMessage.findById(messageId);
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Get current reactions for this emoji
+    const currentReactions = message.reactions.get(emoji) || [];
+
+    // Filter out this user's reaction
+    const updatedReactions = currentReactions.filter(id => id.toString() !== userId);
+
+    if (updatedReactions.length === 0) {
+      message.reactions.delete(emoji);
+    } else {
+      message.reactions.set(emoji, updatedReactions);
+    }
+
+    await message.save();
+    return message;
+  }
+
+  /**
+   * Forward a message to another conversation
+   */
+  async forwardMessage(messageId: string, userId: string, targetConversationId: string): Promise<IChatMessage> {
+    // Get original message
+    const originalMessage = await ChatMessage.findById(messageId);
+
+    if (!originalMessage) {
+      throw new Error('Message not found');
+    }
+
+    // Verify user can access original message
+    const canAccess =
+      originalMessage.senderId.toString() === userId ||
+      originalMessage.recipientId?.toString() === userId ||
+      (originalMessage.groupId && (await this.isGroupMember(originalMessage.groupId.toString(), userId)));
+
+    if (!canAccess) {
+      throw new Error('Not authorized to forward this message');
+    }
+
+    // Get target conversation
+    const targetConversation = await Conversation.findOne({ conversationId: targetConversationId });
+
+    if (!targetConversation) {
+      throw new Error('Target conversation not found');
+    }
+
+    // Verify user is participant in target conversation
+    const isParticipant = targetConversation.participants.some(p => p.toString() === userId);
+
+    if (!isParticipant) {
+      throw new Error('Not authorized to send to this conversation');
+    }
+
+    // Decrypt original content
+    const decryptedContent = this.decryptMessageContent(originalMessage.encryptedContent, originalMessage.iv);
+
+    // Re-encrypt for forwarded message
+    const { encryptedContent, iv } = encryptionService.encryptMessage(decryptedContent);
+
+    // Create forwarded message
+    const forwardedMessage = new ChatMessage({
+      conversationId: targetConversationId,
+      senderId: new Types.ObjectId(userId),
+      recipientId: targetConversation.isGroupChat
+        ? undefined
+        : targetConversation.participants.find(p => p.toString() !== userId),
+      groupId: targetConversation.isGroupChat ? targetConversation.groupId : undefined,
+      encryptedContent,
+      iv,
+      messageType: originalMessage.messageType,
+      metadata: {
+        ...originalMessage.metadata,
+        forwardedFromUserId: originalMessage.senderId,
+        originalMessageId: originalMessage._id
+      },
+      deliveredTo: []
+    });
+
+    await forwardedMessage.save();
+
+    // Update target conversation metadata
+    await this.updateConversationMetadata(
+      targetConversationId,
+      targetConversation.participants.map(p => p.toString()),
+      userId,
+      decryptedContent.substring(0, 100),
+      targetConversation.isGroupChat
+    );
+
+    log.info(`Message ${messageId} forwarded by ${userId} to ${targetConversationId}`);
+    return forwardedMessage;
+  }
+
+  /**
+   * Check if user is a member of a group
+   */
+  private async isGroupMember(groupId: string, userId: string): Promise<boolean> {
+    // This would check against a Group model if you have one
+    // For now, check if user is in any conversation with this groupId
+    const conversation = await Conversation.findOne({
+      groupId: new Types.ObjectId(groupId),
+      participants: new Types.ObjectId(userId)
+    });
+
+    return !!conversation;
   }
 }
 

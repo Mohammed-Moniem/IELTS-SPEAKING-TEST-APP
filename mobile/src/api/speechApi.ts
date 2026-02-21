@@ -1,9 +1,4 @@
-import Constants from "expo-constants";
 import { apiClient } from "./client";
-
-const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiUrl ||
-  "https://ce4be704c8b6.ngrok-free.app/api/v1";
 
 const DEFAULT_EXAMINER_FALLBACK_RESPONSE =
   "Thanks for your response. Could you expand on that a little more?";
@@ -143,11 +138,7 @@ export const transcribeAudio = async (
     formData.append("language", language);
 
     // Use apiClient for authenticated request with FormData
-    const response = await apiClient.post("/speech/transcribe", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await apiClient.post("/speech/transcribe", formData);
 
     if (!response.data.success) {
       throw new Error(response.data.message || "Transcription failed");
@@ -206,8 +197,27 @@ export const synthesizeSpeech = async (
 
     const dataUri = `data:${mimeType || "audio/mpeg"};base64,${audioBase64}`;
     return dataUri;
-  } catch (error) {
-    console.error("❌ Speech synthesis error:", error);
+  } catch (error: any) {
+    const billingErrorRaw =
+      error?.response?.data?.error || error?.response?.data?.message;
+    const billingError =
+      typeof billingErrorRaw === "string"
+        ? billingErrorRaw
+        : JSON.stringify(billingErrorRaw || "");
+    const isPaymentIssue =
+      billingError.toLowerCase().includes("payment_issue") ||
+      billingError.toLowerCase().includes("payment_required") ||
+      billingError.toLowerCase().includes("paid_plan_required");
+
+    if (isPaymentIssue) {
+      const friendlyError = new Error(
+        "Premium examiner voice is temporarily unavailable (billing issue)."
+      ) as Error & { code?: string };
+      friendlyError.code = "ELEVENLABS_BILLING";
+      throw friendlyError;
+    }
+
+    console.warn("⚠️ Speech synthesis request failed:", error);
     throw error;
   }
 };
@@ -281,6 +291,96 @@ export const evaluateResponse = async (
     return response.data.data;
   } catch (error) {
     console.error("❌ Evaluation error:", error);
+    throw error;
+  }
+};
+
+export interface FullTestEvaluationQuestionPayload {
+  questionId?: string;
+  question: string;
+  category: "part1" | "part2" | "part3";
+  difficulty?: "easy" | "medium" | "hard";
+  topic?: string;
+}
+
+export interface FullTestEvaluationRecordingPayload {
+  partNumber: 1 | 2 | 3;
+  questionIndex: number;
+  transcript: string;
+  durationSeconds: number;
+  recordingUrl?: string;
+}
+
+export interface EvaluateFullTestRequest {
+  testSessionId?: string;
+  fullTranscript: string;
+  durationSeconds: number;
+  questions: FullTestEvaluationQuestionPayload[];
+  recordings: FullTestEvaluationRecordingPayload[];
+  metadata?: {
+    candidateName?: string;
+    difficulty?: "beginner" | "intermediate" | "advanced";
+    testStartedAt?: string;
+    testCompletedAt?: string;
+  };
+}
+
+export interface FullTestEvaluationSuggestion {
+  category?: string;
+  suggestion: string;
+  priority?: "high" | "medium" | "low";
+}
+
+export interface FullTestEvaluationDocument {
+  _id: string;
+  testSessionId: string;
+  userId: string;
+  overallBand: number;
+  criteria: EvaluationResult["criteria"];
+  spokenSummary: string;
+  detailedFeedback: string;
+  corrections: Array<{
+    original: string;
+    corrected: string;
+    explanation: string;
+    category?: string;
+  }>;
+  suggestions: FullTestEvaluationSuggestion[];
+  partScores?: {
+    part1?: number;
+    part2?: number;
+    part3?: number;
+  };
+  evaluatedAt?: string;
+  evaluatedBy?: string;
+  evaluatorModel?: string;
+}
+
+export interface EvaluateFullTestResponse {
+  evaluation: FullTestEvaluationDocument;
+  overallBand: number;
+  partScores?: {
+    part1?: number;
+    part2?: number;
+    part3?: number;
+  };
+  spokenSummary: string;
+  testSessionId?: string;
+}
+
+export const evaluateFullTest = async (
+  payload: EvaluateFullTestRequest
+): Promise<EvaluateFullTestResponse> => {
+  try {
+    const response = await apiClient.post("/speech/evaluate-full-test", payload);
+
+    if (!response.data.success) {
+      throw new Error(response.data.message || "Full test evaluation failed");
+    }
+
+    return response.data.data as EvaluateFullTestResponse;
+  } catch (error) {
+    console.error("❌ Full test evaluation error:", error);
     throw error;
   }
 };

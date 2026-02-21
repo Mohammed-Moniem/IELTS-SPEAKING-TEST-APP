@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import {
   BandDistribution,
   compareCriteriaPerformance,
@@ -25,32 +26,50 @@ import {
   ProgressStats,
 } from "../../api/analyticsApi";
 
-const DEMO_USER_ID = "demo-user-123";
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export const ProgressDashboardScreen: React.FC = () => {
+  const { user, initializing: authInitializing } = useAuth();
   const [stats, setStats] = useState<ProgressStats | null>(null);
   const [distribution, setDistribution] = useState<BandDistribution[]>([]);
   const [comparison, setComparison] = useState<CriteriaComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<30 | 90 | 365>(30);
+  const userId = user?._id ?? null;
 
   useEffect(() => {
+    if (authInitializing) {
+      return;
+    }
+
+    if (!userId) {
+      setStats(null);
+      setDistribution([]);
+      setComparison([]);
+      setLoading(false);
+      return;
+    }
+
     loadData();
-  }, [selectedPeriod]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPeriod, userId, authInitializing]);
 
   const loadData = async () => {
+    if (!userId) {
+      return;
+    }
+
     try {
       setLoading(true);
 
       const [statsData, distData, compData] = await Promise.all([
-        getProgressStats(DEMO_USER_ID, {
+        getProgressStats(userId, {
           daysBack: selectedPeriod,
           includeTests: 10,
         }),
-        getBandDistribution(DEMO_USER_ID),
-        compareCriteriaPerformance(DEMO_USER_ID, selectedPeriod),
+        getBandDistribution(userId),
+        compareCriteriaPerformance(userId, selectedPeriod),
       ]);
 
       setStats(statsData);
@@ -64,6 +83,9 @@ export const ProgressDashboardScreen: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    if (!userId) {
+      return;
+    }
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
@@ -361,6 +383,37 @@ export const ProgressDashboardScreen: React.FC = () => {
       </View>
     );
   };
+
+  if (authInitializing) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>Progress Dashboard</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Loading analytics...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>Progress Dashboard</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Text style={styles.emptyTitle}>Sign in required</Text>
+          <Text style={styles.emptySubtitle}>
+            Log in or create an account to unlock your personalized analytics
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (loading && !stats) {
     return (

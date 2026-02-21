@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -15,35 +16,23 @@ import {
 import { practiceApi, simulationApi } from "../../api/services";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   resultsStorage,
   PracticeResult as StoredResult,
 } from "../../services/resultsStorage";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { PracticeSession } from "../../types/api";
 import { EvaluationResultsScreen } from "../EvaluationResults/EvaluationResultsScreen";
 
 type TabType = "local" | "practice" | "simulation";
 type FilterType = "all" | "completed" | "in-progress";
 type SortType = "date-desc" | "date-asc" | "score-desc" | "score-asc";
 
-interface PracticeResult {
-  _id: string;
-  topic: {
-    title: string;
-    slug: string;
-  };
-  feedback?: {
-    overallBand: number;
-    bandBreakdown: {
-      pronunciation: number;
-      fluency: number;
-      lexicalResource: number;
-      grammaticalRange: number;
-    };
-  };
-  completedAt: string;
-  createdAt: string;
-}
+// Use the PracticeSession type from API instead of custom interface
+type PracticeResult = PracticeSession;
 
 interface SimulationResult {
   _id: string;
@@ -60,11 +49,18 @@ export const ResultsScreen = () => {
   const [filter, setFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("date-desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedLocalResult, setSelectedLocalResult] = useState<
-    StoredResult | null
-  >(null);
+  const [selectedLocalResult, setSelectedLocalResult] =
+    useState<StoredResult | null>(null);
   const [showLocalModal, setShowLocalModal] = useState(false);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const renderScorePill = (label: string, score: number) => (
+    <View key={`${label}-${score}`} style={styles.scorePill}>
+      <Text style={styles.scorePillLabel}>{label}</Text>
+      <Text style={styles.scorePillValue}>{score.toFixed(1)}</Text>
+    </View>
+  );
 
   // Query for local stored results
   const localResults = useQuery({
@@ -77,6 +73,12 @@ export const ResultsScreen = () => {
     queryFn: () => practiceApi.listSessions({ limit: 50, offset: 0 }),
   });
 
+  // Full test results from local storage
+  const fullTestResults = useQuery({
+    queryKey: ["full-test-results"],
+    queryFn: () => resultsStorage.getFullTestResults(),
+  });
+
   const simulationResults = useQuery({
     queryKey: ["simulation-results"],
     queryFn: () => simulationApi.list({ limit: 50, offset: 0 }),
@@ -84,6 +86,7 @@ export const ResultsScreen = () => {
 
   const renderPracticeItem = ({ item }: { item: PracticeResult }) => {
     const hasCompleted = item.completedAt && item.feedback;
+    const isInProgress = !hasCompleted && item.status === "in_progress";
     const band = item.feedback?.overallBand || 0;
 
     return (
@@ -91,17 +94,53 @@ export const ResultsScreen = () => {
         style={styles.resultCard}
         onPress={() => {
           if (hasCompleted) {
-            // Navigate to detail screen
-            (navigation as any).navigate("PracticeResultDetail", {
-              sessionId: item._id,
+            // Navigate to detail screen for completed sessions
+            navigation.navigate("Practice", {
+              screen: "PracticeResultDetail",
+              params: { sessionId: item._id },
             });
+          } else if (isInProgress) {
+            // Resume in-progress session
+            Alert.alert(
+              "Resume Session",
+              "Would you like to continue this practice session?",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                },
+                {
+                  text: "Resume",
+                  onPress: () => {
+                    // Navigate to practice session screen to resume
+                    navigation.navigate("Practice", {
+                      screen: "PracticeSession",
+                      params: {
+                        session: {
+                          sessionId: item._id,
+                          topic: {
+                            id: item.topicId,
+                            title: item.topicTitle || "Practice Session",
+                            slug: "",
+                            part: item.part,
+                            category: item.category || `part${item.part}`,
+                            difficulty: item.difficulty || "medium",
+                            question: item.question,
+                          },
+                        },
+                      },
+                    });
+                  },
+                },
+              ]
+            );
           }
         }}
-        disabled={!hasCompleted}
+        disabled={false}
       >
         <View style={styles.resultHeader}>
           <Text style={styles.topicTitle} numberOfLines={2}>
-            {item.topic?.title || "Practice Session"}
+            {item.topicTitle || "Practice Session"}
           </Text>
           {hasCompleted && (
             <View
@@ -113,29 +152,41 @@ export const ResultsScreen = () => {
               <Text style={styles.bandText}>{band.toFixed(1)}</Text>
             </View>
           )}
+          {isInProgress && (
+            <View style={[styles.bandBadge, styles.inProgressBadge]}>
+              <Text style={styles.badgeText}>Resume</Text>
+            </View>
+          )}
         </View>
 
         {hasCompleted ? (
           <View style={styles.scoresRow}>
-            <ScorePill
-              label="Pronunciation"
-              score={item.feedback!.bandBreakdown.pronunciation}
-            />
-            <ScorePill
-              label="Fluency"
-              score={item.feedback!.bandBreakdown.fluency}
-            />
-            <ScorePill
-              label="Vocabulary"
-              score={item.feedback!.bandBreakdown.lexicalResource}
-            />
-            <ScorePill
-              label="Grammar"
-              score={item.feedback!.bandBreakdown.grammaticalRange}
-            />
+            {renderScorePill(
+              "Pronunciation",
+              item.feedback?.bandBreakdown?.pronunciation || 0
+            )}
+            {renderScorePill(
+              "Fluency",
+              item.feedback?.bandBreakdown?.fluency || 0
+            )}
+            {renderScorePill(
+              "Vocabulary",
+              item.feedback?.bandBreakdown?.lexicalResource || 0
+            )}
+            {renderScorePill(
+              "Grammar",
+              item.feedback?.bandBreakdown?.grammaticalRange || 0
+            )}
           </View>
         ) : (
-          <Text style={styles.incompleteText}>In Progress</Text>
+          <View>
+            <Text style={styles.incompleteText}>In Progress</Text>
+            {item.userResponse && (
+              <Text style={styles.incompleteSubtext} numberOfLines={2}>
+                Started: {item.userResponse.substring(0, 50)}...
+              </Text>
+            )}
+          </View>
         )}
 
         <Text style={styles.dateText}>
@@ -177,22 +228,22 @@ export const ResultsScreen = () => {
         </View>
 
         <View style={styles.scoresRow}>
-          <ScorePill
-            label="Fluency"
-            score={item.evaluation.criteria.fluency?.score || 0}
-          />
-          <ScorePill
-            label="Lexical"
-            score={item.evaluation.criteria.lexicalResource?.score || 0}
-          />
-          <ScorePill
-            label="Grammar"
-            score={item.evaluation.criteria.grammaticalRange?.score || 0}
-          />
-          <ScorePill
-            label="Pronunciation"
-            score={item.evaluation.criteria.pronunciation?.score || 0}
-          />
+          {renderScorePill(
+            "Fluency",
+            item.evaluation.criteria.fluency?.score || 0
+          )}
+          {renderScorePill(
+            "Lexical",
+            item.evaluation.criteria.lexicalResource?.score || 0
+          )}
+          {renderScorePill(
+            "Grammar",
+            item.evaluation.criteria.grammaticalRange?.score || 0
+          )}
+          {renderScorePill(
+            "Pronunciation",
+            item.evaluation.criteria.pronunciation?.score || 0
+          )}
         </View>
 
         <Text style={styles.dateText}>
@@ -205,6 +256,75 @@ export const ResultsScreen = () => {
           })}{" "}
           • {Math.floor(item.duration / 60)}:
           {(item.duration % 60).toString().padStart(2, "0")}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFullTestItem = ({ item }: { item: any }) => {
+    const band = item.overallBand || item.evaluation?.overallBand || 0;
+
+    return (
+      <TouchableOpacity
+        style={styles.resultCard}
+        onPress={() => {
+          // Convert full test result to StoredResult format for the modal
+          const convertedResult: StoredResult = {
+            id: item.id,
+            timestamp: item.timestamp,
+            duration: item.durationSeconds,
+            part: 1, // Use part 1 as default for display
+            topic: "Full IELTS Speaking Test",
+            question: item.spokenSummary || "Complete IELTS Speaking Test",
+            transcript: item.fullTranscript || "",
+            audioUri: "", // Full tests don't have individual audio URIs
+            evaluation: {
+              overallBand: band,
+              criteria: item.evaluation?.criteria || {
+                fluency: { score: 0, feedback: "" },
+                lexicalResource: { score: 0, feedback: "" },
+                grammaticalRange: { score: 0, feedback: "" },
+                pronunciation: { score: 0, feedback: "" },
+              },
+              corrections: item.evaluation?.corrections || [],
+              suggestions: item.evaluation?.suggestions || [],
+              bandComparison: item.evaluation?.bandComparison,
+            },
+          };
+          setSelectedLocalResult(convertedResult);
+          setShowLocalModal(true);
+        }}
+      >
+        <View style={styles.resultHeader}>
+          <Text style={styles.topicTitle}>Full IELTS Speaking Test</Text>
+          <View
+            style={[styles.bandBadge, { backgroundColor: getBandColor(band) }]}
+          >
+            <Text style={styles.bandText}>{band.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        {item.partScores && (
+          <View style={styles.scoresRow}>
+            {item.partScores.part1 &&
+              renderScorePill("Part 1", item.partScores.part1)}
+            {item.partScores.part2 &&
+              renderScorePill("Part 2", item.partScores.part2)}
+            {item.partScores.part3 &&
+              renderScorePill("Part 3", item.partScores.part3)}
+          </View>
+        )}
+
+        <Text style={styles.dateText}>
+          {new Date(item.timestamp).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}{" "}
+          • {Math.floor(item.durationSeconds / 60)}:
+          {(item.durationSeconds % 60).toString().padStart(2, "0")}
         </Text>
       </TouchableOpacity>
     );
@@ -318,6 +438,7 @@ export const ResultsScreen = () => {
 
   const practiceData = (practiceResults.data || []) as any[];
   const simulationData = (simulationResults.data || []) as any[];
+  const fullTestData = (fullTestResults.data || []) as any[];
 
   // Filter and search logic
   const filteredPracticeData = useMemo(() => {
@@ -366,6 +487,35 @@ export const ResultsScreen = () => {
     return filtered;
   }, [practiceData, filter, searchQuery, sortBy]);
 
+  const filteredFullTestData = useMemo(() => {
+    let filtered = [...fullTestData];
+
+    // Full tests are always completed, so filter doesn't apply
+    // Just apply sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return b.timestamp - a.timestamp;
+        case "date-asc":
+          return a.timestamp - b.timestamp;
+        case "score-desc":
+          return (
+            (b.overallBand || b.evaluation?.overallBand || 0) -
+            (a.overallBand || a.evaluation?.overallBand || 0)
+          );
+        case "score-asc":
+          return (
+            (a.overallBand || a.evaluation?.overallBand || 0) -
+            (b.overallBand || b.evaluation?.overallBand || 0)
+          );
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [fullTestData, sortBy]);
+
   const filteredSimulationData = useMemo(() => {
     let filtered = [...simulationData];
 
@@ -406,311 +556,401 @@ export const ResultsScreen = () => {
       ? localResults.isLoading
       : activeTab === "practice"
       ? practiceResults.isLoading
-      : simulationResults.isLoading;
+      : fullTestResults.isLoading;
 
   const localData = (localResults.data || []) as StoredResult[];
 
   return (
     <>
       <ScreenContainer>
-      <SectionHeading title="Your Results">
-        Track your progress and review past evaluations
-      </SectionHeading>
+        <SectionHeading title="Your Results">
+          Track your progress and review past evaluations
+        </SectionHeading>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "local" && styles.activeTab]}
-          onPress={() => setActiveTab("local")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "local" && styles.activeTabText,
-            ]}
+        {/* Tab Switcher */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "local" && styles.activeTab]}
+            onPress={() => setActiveTab("local")}
+            activeOpacity={0.7}
           >
-            Local
-          </Text>
-          {localData.length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{localData.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "practice" && styles.activeTab]}
-          onPress={() => setActiveTab("practice")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "practice" && styles.activeTabText,
-            ]}
-          >
-            Practice
-          </Text>
-          {practiceData.length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{practiceData.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "simulation" && styles.activeTab]}
-          onPress={() => setActiveTab("simulation")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "simulation" && styles.activeTabText,
-            ]}
-          >
-            Simulations
-          </Text>
-          {simulationData.length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{simulationData.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar (only for practice) */}
-      {activeTab === "practice" && (
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={colors.textMuted}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by topic..."
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <View
+              style={[
+                styles.tabIconWrapper,
+                activeTab === "local" && styles.tabIconWrapperActive,
+              ]}
+            >
               <Ionicons
-                name="close-circle"
+                name="mic-outline"
                 size={20}
+                color={activeTab === "local" ? "#FFFFFF" : colors.primary}
+              />
+            </View>
+            <View style={styles.tabContent}>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === "local" && styles.activeTabText,
+                ]}
+              >
+                Voice Practice
+              </Text>
+              <Text
+                style={[
+                  styles.tabSubtext,
+                  activeTab === "local" && styles.activeTabSubtext,
+                ]}
+              >
+                Quick sessions
+              </Text>
+            </View>
+            {localData.length > 0 && (
+              <View
+                style={[
+                  styles.badge,
+                  activeTab === "local" && styles.badgeActive,
+                ]}
+              >
+                <Text style={styles.badgeText}>{localData.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "practice" && styles.activeTab]}
+            onPress={() => setActiveTab("practice")}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.tabIconWrapper,
+                activeTab === "practice" && styles.tabIconWrapperActive,
+              ]}
+            >
+              <Ionicons
+                name="book-outline"
+                size={20}
+                color={activeTab === "practice" ? "#FFFFFF" : colors.primary}
+              />
+            </View>
+            <View style={styles.tabContent}>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === "practice" && styles.activeTabText,
+                ]}
+              >
+                Practice Sessions
+              </Text>
+              <Text
+                style={[
+                  styles.tabSubtext,
+                  activeTab === "practice" && styles.activeTabSubtext,
+                ]}
+              >
+                Topic-based
+              </Text>
+            </View>
+            {practiceData.length > 0 && (
+              <View
+                style={[
+                  styles.badge,
+                  activeTab === "practice" && styles.badgeActive,
+                ]}
+              >
+                <Text style={styles.badgeText}>{practiceData.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "simulation" && styles.activeTab]}
+            onPress={() => setActiveTab("simulation")}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.tabIconWrapper,
+                activeTab === "simulation" && styles.tabIconWrapperActive,
+              ]}
+            >
+              <Ionicons
+                name="trophy-outline"
+                size={20}
+                color={activeTab === "simulation" ? "#FFFFFF" : colors.primary}
+              />
+            </View>
+            <View style={styles.tabContent}>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === "simulation" && styles.activeTabText,
+                ]}
+              >
+                Full Tests
+              </Text>
+              <Text
+                style={[
+                  styles.tabSubtext,
+                  activeTab === "simulation" && styles.activeTabSubtext,
+                ]}
+              >
+                Complete exams
+              </Text>
+            </View>
+            {fullTestData.length > 0 && (
+              <View
+                style={[
+                  styles.badge,
+                  activeTab === "simulation" && styles.badgeActive,
+                ]}
+              >
+                <Text style={styles.badgeText}>{fullTestData.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Bar (only for practice) */}
+        {activeTab === "practice" && (
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color={colors.textMuted}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by topic..."
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Filter and Sort Controls */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={colors.textPrimary}
+            />
+            <Text style={styles.filterButtonText}>Filters</Text>
+          </TouchableOpacity>
+
+          <View style={styles.sortContainer}>
+            <Text style={styles.sortLabel}>Sort:</Text>
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() =>
+                setSortBy((prev) =>
+                  prev === "date-desc"
+                    ? "date-asc"
+                    : prev === "date-asc"
+                    ? "score-desc"
+                    : prev === "score-desc"
+                    ? "score-asc"
+                    : "date-desc"
+                )
+              }
+            >
+              <Text style={styles.sortButtonText}>
+                {sortBy === "date-desc"
+                  ? "Newest first"
+                  : sortBy === "date-asc"
+                  ? "Oldest first"
+                  : sortBy === "score-desc"
+                  ? "Highest score"
+                  : "Lowest score"}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={16}
                 color={colors.textMuted}
               />
             </TouchableOpacity>
-          )}
+          </View>
         </View>
-      )}
 
-      {/* Filter and Sort Controls */}
-      <View style={styles.controlsRow}>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(!showFilters)}
-        >
-          <Ionicons
-            name="options-outline"
-            size={18}
-            color={colors.textPrimary}
-          />
-          <Text style={styles.filterButtonText}>Filters</Text>
-        </TouchableOpacity>
-
-        <View style={styles.sortContainer}>
-          <Text style={styles.sortLabel}>Sort:</Text>
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() =>
-              setSortBy((prev) =>
-                prev === "date-desc"
-                  ? "date-asc"
-                  : prev === "date-asc"
-                  ? "score-desc"
-                  : prev === "score-desc"
-                  ? "score-asc"
-                  : "date-desc"
-              )
-            }
-          >
-            <Text style={styles.sortButtonText}>
-              {sortBy === "date-desc"
-                ? "Newest first"
-                : sortBy === "date-asc"
-                ? "Oldest first"
-                : sortBy === "score-desc"
-                ? "Highest score"
-                : "Lowest score"}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filter Chips */}
-      {showFilters && (
-        <View style={styles.filterChips}>
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              filter === "all" && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter("all")}
-          >
-            <Text
+        {/* Filter Chips */}
+        {showFilters && (
+          <View style={styles.filterChips}>
+            <TouchableOpacity
               style={[
-                styles.filterChipText,
-                filter === "all" && styles.filterChipTextActive,
+                styles.filterChip,
+                filter === "all" && styles.filterChipActive,
               ]}
+              onPress={() => setFilter("all")}
             >
-              All
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              filter === "completed" && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter("completed")}
-          >
-            <Text
+              <Text
+                style={[
+                  styles.filterChipText,
+                  filter === "all" && styles.filterChipTextActive,
+                ]}
+              >
+                All
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.filterChipText,
-                filter === "completed" && styles.filterChipTextActive,
+                styles.filterChip,
+                filter === "completed" && styles.filterChipActive,
               ]}
+              onPress={() => setFilter("completed")}
             >
-              Completed
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              filter === "in-progress" && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter("in-progress")}
-          >
-            <Text
+              <Text
+                style={[
+                  styles.filterChipText,
+                  filter === "completed" && styles.filterChipTextActive,
+                ]}
+              >
+                Completed
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[
-                styles.filterChipText,
-                filter === "in-progress" && styles.filterChipTextActive,
+                styles.filterChip,
+                filter === "in-progress" && styles.filterChipActive,
               ]}
+              onPress={() => setFilter("in-progress")}
             >
-              In Progress
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+              <Text
+                style={[
+                  styles.filterChipText,
+                  filter === "in-progress" && styles.filterChipTextActive,
+                ]}
+              >
+                In Progress
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-      {/* Results List */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : activeTab === "local" ? (
-        localData.length === 0 ? (
+        {/* Results List */}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : activeTab === "local" ? (
+          localData.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No local results yet</Text>
+              <Text style={styles.emptyText}>
+                Complete a Voice AI practice session to see your results here
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={localData}
+              renderItem={renderLocalResultItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          )
+        ) : activeTab === "practice" ? (
+          filteredPracticeData.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>
+                {searchQuery || filter !== "all"
+                  ? "No results found"
+                  : "No results yet"}
+              </Text>
+              <Text style={styles.emptyText}>
+                {searchQuery || filter !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "Complete a practice session to see your results here"}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredPracticeData}
+              renderItem={renderPracticeItem}
+              keyExtractor={(item) => item._id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          )
+        ) : filteredFullTestData.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No local results yet</Text>
+            <Text style={styles.emptyTitle}>No full test results yet</Text>
             <Text style={styles.emptyText}>
-              Complete a Voice AI practice session to see your results here
+              Complete a full IELTS speaking test to see your results here
             </Text>
           </View>
         ) : (
           <FlatList
-            data={localData}
-            renderItem={renderLocalResultItem}
+            data={filteredFullTestData}
+            renderItem={renderFullTestItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
-        )
-      ) : activeTab === "practice" ? (
-        filteredPracticeData.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>
-              {searchQuery || filter !== "all"
-                ? "No results found"
-                : "No results yet"}
-            </Text>
-            <Text style={styles.emptyText}>
-              {searchQuery || filter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Complete a practice session to see your results here"}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredPracticeData}
-            renderItem={renderPracticeItem}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )
-      ) : filteredSimulationData.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>
-            {filter !== "all" ? "No results found" : "No results yet"}
-          </Text>
-          <Text style={styles.emptyText}>
-            {filter !== "all"
-              ? "Try adjusting your filters"
-              : "Complete a simulation to see your results here"}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredSimulationData}
-          renderItem={renderSimulationItem}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        )}
       </ScreenContainer>
 
       <Modal
-      visible={showLocalModal && !!selectedLocalResult}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={() => {
-        setShowLocalModal(false);
-        setSelectedLocalResult(null);
-      }}
-    >
-      {selectedLocalResult && (
-        <EvaluationResultsScreen
-          overallBand={selectedLocalResult.evaluation.overallBand}
-          criteria={buildEvaluationCriteria(selectedLocalResult)}
-          corrections={selectedLocalResult.evaluation.corrections}
-          suggestions={selectedLocalResult.evaluation.suggestions || []}
-          bandComparison={selectedLocalResult.evaluation.bandComparison}
-          onClose={() => {
-            setShowLocalModal(false);
-            setSelectedLocalResult(null);
-          }}
-          onTryAgain={() => {
-            setShowLocalModal(false);
-            setSelectedLocalResult(null);
-          }}
-          testType="practice"
-          topic={selectedLocalResult.topic}
-          testPart={`Part ${selectedLocalResult.part}`}
-          durationSeconds={selectedLocalResult.duration}
-        />
-      )}
-    </Modal>
+        visible={showLocalModal && !!selectedLocalResult}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          setShowLocalModal(false);
+          setSelectedLocalResult(null);
+        }}
+      >
+        {selectedLocalResult && (
+          <EvaluationResultsScreen
+            overallBand={selectedLocalResult.evaluation.overallBand}
+            criteria={buildEvaluationCriteria(selectedLocalResult)}
+            corrections={selectedLocalResult.evaluation.corrections}
+            suggestions={selectedLocalResult.evaluation.suggestions || []}
+            bandComparison={selectedLocalResult.evaluation.bandComparison}
+            onClose={() => {
+              setShowLocalModal(false);
+              setSelectedLocalResult(null);
+            }}
+            onTryAgain={() => {
+              // Close modal
+              setShowLocalModal(false);
+              setSelectedLocalResult(null);
+
+              // Navigate to VoiceTest screen to retry
+              navigation.navigate("VoiceTest", {
+                retryData: {
+                  part: selectedLocalResult.part,
+                  topic: selectedLocalResult.topic,
+                  question: selectedLocalResult.question,
+                },
+              });
+            }}
+            testType="local"
+            topic={selectedLocalResult.topic}
+            testPart={`Part ${selectedLocalResult.part}`}
+            durationSeconds={selectedLocalResult.duration}
+            showTryAgain={
+              selectedLocalResult.topic !== "Full IELTS Speaking Test"
+            }
+          />
+        )}
+      </Modal>
     </>
   );
 };
-
-const ScorePill = ({ label, score }: { label: string; score: number }) => (
-  <View style={styles.scorePill}>
-    <Text style={styles.scorePillLabel}>{label}</Text>
-    <Text style={styles.scorePillValue}>{score.toFixed(1)}</Text>
-  </View>
-);
 
 const getBandColor = (band: number): string => {
   if (band >= 8) return "#10B981"; // Green
@@ -720,41 +960,84 @@ const getBandColor = (band: number): string => {
   return "#6B7280"; // Gray
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 4,
+    gap: spacing.sm,
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
   tab: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 8,
-    flexDirection: "row",
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: "transparent",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   activeTab: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tabIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xs,
+  },
+  tabIconWrapperActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  tabContent: {
+    alignItems: "center",
+    flex: 1,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 2,
   },
   activeTabText: {
     color: "#FFFFFF",
   },
+  tabSubtext: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: colors.textMuted,
+    textAlign: "center",
+  },
+  activeTabSubtext: {
+    color: "rgba(255, 255, 255, 0.8)",
+  },
   badge: {
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: colors.primary,
     borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: spacing.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: spacing.xs,
+    minWidth: 24,
+    alignItems: "center",
+  },
+  badgeActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
   },
   badgeText: {
     fontSize: 11,
@@ -879,6 +1162,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 44,
   },
+  inProgressBadge: {
+    backgroundColor: colors.warning,
+  },
   bandText: {
     fontSize: 16,
     fontWeight: "800",
@@ -921,6 +1207,12 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginBottom: spacing.xs,
   },
+  incompleteSubtext: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontStyle: "italic",
+    marginBottom: spacing.xs,
+  },
   dateText: {
     fontSize: 12,
     color: colors.textSecondary,
@@ -951,4 +1243,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-});
+  });

@@ -9,7 +9,8 @@ export enum RecordingType {
 }
 
 export enum StorageProvider {
-  MONGODB = 'mongodb',
+  SUPABASE = 'supabase',
+  MONGODB = 'mongodb', // deprecated fallback label retained for backward compatibility
   S3 = 's3'
 }
 
@@ -27,7 +28,7 @@ export interface AudioRecording {
 
   // Storage details
   storageProvider: StorageProvider;
-  mongoData?: Buffer; // For MongoDB storage
+  mongoData?: Buffer; // Legacy field retained for backward compatibility
   s3Key?: string; // For S3 storage
   s3Bucket?: string;
 
@@ -67,7 +68,7 @@ export class AudioRecordingModel {
       mimeType: data.mimeType!,
       fileSizeBytes: data.fileSizeBytes || 0,
       durationSeconds: data.durationSeconds || 0,
-      storageProvider: data.storageProvider || StorageProvider.MONGODB,
+      storageProvider: data.storageProvider || StorageProvider.SUPABASE,
       mongoData: data.mongoData,
       s3Key: data.s3Key,
       s3Bucket: data.s3Bucket,

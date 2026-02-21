@@ -1,6 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 
 interface UsageLimitModalProps {
   visible: boolean;
@@ -8,10 +19,15 @@ interface UsageLimitModalProps {
   currentTier: string;
   used: number;
   limit: number;
-  resetDate: Date;
+  resetDate?: Date;
   onClose: () => void;
   onUpgrade: () => void;
 }
+
+const sessionLabelMap: Record<"practice" | "simulation", string> = {
+  practice: "practice",
+  simulation: "simulation",
+};
 
 export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
   visible,
@@ -23,12 +39,15 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
   onClose,
   onUpgrade,
 }) => {
-  const formatResetDate = (date: Date): string => {
-    const d = new Date(date);
-    const month = d.toLocaleString("default", { month: "long" });
-    const day = d.getDate();
-    return `${month} ${day}`;
-  };
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
+  const safeLimit = Math.max(limit, 1);
+  const progressWidth = Math.min(100, Math.round((used / safeLimit) * 100));
+
+  const resetCopy = resetDate
+    ? `Resets on ${resetDate.toLocaleDateString()}`
+    : "Usage resets every billing cycle";
 
   return (
     <Modal
@@ -39,29 +58,27 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          {/* Icon */}
           <View style={styles.iconContainer}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="lock-closed" size={40} color="#ef4444" />
+            <View style={[styles.iconCircle, { backgroundColor: colors.dangerSoft }]}>
+              <Ionicons name="lock-closed" size={40} color={colors.danger} />
             </View>
           </View>
 
-          {/* Title */}
-          <Text style={styles.title}>Usage Limit Reached</Text>
-
-          {/* Message */}
+          <Text style={styles.title}>Usage limit reached</Text>
           <Text style={styles.message}>
-            You've used all {limit} {sessionType} session{limit > 1 ? "s" : ""}{" "}
-            in your {currentTier} plan this month.
+            You've used all {limit} {sessionLabelMap[sessionType]} session
+            {limit > 1 ? "s" : ""} in your {currentTier} plan this month.
           </Text>
 
-          {/* Progress */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${(used / limit) * 100}%` },
+                  {
+                    width: `${progressWidth}%`,
+                    backgroundColor: colors.danger,
+                  },
                 ]}
               />
             </View>
@@ -70,31 +87,40 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
             </Text>
           </View>
 
-          {/* Reset Info */}
-          <View style={styles.resetInfo}>
-            <Ionicons name="refresh" size={20} color="#94a3b8" />
-            <Text style={styles.resetText}>
-              Resets on {formatResetDate(resetDate)}
-            </Text>
+          <View style={[styles.resetInfo, { backgroundColor: colors.backgroundMuted }]}>
+            <Ionicons name="refresh" size={18} color={colors.textSecondary} />
+            <Text style={styles.resetText}>{resetCopy}</Text>
           </View>
 
-          {/* Upgrade CTA */}
-          <View style={styles.upgradeBox}>
-            <Ionicons name="star" size={24} color="#d4a745" />
-            <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
+          <View
+            style={[
+              styles.upgradeBox,
+              {
+                backgroundColor: colors.surfaceSubtle ?? colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="star" size={22} color={colors.warning} />
+            <Text style={styles.upgradeTitle}>Upgrade for more sessions</Text>
             <Text style={styles.upgradeSubtitle}>
-              Get unlimited {sessionType} sessions and more
+              Unlock unlimited {sessionLabelMap[sessionType]} sessions, advanced
+              analytics, and priority support.
             </Text>
           </View>
 
-          {/* Actions */}
-          <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
-            <Ionicons name="arrow-up-circle" size={20} color="#fff" />
-            <Text style={styles.upgradeButtonText}>View Plans</Text>
+          <TouchableOpacity
+            style={[styles.upgradeButton, { backgroundColor: colors.primary }]}
+            onPress={onUpgrade}
+          >
+            <Ionicons name="arrow-up-circle" size={20} color={colors.primaryOn} />
+            <Text style={[styles.upgradeButtonText, { color: colors.primaryOn }]}>
+              View plans
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Maybe Later</Text>
+            <Text style={styles.closeButtonText}>Maybe later</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -102,127 +128,127 @@ export const UsageLimitModal: React.FC<UsageLimitModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: "#1e293b",
-    borderRadius: 24,
-    padding: 32,
-    width: "100%",
-    maxWidth: 400,
-    alignItems: "center",
-  },
-  iconContainer: {
-    marginBottom: 20,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  message: {
-    fontSize: 16,
-    color: "#cbd5e1",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  progressContainer: {
-    width: "100%",
-    marginBottom: 20,
-  },
-  progressBar: {
-    width: "100%",
-    height: 8,
-    backgroundColor: "rgba(100, 116, 139, 0.3)",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#ef4444",
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    color: "#94a3b8",
-    textAlign: "center",
-  },
-  resetInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(100, 116, 139, 0.1)",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginBottom: 24,
-  },
-  resetText: {
-    fontSize: 14,
-    color: "#94a3b8",
-  },
-  upgradeBox: {
-    backgroundColor: "rgba(212, 167, 69, 0.1)",
-    padding: 20,
-    borderRadius: 16,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "rgba(212, 167, 69, 0.3)",
-  },
-  upgradeTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#d4a745",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  upgradeSubtitle: {
-    fontSize: 14,
-    color: "#cbd5e1",
-    textAlign: "center",
-  },
-  upgradeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#d4a745",
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-    width: "100%",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  upgradeButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  closeButton: {
-    paddingVertical: 12,
-  },
-  closeButtonText: {
-    fontSize: 14,
-    color: "#94a3b8",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.xl,
+    },
+    modal: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: spacing.xxl,
+      width: "100%",
+      maxWidth: 420,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    iconContainer: {
+      marginBottom: spacing.lg,
+    },
+    iconCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+      textAlign: "center",
+    },
+    message: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: spacing.xl,
+    },
+    progressContainer: {
+      width: "100%",
+      marginBottom: spacing.lg,
+    },
+    progressBar: {
+      width: "100%",
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: "hidden",
+      marginBottom: spacing.xs,
+    },
+    progressFill: {
+      height: "100%",
+      borderRadius: 4,
+    },
+    progressText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    resetInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: spacing.lg,
+      marginBottom: spacing.lg,
+    },
+    resetText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    upgradeBox: {
+      width: "100%",
+      borderRadius: 18,
+      padding: spacing.lg,
+      alignItems: "center",
+      marginBottom: spacing.lg,
+      borderWidth: 1,
+    },
+    upgradeTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+      textAlign: "center",
+    },
+    upgradeSubtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    upgradeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: spacing.lg,
+      width: "100%",
+      justifyContent: "center",
+      marginBottom: spacing.sm,
+    },
+    upgradeButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    closeButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
+    closeButtonText: {
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+  });
+

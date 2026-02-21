@@ -18,8 +18,11 @@ import { DetailedFeedbackView } from "../../components/DetailedFeedbackView";
 import { EmptyState } from "../../components/EmptyState";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { PracticeStackParamList } from "../../navigation/PracticeNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { formatDateTime } from "../../utils/date";
 import { extractErrorMessage } from "../../utils/errors";
 
@@ -33,6 +36,8 @@ export const PracticeResultDetailScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<PracticeStackParamList>>();
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const { sessionId } = route.params;
 
@@ -164,7 +169,8 @@ export const PracticeResultDetailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   centerContainer: {
     flex: 1,
     justifyContent: "center",
@@ -243,4 +249,4 @@ const styles = StyleSheet.create({
   actionButton: {
     width: "100%",
   },
-});
+  });

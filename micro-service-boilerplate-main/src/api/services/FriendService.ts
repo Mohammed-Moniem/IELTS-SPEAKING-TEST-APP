@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
 import { FriendRequest, FriendRequestStatus, Friendship, IFriendRequest } from '../models/FriendModel';
 import { UserProfile } from '../models/UserProfileModel';
@@ -169,9 +169,14 @@ export class FriendService {
       userId: { $in: friendIds }
     })
       .select('userId username avatar bio lastActive')
-      .populate('userId', 'email name');
+      .populate('userId', 'firstName lastName email')
+      .lean();
 
-    return profiles;
+    // Convert userId ObjectId to string for proper serialization
+    return profiles.map(profile => ({
+      ...profile,
+      userId: profile.userId?._id?.toString() || profile.userId
+    }));
   }
 
   /**
@@ -182,8 +187,9 @@ export class FriendService {
       receiverId: new Types.ObjectId(userId),
       status: FriendRequestStatus.PENDING
     })
-      .populate('senderId', 'email name')
-      .sort({ createdAt: -1 });
+      .populate('senderId', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   /**
@@ -194,8 +200,9 @@ export class FriendService {
       senderId: new Types.ObjectId(userId),
       status: FriendRequestStatus.PENDING
     })
-      .populate('receiverId', 'email name')
-      .sort({ createdAt: -1 });
+      .populate('receiverId', 'firstName lastName email')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   /**
@@ -211,15 +218,74 @@ export class FriendService {
   }
 
   /**
+   * Get relationship status between two users
+   */
+  async getRelationshipStatus(
+    requesterId: string,
+    targetUserId: string
+  ): Promise<{
+    isFriend: boolean;
+    hasPendingRequest: boolean;
+    pendingDirection: 'outgoing' | 'incoming' | null;
+  }> {
+    if (!Types.ObjectId.isValid(requesterId) || !Types.ObjectId.isValid(targetUserId)) {
+      throw new Error('Invalid user identifier');
+    }
+
+    const requesterObjectId = new Types.ObjectId(requesterId);
+    const targetObjectId = new Types.ObjectId(targetUserId);
+
+    const friendship = await Friendship.findOne({
+      $or: [
+        { user1Id: requesterObjectId, user2Id: targetObjectId },
+        { user1Id: targetObjectId, user2Id: requesterObjectId }
+      ]
+    });
+
+    const pendingRequest = await FriendRequest.findOne({
+      status: FriendRequestStatus.PENDING,
+      $or: [
+        { senderId: requesterObjectId, receiverId: targetObjectId },
+        { senderId: targetObjectId, receiverId: requesterObjectId }
+      ]
+    });
+
+    let pendingDirection: 'outgoing' | 'incoming' | null = null;
+
+    if (pendingRequest) {
+      pendingDirection =
+        pendingRequest.senderId.toString() === requesterId ? 'outgoing' : 'incoming';
+    }
+
+    return {
+      isFriend: !!friendship,
+      hasPendingRequest: !!pendingRequest,
+      pendingDirection
+    };
+  }
+
+  /**
    * Check if users are friends
    */
   async areFriends(userId1: string, userId2: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(userId1) || !Types.ObjectId.isValid(userId2)) {
+      log.warn(`areFriends called with invalid ObjectId(s): userId1=${userId1}, userId2=${userId2}`);
+      return false;
+    }
+
+    const user1ObjectId = new Types.ObjectId(userId1);
+    const user2ObjectId = new Types.ObjectId(userId2);
+
     const friendship = await Friendship.findOne({
       $or: [
-        { user1Id: new Types.ObjectId(userId1), user2Id: new Types.ObjectId(userId2) },
-        { user1Id: new Types.ObjectId(userId2), user2Id: new Types.ObjectId(userId1) }
+        { user1Id: user1ObjectId, user2Id: user2ObjectId },
+        { user1Id: user2ObjectId, user2Id: user1ObjectId }
       ]
     });
+
+    if (!friendship) {
+      log.warn(`No friendship found between users ${userId1} and ${userId2}`);
+    }
 
     return !!friendship;
   }
@@ -249,11 +315,16 @@ export class FriendService {
         }
       ]
     })
-      .populate('userId', 'email name')
+      .populate('userId', 'firstName lastName email')
       .select('userId username avatar bio')
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
-    return profiles;
+    // Convert userId ObjectId to string for proper serialization
+    return profiles.map(profile => ({
+      ...profile,
+      userId: profile.userId?._id?.toString() || profile.userId
+    }));
   }
 
   /**
@@ -294,12 +365,17 @@ export class FriendService {
     }
 
     const suggestions = await UserProfile.find(matchCriteria)
-      .populate('userId', 'email name')
+      .populate('userId', 'firstName lastName email')
       .select('userId username avatar bio ieltsInfo studyGoals')
       .limit(limit)
-      .sort({ lastActive: -1 }); // Prioritize active users
+      .sort({ lastActive: -1 }) // Prioritize active users
+      .lean();
 
-    return suggestions;
+    // Convert userId ObjectId to string for proper serialization
+    return suggestions.map(profile => ({
+      ...profile,
+      userId: profile.userId?._id?.toString() || profile.userId
+    }));
   }
 
   /**

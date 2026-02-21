@@ -9,7 +9,9 @@ import {
   View,
 } from "react-native";
 
-import { colors } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const TAB_WIDTH = SCREEN_WIDTH / 5; // Exactly 5 tabs
@@ -19,6 +21,9 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   descriptors,
   navigation,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   const getIconName = (routeName: string, focused: boolean) => {
     switch (routeName) {
       case "Practice":
@@ -107,7 +112,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
           });
         };
 
-        const color = isFocused ? colors.primary : "#999999";
+        const color = isFocused ? colors.primary : colors.tabInactive;
 
         return (
           <TouchableOpacity
@@ -139,32 +144,33 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: "row",
-    height: 65,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5E5",
-    paddingBottom: 8,
-    paddingTop: 5,
-    width: SCREEN_WIDTH,
-  },
-  tab: {
-    width: TAB_WIDTH,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tabContent: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  labelFocused: {
-    fontWeight: "700",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    tabBar: {
+      flexDirection: "row",
+      height: 65,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+      paddingBottom: 8,
+      paddingTop: 5,
+      width: SCREEN_WIDTH,
+    },
+    tab: {
+      width: TAB_WIDTH,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    tabContent: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    label: {
+      fontSize: 10,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    labelFocused: {
+      fontWeight: "700",
+    },
+  });

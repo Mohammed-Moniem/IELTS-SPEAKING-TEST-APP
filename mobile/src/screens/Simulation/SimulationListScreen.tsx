@@ -19,6 +19,8 @@ import { OfflineBanner } from "../../components/OfflineBanner";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { Tag } from "../../components/Tag";
+import { UsageLimitModal } from "../../components/UsageLimitModal";
+import { useUsageGuard } from "../../hooks";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
 import { colors, spacing } from "../../theme/tokens";
 import { TestSimulation } from "../../types/api";
@@ -29,6 +31,8 @@ export const SimulationListScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<SimulationStackParamList>>();
   const queryClient = useQueryClient();
+  const { ensureCanStart, limitState, dismissLimit, refreshUsage } =
+    useUsageGuard();
 
   const simulationsQuery = useQuery({
     queryKey: ["test-simulations"],
@@ -41,6 +45,7 @@ export const SimulationListScreen: React.FC = () => {
       queryClient
         .invalidateQueries({ queryKey: ["test-simulations"] })
         .catch(() => undefined);
+      void refreshUsage();
       navigation.navigate("SimulationSession", {
         simulationId: simulation.simulationId,
         parts: simulation.parts.map((part) => ({
@@ -110,7 +115,12 @@ export const SimulationListScreen: React.FC = () => {
 
       <Button
         title="Start a new simulation"
-        onPress={() => startSimulationMutation.mutate()}
+        onPress={() => {
+          if (!ensureCanStart("simulation")) {
+            return;
+          }
+          startSimulationMutation.mutate();
+        }}
         loading={startSimulationMutation.isPending}
       />
 
@@ -127,6 +137,22 @@ export const SimulationListScreen: React.FC = () => {
         <EmptyState
           title="No simulations yet"
           description="Run your first full test to unlock detailed feedback."
+        />
+      )}
+
+      {limitState && (
+        <UsageLimitModal
+          visible
+          sessionType={limitState.sessionType}
+          currentTier={limitState.currentTier}
+          used={limitState.used}
+          limit={limitState.limit}
+          resetDate={limitState.resetDate}
+          onClose={dismissLimit}
+          onUpgrade={() => {
+            dismissLimit();
+            navigation.getParent()?.navigate("Profile" as never);
+          }}
         />
       )}
     </ScreenContainer>

@@ -1,57 +1,38 @@
 /**
  * Audio Storage Service
- * Handles audio file storage in MongoDB or S3 based on configuration
+ * Handles audio file storage in Supabase Storage or S3 while persisting metadata in Supabase Postgres.
  */
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Db, GridFSBucket, MongoClient, ObjectId } from 'mongodb';
-import { Readable } from 'stream';
+import { env } from '@env';
+import { createSupabaseSignedUrl, deleteFromSupabaseStorage, uploadToSupabaseStorage } from '@lib/db/supabaseStorage';
+import { deleteRowsByIds, loadTableRows, upsertRow } from '@lib/db/documentStore';
+import { EXTRA_TABLES } from '@lib/db/tableMappings';
+import { generateMongoStyleId } from '@lib/db/id';
 import { Service } from 'typedi';
-import { env } from '../../env';
 import { Logger } from '../../lib/logger';
 import { AudioRecording, AudioRecordingModel, RecordingType, StorageProvider } from '../models/AudioRecording';
 
 @Service()
 export class AudioStorageService {
   private log = new Logger(__filename);
-  private db: Db;
-  private gridFSBucket: GridFSBucket;
-  private s3Client: S3Client;
+  private s3Client: S3Client | null = null;
   private readonly storageProvider: StorageProvider;
 
   constructor() {
-    this.storageProvider = env.storage.provider === 's3' ? StorageProvider.S3 : StorageProvider.MONGODB;
-    this.log.info(`📦 Audio Storage initialized with provider: ${this.storageProvider}`);
+    this.storageProvider = env.storage.provider === 's3' ? StorageProvider.S3 : StorageProvider.SUPABASE;
 
     if (this.storageProvider === StorageProvider.S3) {
       this.initializeS3();
     }
+
+    this.log.info(`Audio Storage initialized with provider: ${this.storageProvider}`);
   }
 
-  /**
-   * Initialize MongoDB GridFS connection
-   */
-  async initializeMongoDB(): Promise<void> {
-    try {
-      const client = await MongoClient.connect(env.db.mongoURL);
-      this.db = client.db();
-      this.gridFSBucket = new GridFSBucket(this.db, {
-        bucketName: env.storage.mongodb.audioCollectionName
-      });
-      this.log.info('✅ MongoDB GridFS initialized');
-    } catch (error) {
-      this.log.error('❌ Failed to initialize MongoDB GridFS:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Initialize AWS S3 client
-   */
   private initializeS3(): void {
     if (!env.storage.s3.accessKeyId || !env.storage.s3.secretAccessKey) {
-      this.log.warn('⚠️  S3 credentials not configured, falling back to MongoDB');
+      this.log.warn('S3 credentials not configured, S3 provider will fail');
       return;
     }
 
@@ -62,12 +43,27 @@ export class AudioStorageService {
         secretAccessKey: env.storage.s3.secretAccessKey
       }
     });
-    this.log.info('✅ AWS S3 client initialized');
   }
 
-  /**
-   * Upload audio file
-   */
+  private async listRows(): Promise<AudioRecording[]> {
+    const rows = await loadTableRows(EXTRA_TABLES.audioRecordings);
+    return rows.map(row => ({
+      _id: row.id,
+      ...(row.data as AudioRecording)
+    }));
+  }
+
+  private async getRecording(recordingId: string): Promise<AudioRecording> {
+    const rows = await this.listRows();
+    const recording = rows.find(candidate => candidate._id === recordingId);
+
+    if (!recording) {
+      throw new Error(`Recording not found: ${recordingId}`);
+    }
+
+    return recording;
+  }
+
   async uploadAudio(params: {
     userId: string;
     sessionId: string;
@@ -82,20 +78,17 @@ export class AudioStorageService {
     scores?: AudioRecording['scores'];
     userTier?: 'free' | 'premium' | 'pro';
   }): Promise<AudioRecording> {
-    this.log.info(`📤 Uploading audio for user ${params.userId}, session ${params.sessionId}`);
-
-    // Validate file size
     const fileSizeMB = params.audioBuffer.length / (1024 * 1024);
     if (fileSizeMB > env.storage.maxFileSizeMB) {
       throw new Error(`File size ${fileSizeMB.toFixed(2)}MB exceeds maximum ${env.storage.maxFileSizeMB}MB`);
     }
 
-    // Validate MIME type
     if (!env.storage.allowedMimeTypes.includes(params.mimeType)) {
-      throw new Error(`MIME type ${params.mimeType} not allowed. Allowed: ${env.storage.allowedMimeTypes.join(', ')}`);
+      throw new Error(`MIME type ${params.mimeType} not allowed`);
     }
 
     const recording: AudioRecording = AudioRecordingModel.create({
+      _id: generateMongoStyleId(),
       userId: params.userId,
       sessionId: params.sessionId,
       recordingType: params.recordingType,
@@ -111,164 +104,83 @@ export class AudioStorageService {
       expiresAt: AudioRecordingModel.calculateExpiryDate(params.userTier || 'free')
     });
 
-    try {
-      if (this.storageProvider === StorageProvider.MONGODB) {
-        await this.uploadToMongoDB(recording, params.audioBuffer);
-      } else {
-        await this.uploadToS3(recording, params.audioBuffer);
+    const storagePath = `audio-recordings/${recording.userId}/${recording.sessionId}/${recording._id}/${recording.fileName}`;
+
+    if (this.storageProvider === StorageProvider.S3) {
+      if (!this.s3Client) {
+        throw new Error('S3 client not initialized');
       }
 
-      this.log.info(`✅ Audio uploaded successfully: ${recording._id}`);
-      return recording;
-    } catch (error) {
-      this.log.error('❌ Failed to upload audio:', error);
-      throw error;
-    }
-  }
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: env.storage.s3.bucket,
+          Key: storagePath,
+          Body: params.audioBuffer,
+          ContentType: recording.mimeType,
+          Metadata: {
+            userId: recording.userId,
+            sessionId: recording.sessionId,
+            recordingType: recording.recordingType
+          }
+        })
+      );
 
-  /**
-   * Upload to MongoDB GridFS
-   */
-  private async uploadToMongoDB(recording: AudioRecording, audioBuffer: Buffer): Promise<void> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-
-    // Store audio data directly in document (for small files) or use GridFS (for large files)
-    if (audioBuffer.length < 16 * 1024 * 1024) {
-      // < 16MB, store inline
-      recording.mongoData = audioBuffer;
-      const result = await collection.insertOne(recording as any);
-      recording._id = result.insertedId.toString();
+      recording.s3Bucket = env.storage.s3.bucket;
+      recording.s3Key = storagePath;
     } else {
-      // Use GridFS for large files
-      const uploadStream = this.gridFSBucket.openUploadStream(recording.fileName, {
-        metadata: {
-          userId: recording.userId,
-          sessionId: recording.sessionId,
-          mimeType: recording.mimeType
-        }
-      });
-
-      const readable = Readable.from(audioBuffer);
-      await new Promise((resolve, reject) => {
-        readable.pipe(uploadStream).on('finish', resolve).on('error', reject);
-      });
-
-      recording.mongoData = undefined;
-      recording.metadata = { gridFSFileId: uploadStream.id.toString() };
-
-      const result = await collection.insertOne(recording as any);
-      recording._id = result.insertedId.toString();
+      await uploadToSupabaseStorage(env.storage.supabase.audioBucket, storagePath, params.audioBuffer, recording.mimeType);
+      recording.metadata = {
+        ...(recording.metadata || {}),
+        bucket: env.storage.supabase.audioBucket,
+        objectPath: storagePath
+      };
     }
-  }
 
-  /**
-   * Upload to AWS S3
-   */
-  private async uploadToS3(recording: AudioRecording, audioBuffer: Buffer): Promise<void> {
-    const s3Key = AudioRecordingModel.generateS3Key(recording.userId, recording.sessionId, recording.fileName);
-
-    const command = new PutObjectCommand({
-      Bucket: env.storage.s3.bucket,
-      Key: s3Key,
-      Body: audioBuffer,
-      ContentType: recording.mimeType,
-      Metadata: {
-        userId: recording.userId,
-        sessionId: recording.sessionId,
-        recordingType: recording.recordingType,
-        topic: recording.topic || '',
-        overallBand: recording.overallBand?.toString() || ''
-      }
+    await upsertRow(EXTRA_TABLES.audioRecordings, recording._id!, {
+      ...recording,
+      createdAt: (recording.createdAt || new Date()).toISOString(),
+      expiresAt: recording.expiresAt ? new Date(recording.expiresAt).toISOString() : undefined
     });
 
-    await this.s3Client.send(command);
-
-    recording.s3Key = s3Key;
-    recording.s3Bucket = env.storage.s3.bucket;
-
-    // Save metadata to MongoDB
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-    const result = await collection.insertOne(recording as any);
-    recording._id = result.insertedId.toString();
+    return recording;
   }
 
-  /**
-   * Get audio download URL or buffer
-   */
   async getAudio(recordingId: string): Promise<{ url?: string; buffer?: Buffer; mimeType: string }> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+    const recording = await this.getRecording(recordingId);
+
+    if (recording.storageProvider === StorageProvider.S3) {
+      if (!recording.s3Key || !recording.s3Bucket || !this.s3Client) {
+        throw new Error('S3 storage metadata missing');
+      }
+
+      const signedUrl = await getSignedUrl(
+        this.s3Client,
+        new GetObjectCommand({
+          Bucket: recording.s3Bucket,
+          Key: recording.s3Key
+        }),
+        { expiresIn: env.storage.s3.signedUrlExpiry }
+      );
+
+      return {
+        url: signedUrl,
+        mimeType: recording.mimeType
+      };
     }
 
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-    const recording = await collection.findOne({ _id: new ObjectId(recordingId) as any });
-
-    if (!recording) {
-      throw new Error(`Recording not found: ${recordingId}`);
+    const bucket = recording.metadata?.bucket || env.storage.supabase.audioBucket;
+    const objectPath = recording.metadata?.objectPath;
+    if (!objectPath) {
+      throw new Error('Supabase object path missing for recording');
     }
 
-    if (recording.storageProvider === StorageProvider.MONGODB) {
-      return this.getFromMongoDB(recording);
-    } else {
-      return this.getFromS3(recording);
-    }
+    const signedUrl = await createSupabaseSignedUrl(bucket, objectPath);
+    return {
+      url: signedUrl,
+      mimeType: recording.mimeType
+    };
   }
 
-  /**
-   * Get from MongoDB
-   */
-  private async getFromMongoDB(recording: AudioRecording): Promise<{ buffer: Buffer; mimeType: string }> {
-    if (recording.mongoData) {
-      // Data stored inline
-      return { buffer: recording.mongoData, mimeType: recording.mimeType };
-    } else if (recording.metadata?.gridFSFileId) {
-      // Data in GridFS
-      const downloadStream = this.gridFSBucket.openDownloadStream(new ObjectId(recording.metadata.gridFSFileId));
-      const chunks: Buffer[] = [];
-
-      await new Promise((resolve, reject) => {
-        downloadStream
-          .on('data', chunk => chunks.push(chunk))
-          .on('end', resolve)
-          .on('error', reject);
-      });
-
-      return { buffer: Buffer.concat(chunks), mimeType: recording.mimeType };
-    } else {
-      throw new Error('Audio data not found in MongoDB');
-    }
-  }
-
-  /**
-   * Get from S3 (signed URL)
-   */
-  private async getFromS3(recording: AudioRecording): Promise<{ url: string; mimeType: string }> {
-    if (!recording.s3Key || !recording.s3Bucket) {
-      throw new Error('S3 key not found for recording');
-    }
-
-    const command = new GetObjectCommand({
-      Bucket: recording.s3Bucket,
-      Key: recording.s3Key
-    });
-
-    const signedUrl = await getSignedUrl(this.s3Client, command, {
-      expiresIn: env.storage.s3.signedUrlExpiry
-    });
-
-    return { url: signedUrl, mimeType: recording.mimeType };
-  }
-
-  /**
-   * List user recordings
-   */
   async listUserRecordings(
     userId: string,
     options?: {
@@ -277,94 +189,74 @@ export class AudioStorageService {
       recordingType?: RecordingType;
     }
   ): Promise<{ recordings: AudioRecording[]; total: number }> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    const all = await this.listRows();
 
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-
-    const query: any = { userId };
-    if (options?.recordingType) {
-      query.recordingType = options.recordingType;
-    }
-
-    const total = await collection.countDocuments(query);
-    const recordings = await collection
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(options?.skip || 0)
-      .limit(options?.limit || 50)
-      .toArray();
-
-    // Remove audio data from response (only return metadata)
-    const sanitized = recordings.map(r => {
-      const { mongoData, ...rest } = r;
-      return rest;
+    const filtered = all.filter(recording => {
+      if (recording.userId !== userId) return false;
+      if (options?.recordingType && recording.recordingType !== options.recordingType) return false;
+      return true;
     });
 
-    return { recordings: sanitized as AudioRecording[], total };
+    filtered.sort((a, b) => {
+      const aDate = new Date(a.createdAt || 0).getTime();
+      const bDate = new Date(b.createdAt || 0).getTime();
+      return bDate - aDate;
+    });
+
+    const skip = options?.skip || 0;
+    const limit = options?.limit || 50;
+    const paginated = filtered.slice(skip, skip + limit);
+
+    return {
+      recordings: paginated,
+      total: filtered.length
+    };
   }
 
-  /**
-   * Delete recording
-   */
   async deleteRecording(recordingId: string): Promise<void> {
-    if (!this.db) {
-      await this.initializeMongoDB();
+    const recording = await this.getRecording(recordingId);
+
+    if (recording.storageProvider === StorageProvider.S3) {
+      if (!this.s3Client || !recording.s3Bucket || !recording.s3Key) {
+        throw new Error('S3 storage metadata missing');
+      }
+
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: recording.s3Bucket,
+          Key: recording.s3Key
+        })
+      );
+    } else {
+      const bucket = recording.metadata?.bucket || env.storage.supabase.audioBucket;
+      const objectPath = recording.metadata?.objectPath;
+      if (objectPath) {
+        await deleteFromSupabaseStorage(bucket, objectPath);
+      }
     }
 
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-    const recording = await collection.findOne({ _id: new ObjectId(recordingId) as any });
-
-    if (!recording) {
-      throw new Error(`Recording not found: ${recordingId}`);
-    }
-
-    if (recording.storageProvider === StorageProvider.S3 && recording.s3Key) {
-      // Delete from S3
-      const command = new DeleteObjectCommand({
-        Bucket: recording.s3Bucket,
-        Key: recording.s3Key
-      });
-      await this.s3Client.send(command);
-    } else if (recording.metadata?.gridFSFileId) {
-      // Delete from GridFS
-      await this.gridFSBucket.delete(new ObjectId(recording.metadata.gridFSFileId));
-    }
-
-    // Delete metadata
-    await collection.deleteOne({ _id: new ObjectId(recordingId) as any });
-    this.log.info(`🗑️  Deleted recording: ${recordingId}`);
+    await deleteRowsByIds(EXTRA_TABLES.audioRecordings, [recordingId]);
   }
 
-  /**
-   * Cleanup expired recordings (cron job)
-   */
   async cleanupExpiredRecordings(): Promise<number> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
-    const expiredRecordings = await collection.find({ expiresAt: { $lte: new Date() } }).toArray();
+    const rows = await this.listRows();
+    const now = Date.now();
+    const expired = rows.filter(recording => recording.expiresAt && new Date(recording.expiresAt).getTime() <= now);
 
     let deletedCount = 0;
-    for (const recording of expiredRecordings) {
+    for (const recording of expired) {
       try {
-        await this.deleteRecording(recording._id!.toString());
-        deletedCount++;
+        // eslint-disable-next-line no-await-in-loop
+        await this.deleteRecording(recording._id!);
+        deletedCount += 1;
       } catch (error) {
         this.log.error(`Failed to delete expired recording ${recording._id}:`, error);
       }
     }
 
-    this.log.info(`🧹 Cleanup completed: ${deletedCount} expired recordings deleted`);
     return deletedCount;
   }
 
-  /**
-   * Get storage statistics
-   */
   async getStorageStats(userId: string): Promise<{
     totalRecordings: number;
     totalSizeMB: number;
@@ -373,19 +265,17 @@ export class AudioStorageService {
     oldestRecording?: Date;
     newestRecording?: Date;
   }> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    const rows = await this.listRows();
+    const recordings = rows.filter(recording => recording.userId === userId);
 
-    const collection = this.db.collection<AudioRecording>(AudioRecordingModel.collectionName);
+    const totalSizeBytes = recordings.reduce((sum, item) => sum + (item.fileSizeBytes || 0), 0);
+    const practiceCount = recordings.filter(item => item.recordingType === RecordingType.PRACTICE).length;
+    const simulationCount = recordings.filter(item => item.recordingType === RecordingType.SIMULATION).length;
 
-    const recordings = await collection.find({ userId }).toArray();
-
-    const totalSizeBytes = recordings.reduce((sum, r) => sum + r.fileSizeBytes, 0);
-    const practiceCount = recordings.filter(r => r.recordingType === RecordingType.PRACTICE).length;
-    const simulationCount = recordings.filter(r => r.recordingType === RecordingType.SIMULATION).length;
-
-    const dates = recordings.map(r => r.createdAt).sort((a, b) => a.getTime() - b.getTime());
+    const dates = recordings
+      .map(item => new Date(item.createdAt))
+      .filter(date => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
 
     return {
       totalRecordings: recordings.length,

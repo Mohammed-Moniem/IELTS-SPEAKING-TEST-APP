@@ -10,6 +10,7 @@ import connectDB from './loaders/DBLoader';
 import './loaders/expressLoader';
 import './loaders/homeLoader';
 import { connectToRabbitMQ } from './loaders/RabbitMQLoader';
+import { initializeNotificationScheduler } from './loaders/NotificationScheduler';
 import { winstonLoader } from './loaders/winstonLoader';
 
 const log = new Logger(__filename);
@@ -19,6 +20,7 @@ const log = new Logger(__filename);
     await connectDB();
     await winstonLoader();
     await connectToRabbitMQ();
+    initializeNotificationScheduler();
   } catch (error: any) {
     log.error(`Error while initializing the app`, { error });
   }

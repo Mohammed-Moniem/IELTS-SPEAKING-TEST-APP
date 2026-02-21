@@ -22,6 +22,12 @@ export class RegisterRequest {
     message: 'Password must include upper, lower, number, and special character'
   })
   password!: string;
+
+  @IsOptional()
+  @Matches(/^[A-Z0-9]{4,20}$/, {
+    message: 'Referral code must be 4-20 characters using uppercase letters or numbers'
+  })
+  referralCode?: string;
 }
 
 export class LoginRequest {

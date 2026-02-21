@@ -4,11 +4,16 @@ import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
+import { UserStats } from '@models/AchievementModel';
 import { PracticeSessionDocument, PracticeSessionModel } from '@models/PracticeSessionModel';
 import { TestPreferenceModel } from '@models/TestPreferenceModel';
 import { UserModel } from '@models/UserModel';
 import { Service } from 'typedi';
+import { emitToUser } from '../../loaders/SocketIOLoader';
+import { achievementTracker } from './AchievementTracker';
 import { FeedbackService } from './FeedbackService';
+import { PointsService } from './PointsService';
+import { ReferralService } from './ReferralService';
 import { TopicService } from './TopicService';
 import { UsageService } from './UsageService';
 
@@ -129,7 +134,7 @@ export class PracticeService {
       return session;
     }
 
-    const preferences = await TestPreferenceModel.findOne({ user: userId }).lean<{ targetBand?: string }>();
+    const preferences = await TestPreferenceModel.findOne({ user: userId }).lean();
 
     const feedback = await this.feedbackService.generatePracticeFeedback(
       session.question,
@@ -159,6 +164,117 @@ export class PracticeService {
     await session.save();
 
     // Usage was already incremented at session start to prevent race conditions
+
+    // Track achievement progress
+    try {
+      const sessionDate = new Date();
+      await achievementTracker.trackPracticeCompletion(userId, {
+        score: feedback.scores.overallBand,
+        partNumber: session.part,
+        duration: timeSpent,
+        topicId: session.topicId
+      });
+
+      // Track time-based achievements (morning/night/weekend)
+      await achievementTracker.trackTimeBased(userId, sessionDate);
+
+      // Track seasonal achievements
+      await achievementTracker.trackSeasonalPractice(userId, sessionDate);
+
+      // Track speed achievements if completed quickly
+      if (timeSpent) {
+        const targetDurations: { [key: number]: number } = {
+          1: 300, // Part 1: 5 minutes
+          2: 180, // Part 2: 3 minutes (2 min talk + prep)
+          3: 300 // Part 3: 5 minutes
+        };
+
+        const targetDuration = targetDurations[session.part];
+        if (targetDuration && timeSpent <= targetDuration) {
+          await achievementTracker.trackSpeedCompletion(userId, {
+            partNumber: session.part,
+            duration: timeSpent,
+            targetDuration
+          });
+        }
+      }
+
+      // Track topic mastery if score is high
+      if (feedback.scores.overallBand >= 8.0 && session.topicId) {
+        await achievementTracker.trackTopicMastery(userId, {
+          topicKey: session.topicId.toString(),
+          topicName: 'Practice Topic', // You can enhance this with actual topic name
+          score: feedback.scores.overallBand
+        });
+      }
+    } catch (error: any) {
+      this.log.error(`${logMessage} :: Error tracking achievements:`, error);
+      // Don't fail the request if achievement tracking fails
+    }
+
+    // Grant practice points (Phase 2: Gamification)
+    try {
+      // Calculate score improvement
+      const userStats = await UserStats.findOne({ userId });
+      let scoreImprovement = 0;
+      if (userStats && userStats.averageScore > 0) {
+        scoreImprovement = feedback.scores.overallBand - userStats.averageScore;
+      }
+
+      // Check streak status
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+
+      let isStreakActive = false;
+      let streakDays = 0;
+
+      if (userStats && userStats.lastPracticeDate) {
+        const lastPractice = new Date(userStats.lastPracticeDate);
+        lastPractice.setHours(0, 0, 0, 0);
+
+        // Streak continues if last practice was today or yesterday
+        if (lastPractice.getTime() === yesterday.getTime() || lastPractice.getTime() === today.getTime()) {
+          isStreakActive = true;
+          streakDays = userStats.currentStreak || 1;
+        }
+      }
+
+      // Grant points
+      const pointsResult = await PointsService.grantPracticePoints(userId, sessionId, {
+        scoreImprovement: scoreImprovement > 0 ? scoreImprovement : undefined,
+        isStreakActive,
+        streakDays: isStreakActive ? streakDays : undefined
+      });
+
+      // Emit socket event for real-time UI update
+      emitToUser(userId, 'points:granted', {
+        points: pointsResult.points,
+        breakdown: pointsResult.breakdown,
+        source: 'practice',
+        sessionId
+      });
+
+      this.log.info(`${logMessage} :: Granted ${pointsResult.points} points to user ${userId}`, {
+        breakdown: pointsResult.breakdown
+      });
+    } catch (error: any) {
+      this.log.error(`${logMessage} :: Error granting practice points:`, error);
+      // Don't fail the request if points grant fails
+    }
+
+    // Grant referral points if this is referee's first session (Phase 2: Gamification)
+    try {
+      const referralService = new ReferralService();
+      await referralService.grantReferralPoints(userId);
+    } catch (error: any) {
+      this.log.error(`${logMessage} :: Error granting referral points:`, error);
+      // Don't fail the request if referral points fail
+    }
 
     this.log.info(`${logMessage} :: Completed session ${sessionId}`);
 

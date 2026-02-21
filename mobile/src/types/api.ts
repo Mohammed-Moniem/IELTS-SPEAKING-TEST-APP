@@ -11,6 +11,8 @@ export interface User {
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
+  isGuest?: boolean;
+  guestTrialRemaining?: number;
 }
 
 export interface StandardResponse<T> {
@@ -198,6 +200,20 @@ export interface UsageSummary {
   lastReset?: string;
 }
 
+export interface NotificationSettings {
+  dailyReminderEnabled: boolean;
+  dailyReminderHour: number;
+  dailyReminderMinute: number;
+  achievementsEnabled: boolean;
+  streakRemindersEnabled: boolean;
+  inactivityRemindersEnabled: boolean;
+  feedbackNotificationsEnabled: boolean;
+  directMessagesEnabled: boolean;
+  groupMessagesEnabled: boolean;
+  systemAnnouncementsEnabled: boolean;
+  offersEnabled: boolean;
+}
+
 export interface Preferences {
   _id: string;
   user: string;
@@ -211,6 +227,19 @@ export interface Preferences {
 export interface SubscriptionMetadata {
   label: string;
   features: string[];
+}
+
+export interface SubscriptionPlanDetails {
+  tier: SubscriptionPlan;
+  name: string;
+  price: number;
+  currency?: string;
+  description?: string;
+  features?: string[];
+  limits?: {
+    practice?: number | null;
+    simulation?: number | null;
+  };
 }
 
 export interface SubscriptionInfo {
@@ -230,4 +259,5 @@ export interface StripeConfig {
     premium?: string;
     pro?: string;
   };
+  plans?: SubscriptionPlanDetails[];
 }

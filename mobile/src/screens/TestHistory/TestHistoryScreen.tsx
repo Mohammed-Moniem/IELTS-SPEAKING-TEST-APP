@@ -16,19 +16,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import {
   deleteTest,
   getTestHistory,
   TestHistory,
 } from "../../api/analyticsApi";
 
-const DEMO_USER_ID = "demo-user-123";
 const PAGE_SIZE = 20;
 
 type TestType = "all" | "practice" | "simulation";
 type SortBy = "date-desc" | "date-asc" | "score-desc" | "score-asc";
 
 export const TestHistoryScreen: React.FC = () => {
+  const { user, initializing: authInitializing } = useAuth();
   const [tests, setTests] = useState<TestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,11 +39,33 @@ export const TestHistoryScreen: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortBy>("date-desc");
   const [skip, setSkip] = useState(0);
 
+  const userId = user?._id ?? null;
+
   useEffect(() => {
+    if (authInitializing) {
+      return;
+    }
+
+    if (!userId) {
+      setTests([]);
+      setLoading(false);
+      setHasMore(false);
+      setSkip(0);
+      return;
+    }
+
     loadTests(true);
-  }, [filter, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, sortBy, userId, authInitializing]);
 
   const loadTests = async (reset: boolean = false) => {
+    if (!userId) {
+      setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
+      return;
+    }
+
     try {
       if (reset) {
         setLoading(true);
@@ -54,7 +77,7 @@ export const TestHistoryScreen: React.FC = () => {
       const newSkip = reset ? 0 : skip;
       const testType = filter === "all" ? undefined : filter;
 
-      const response = await getTestHistory(DEMO_USER_ID, {
+      const response = await getTestHistory(userId, {
         limit: PAGE_SIZE,
         skip: newSkip,
         testType,
@@ -104,13 +127,16 @@ export const TestHistoryScreen: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    if (!userId) {
+      return;
+    }
     setRefreshing(true);
     await loadTests(true);
     setRefreshing(false);
   };
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loadingMore && hasMore && userId) {
       loadTests(false);
     }
   };
@@ -343,6 +369,37 @@ export const TestHistoryScreen: React.FC = () => {
       </View>
     );
   };
+
+  if (authInitializing) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>Test History</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text style={styles.loadingText}>Loading your account...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+          <Text style={styles.headerTitle}>Test History</Text>
+        </LinearGradient>
+        <View style={styles.centerContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Text style={styles.emptyTitle}>Sign in to view history</Text>
+          <Text style={styles.emptySubtitle}>
+            Create an account or log in to sync your IELTS progress
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (

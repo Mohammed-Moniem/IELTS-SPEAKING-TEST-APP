@@ -4,14 +4,18 @@ import React, { useState } from "react";
 import {
   Modal,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
 
 import { useAuth } from "../auth/AuthContext";
-import { colors } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
 
 interface MenuItem {
   icon: string;
@@ -61,7 +65,15 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-export const ProfileMenu: React.FC = () => {
+interface ProfileMenuProps {
+  containerStyle?: StyleProp<ViewStyle>;
+}
+
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({
+  containerStyle,
+}) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [visible, setVisible] = useState(false);
   const navigation = useNavigation();
   const { logout } = useAuth();
@@ -85,7 +97,7 @@ export const ProfileMenu: React.FC = () => {
       {/* Profile Icon Button */}
       <TouchableOpacity
         onPress={() => setVisible(true)}
-        style={styles.profileButton}
+        style={[styles.profileButton, containerStyle]}
         activeOpacity={0.7}
       >
         <View style={styles.profileIconContainer}>
@@ -162,7 +174,8 @@ export const ProfileMenu: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   profileButton: {
     marginRight: 16,
     paddingLeft: 8,
@@ -246,4 +259,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
   },
-});
+  });

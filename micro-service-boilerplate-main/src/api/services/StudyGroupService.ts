@@ -1,11 +1,71 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
+import { Friendship } from '../models/FriendModel';
 import { IStudyGroup, IStudyGroupInvite, StudyGroup, StudyGroupInvite } from '../models/StudyGroupModel';
 import { UserProfile } from '../models/UserProfileModel';
 
 const log = new Logger(__filename);
 
 export class StudyGroupService {
+  private readonly MAX_MEMBERS = 10;
+
+  private async getFriendIdsSet(userId: string): Promise<Set<string>> {
+    const objectId = new Types.ObjectId(userId);
+    const friendships = await Friendship.find({
+      $or: [{ user1Id: objectId }, { user2Id: objectId }]
+    });
+
+    const friendIds = new Set<string>();
+    friendships.forEach(friendship => {
+      if (friendship.user1Id.toString() === userId) {
+        friendIds.add(friendship.user2Id.toString());
+      } else {
+        friendIds.add(friendship.user1Id.toString());
+      }
+    });
+
+    return friendIds;
+  }
+
+  private async ensureFriends(userId: string, candidateIds: string[]): Promise<void> {
+    if (!candidateIds.length) {
+      return;
+    }
+
+    const friendIdSet = await this.getFriendIdsSet(userId);
+    const notFriends = candidateIds.filter(id => !friendIdSet.has(id));
+
+    if (notFriends.length) {
+      throw new Error('You can only add friends to the study group');
+    }
+  }
+
+  private enforceMaxMembers(group: IStudyGroup) {
+    if (!group.maxMembers || group.maxMembers > this.MAX_MEMBERS) {
+      group.maxMembers = this.MAX_MEMBERS;
+    }
+  }
+
+  private buildGroupResponse(group: IStudyGroup, userId: string) {
+    this.enforceMaxMembers(group);
+    const groupObj = group.toObject();
+    const normalizedMemberIds = group.memberIds.map(id => id.toString());
+    const normalizedAdminIds = group.adminIds.map(id => id.toString());
+    const normalizedCreatorId = group.creatorId.toString();
+
+    return {
+      ...groupObj,
+      _id: groupObj._id?.toString?.() ?? group._id.toString(),
+      creatorId: normalizedCreatorId,
+      adminIds: normalizedAdminIds,
+      memberIds: normalizedMemberIds,
+      memberCount: normalizedMemberIds.length,
+      maxMembers: group.maxMembers,
+      isCreator: normalizedCreatorId === userId,
+      isAdmin: normalizedAdminIds.includes(userId)
+    };
+  }
+
   /**
    * Create a new study group
    */
@@ -14,35 +74,55 @@ export class StudyGroupService {
     name: string,
     description?: string,
     metadata?: any,
-    settings?: any
-  ): Promise<IStudyGroup> {
+    settings?: any,
+    initialMemberIds: string[] = []
+  ) {
+    const sanitizedInitialMembers = Array.from(
+      new Set(
+        (initialMemberIds || [])
+          .map(id => id && id.toString())
+          .filter(id => id && id !== creatorId)
+      )
+    );
+
+    await this.ensureFriends(creatorId, sanitizedInitialMembers);
+
+    if (sanitizedInitialMembers.length + 1 > this.MAX_MEMBERS) {
+      throw new Error(`A study group can have at most ${this.MAX_MEMBERS} members`);
+    }
+
     const group = new StudyGroup({
       name,
       description,
       creatorId: new Types.ObjectId(creatorId),
       adminIds: [new Types.ObjectId(creatorId)],
-      memberIds: [new Types.ObjectId(creatorId)],
+      memberIds: [new Types.ObjectId(creatorId), ...sanitizedInitialMembers.map(id => new Types.ObjectId(id))],
+      maxMembers: this.MAX_MEMBERS,
       metadata: metadata || {},
-      settings: settings || {
-        isPrivate: false,
-        allowMemberInvites: true,
-        requireApproval: false
+      settings: {
+        isPrivate: settings?.isPrivate ?? false,
+        allowMemberInvites: false,
+        requireApproval: settings?.requireApproval ?? false
       }
     });
 
+    this.enforceMaxMembers(group);
     await group.save();
     log.info(`Study group created: ${group._id} by ${creatorId}`);
-    return group;
+    return this.buildGroupResponse(group, creatorId);
   }
 
   /**
    * Get group details
    */
-  async getGroup(groupId: string): Promise<IStudyGroup | null> {
-    return await StudyGroup.findById(groupId)
-      .populate('creatorId', 'name email')
-      .populate('memberIds', 'name email')
-      .populate('adminIds', 'name email');
+  async getGroup(groupId: string, userId: string) {
+    const group = await StudyGroup.findById(groupId);
+
+    if (!group) {
+      throw new Error('Group not found');
+    }
+
+    return this.buildGroupResponse(group, userId);
   }
 
   /**
@@ -66,12 +146,16 @@ export class StudyGroupService {
     if (updates.avatar !== undefined) group.avatar = updates.avatar;
     if (updates.settings) {
       group.settings = { ...group.settings, ...updates.settings };
+      group.settings.allowMemberInvites = false;
     }
     if (updates.metadata) {
       group.metadata = { ...group.metadata, ...updates.metadata };
     }
 
-    return await group.save();
+    this.enforceMaxMembers(group);
+
+    const savedGroup = await group.save();
+    return this.buildGroupResponse(savedGroup, userId);
   }
 
   /**
@@ -112,18 +196,19 @@ export class StudyGroupService {
       throw new Error('Group not found');
     }
 
+    this.enforceMaxMembers(group);
+
     // Check if group is full
     if (group.memberIds.length >= group.maxMembers) {
       throw new Error('Group is full');
     }
 
-    // Check if inviter has permission
-    const isAdmin = this.isAdmin(group, inviterId);
-    const canInvite = isAdmin || group.settings.allowMemberInvites;
-
-    if (!canInvite) {
-      throw new Error('You do not have permission to invite members');
+    // Only admins can invite
+    if (!this.isAdmin(group, inviterId)) {
+      throw new Error('Only admins can invite members');
     }
+
+    await this.ensureFriends(inviterId, [inviteeId]);
 
     // Check if user is already a member
     if (group.memberIds.some(id => id.toString() === inviteeId)) {
@@ -155,6 +240,41 @@ export class StudyGroupService {
     return invite;
   }
 
+  async addMember(groupId: string, adminId: string, memberId: string) {
+    const group = await StudyGroup.findById(groupId);
+
+    if (!group) {
+      throw new Error('Group not found');
+    }
+
+    if (!this.isAdmin(group, adminId)) {
+      throw new Error('Only admins can add members');
+    }
+
+    this.enforceMaxMembers(group);
+
+    if (group.memberIds.length >= group.maxMembers) {
+      throw new Error('Group is full');
+    }
+
+    if (group.memberIds.some(id => id.toString() === memberId)) {
+      throw new Error('User is already a member');
+    }
+
+    await this.ensureFriends(adminId, [memberId]);
+
+    group.memberIds.push(new Types.ObjectId(memberId));
+    await group.save();
+
+    await StudyGroupInvite.deleteMany({
+      groupId: group._id,
+      inviteeId: new Types.ObjectId(memberId)
+    });
+
+    log.info(`Member ${memberId} added to group ${groupId} by admin ${adminId}`);
+    return this.buildGroupResponse(group, adminId);
+  }
+
   /**
    * Accept group invitation
    */
@@ -178,6 +298,8 @@ export class StudyGroupService {
     if (!group) {
       throw new Error('Group not found');
     }
+
+    this.enforceMaxMembers(group);
 
     // Check if group is full
     if (group.memberIds.length >= group.maxMembers) {
@@ -266,6 +388,34 @@ export class StudyGroupService {
     log.info(`User ${userId} left group ${groupId}`);
   }
 
+  async joinGroup(groupId: string, userId: string) {
+    const group = await StudyGroup.findById(groupId);
+
+    if (!group) {
+      throw new Error('Group not found');
+    }
+
+    this.enforceMaxMembers(group);
+
+    if (group.settings.isPrivate) {
+      throw new Error('This group is private. Ask an admin to add you.');
+    }
+
+    if (group.memberIds.some(id => id.toString() === userId)) {
+      throw new Error('You are already a member of this group');
+    }
+
+    if (group.memberIds.length >= group.maxMembers) {
+      throw new Error('Group is full');
+    }
+
+    group.memberIds.push(new Types.ObjectId(userId));
+    await group.save();
+
+    log.info(`User ${userId} joined public group ${groupId}`);
+    return this.buildGroupResponse(group, userId);
+  }
+
   /**
    * Promote member to admin
    */
@@ -328,12 +478,12 @@ export class StudyGroupService {
   /**
    * Get user's groups
    */
-  async getUserGroups(userId: string): Promise<IStudyGroup[]> {
-    return await StudyGroup.find({
+  async getUserGroups(userId: string) {
+    const groups = await StudyGroup.find({
       memberIds: new Types.ObjectId(userId)
-    })
-      .populate('creatorId', 'name email')
-      .sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 });
+
+    return groups.map(group => this.buildGroupResponse(group, userId));
   }
 
   /**
@@ -349,15 +499,31 @@ export class StudyGroupService {
     const profiles = await UserProfile.find({
       userId: { $in: group.memberIds }
     })
-      .populate('userId', 'name email')
+      .populate('userId', 'email firstName lastName')
       .select('userId username avatar bio lastActive');
 
-    // Mark admins
-    return profiles.map(profile => ({
-      ...profile.toObject(),
-      isAdmin: group.adminIds.some(id => id.toString() === profile.userId.toString()),
-      isCreator: group.creatorId.toString() === profile.userId.toString()
-    }));
+    return profiles.map(profile => {
+      const profileObj = profile.toObject() as any;
+      const userDoc = profileObj.userId;
+      const userId = userDoc?._id ? userDoc._id.toString() : profile.userId.toString();
+      const displayName = [userDoc?.firstName, userDoc?.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      return {
+        id: profileObj._id,
+        userId,
+        username: profileObj.username,
+        avatar: profileObj.avatar,
+        bio: profileObj.bio,
+        lastActive: profileObj.lastActive,
+        email: userDoc?.email,
+        displayName: displayName || profileObj.username || userDoc?.email,
+        isAdmin: group.adminIds.some(id => id.toString() === userId),
+        isCreator: group.creatorId.toString() === userId
+      };
+    });
   }
 
   /**
@@ -400,10 +566,8 @@ export class StudyGroupService {
       searchCriteria['metadata.targetCountry'] = filters.targetCountry;
     }
 
-    return await StudyGroup.find(searchCriteria)
-      .populate('creatorId', 'name email')
-      .limit(limit)
-      .sort({ createdAt: -1 });
+    const groups = await StudyGroup.find(searchCriteria).limit(limit).sort({ createdAt: -1 });
+    return groups.map(group => this.buildGroupResponse(group, userId));
   }
 
   /**
@@ -418,7 +582,7 @@ export class StudyGroupService {
 
     // Get groups user is already in
     const userGroups = await this.getUserGroups(userId);
-    const excludeGroupIds = userGroups.map(g => g._id);
+    const excludeGroupIds = userGroups.map(g => new Types.ObjectId(g._id));
 
     const matchCriteria: any = {
       _id: { $nin: excludeGroupIds },
@@ -436,7 +600,8 @@ export class StudyGroupService {
       matchCriteria['metadata.targetCountry'] = userProfile.studyGoals.targetCountry;
     }
 
-    return await StudyGroup.find(matchCriteria).populate('creatorId', 'name email').limit(limit).sort({ memberIds: 1 }); // Prioritize groups with fewer members
+    const groups = await StudyGroup.find(matchCriteria).limit(limit).sort({ memberIds: 1 });
+    return groups.map(group => this.buildGroupResponse(group, userId));
   }
 
   /**

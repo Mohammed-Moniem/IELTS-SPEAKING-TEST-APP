@@ -5,8 +5,10 @@ import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
 import { GeneratedQuestionModel, IGeneratedQuestion } from '@models/GeneratedQuestionModel';
+import { IELTSQuestionDocument } from '@models/IELTSQuestionModel';
 import OpenAI from 'openai';
 import { Service } from 'typedi';
+import { IELTSQuestionService } from './IELTSQuestionService';
 
 interface Part1Question {
   topic: string;
@@ -42,7 +44,7 @@ export class QuestionGenerationService {
   private log = new Logger(__filename);
   private client?: OpenAI;
 
-  constructor() {
+  constructor(private readonly questionBankService: IELTSQuestionService) {
     if (env.openai.apiKey) {
       this.client = new OpenAI({ apiKey: env.openai.apiKey });
     }
@@ -57,12 +59,77 @@ export class QuestionGenerationService {
     headers: IRequestHeaders
   ): Promise<GeneratedTestStructure> {
     const logMessage = constructLogMessage(__filename, 'generateCompleteTest', headers);
+    this.log.info(`${logMessage} :: Generating ${difficulty} test for user ${userId}`);
 
+    const questionBankResult = await this.generateFromQuestionBank(userId, difficulty, headers, logMessage);
+    if (questionBankResult) {
+      return questionBankResult;
+    }
+
+    this.log.warn(`${logMessage} :: Falling back to AI question generation`);
+
+    if (!this.client) {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.GenericErrorMessage,
+        'Question bank unavailable and AI generation disabled'
+      );
+    }
+
+    return this.generateViaOpenAI(userId, difficulty, headers, logMessage);
+  }
+
+  private async generateFromQuestionBank(
+    userId: string,
+    difficulty: 'beginner' | 'intermediate' | 'advanced',
+    headers: IRequestHeaders,
+    logMessage: string
+  ): Promise<GeneratedTestStructure | null> {
+    try {
+      const selection = await this.questionBankService.buildFullTestFromBank(userId, difficulty, headers);
+      if (!selection || !selection.part2) {
+        return null;
+      }
+
+      const part1 = this.mapPart1(selection.part1);
+      const part2 = this.mapPart2(selection.part2);
+      const part3 = this.mapPart3(selection.part3);
+
+      const questionDoc = await GeneratedQuestionModel.create({
+        userId,
+        difficulty,
+        part1,
+        part2,
+        part3,
+        generatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
+
+      this.log.info(`${logMessage} :: Test served from question bank, ID: ${questionDoc._id}`);
+
+      return {
+        testId: questionDoc._id.toString(),
+        part1,
+        part2,
+        part3,
+        generatedAt: questionDoc.generatedAt,
+        expiresAt: questionDoc.expiresAt
+      };
+    } catch (error: any) {
+      this.log.warn(`${logMessage} :: Question bank lookup failed`, { error: error.message });
+      return null;
+    }
+  }
+
+  private async generateViaOpenAI(
+    userId: string,
+    difficulty: 'beginner' | 'intermediate' | 'advanced',
+    headers: IRequestHeaders,
+    logMessage: string
+  ): Promise<GeneratedTestStructure> {
     if (!this.client) {
       throw new CSError(HTTP_STATUS_CODES.SERVICE_UNAVAILABLE, CODES.GenericErrorMessage, 'AI service unavailable');
     }
-
-    this.log.info(`${logMessage} :: Generating ${difficulty} test for user ${userId}`);
 
     try {
       const prompt = this.buildCompleteTestPrompt(difficulty);
@@ -80,7 +147,7 @@ export class QuestionGenerationService {
             content: prompt
           }
         ],
-        temperature: 0.8, // Higher creativity for varied questions
+        temperature: 0.8,
         max_tokens: 2000,
         response_format: { type: 'json_object' }
       });
@@ -92,7 +159,6 @@ export class QuestionGenerationService {
 
       const parsed = JSON.parse(content);
 
-      // Store in database for future reference
       const questionDoc = await GeneratedQuestionModel.create({
         userId,
         difficulty,
@@ -100,10 +166,10 @@ export class QuestionGenerationService {
         part2: parsed.part2,
         part3: parsed.part3,
         generatedAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       });
 
-      this.log.info(`${logMessage} :: Test generated successfully, ID: ${questionDoc._id}`);
+      this.log.info(`${logMessage} :: Test generated via AI, ID: ${questionDoc._id}`);
 
       return {
         testId: questionDoc._id.toString(),
@@ -121,6 +187,62 @@ export class QuestionGenerationService {
         'Failed to generate test questions'
       );
     }
+  }
+
+  private mapPart1(part1Docs: IELTSQuestionDocument[]): Part1Question {
+    const questions = part1Docs.map(doc => doc.question).filter(Boolean);
+    if (!questions.length) {
+      questions.push('Tell me about yourself.');
+    }
+
+    return {
+      topic: part1Docs[0]?.topic || 'Part 1 Warm-up',
+      questions,
+      timeLimit: 60
+    };
+  }
+
+  private mapPart2(part2Doc: IELTSQuestionDocument): Part2CueCard {
+    const cueCard = part2Doc.cueCard || {};
+    const mainPrompt = part2Doc.question || cueCard.mainTopic || 'Describe an experience that was important to you.';
+    const bulletPoints =
+      cueCard.bulletPoints && cueCard.bulletPoints.length
+        ? cueCard.bulletPoints
+        : this.buildFallbackCueCardBulletPoints(mainPrompt);
+
+    const responseTime =
+      (cueCard as { timeToSpeak?: number; responseTime?: number }).responseTime ?? cueCard.timeToSpeak ?? 120;
+
+    return {
+      topic: part2Doc.topic || cueCard.mainTopic || 'Part 2 Topic',
+      mainPrompt,
+      bulletPoints,
+      preparationTime: cueCard.preparationTime ?? 60,
+      responseTime
+    };
+  }
+
+  private mapPart3(part3Docs: IELTSQuestionDocument[]): Part3Question {
+    const questions = part3Docs.map(doc => doc.question).filter(Boolean);
+    if (!questions.length) {
+      questions.push('What are the wider implications of this topic?');
+    }
+
+    return {
+      topic: part3Docs[0]?.topic || 'Part 3 Discussion',
+      questions,
+      timeLimit: 90
+    };
+  }
+
+  private buildFallbackCueCardBulletPoints(mainPrompt: string): string[] {
+    const prompt = mainPrompt.trim().replace(/\.$/, '');
+    return [
+      `What ${prompt.toLowerCase().startsWith('describe') ? 'it is about' : 'happened'}`,
+      'When it happened',
+      'Who was involved',
+      'Why it is significant to you'
+    ];
   }
 
   /**

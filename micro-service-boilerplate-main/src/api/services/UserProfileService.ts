@@ -1,5 +1,4 @@
-import { Types } from 'mongoose';
-import * as QRCode from 'qrcode';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
 import { UserStats } from '../models/AchievementModel';
 import { IUserProfile, UserProfile } from '../models/UserProfileModel';
@@ -10,26 +9,18 @@ export class UserProfileService {
   /**
    * Create user profile (called during registration)
    */
-  async createProfile(userId: string, username: string, email: string): Promise<IUserProfile> {
+  async createProfile(userId: string, username: string, _email: string): Promise<IUserProfile> {
     // Check if username is taken
     const existing = await UserProfile.findOne({ username: username.toLowerCase() });
     if (existing) {
       throw new Error('Username already taken');
     }
 
-    // Generate QR code for user
-    const qrData = JSON.stringify({
-      userId,
-      username,
-      type: 'friend_request'
-    });
-    const qrCode = await QRCode.toDataURL(qrData);
-
     const profile = new UserProfile({
       userId: new Types.ObjectId(userId),
       username: username.toLowerCase(),
       social: {
-        qrCode,
+        qrCode: this.buildFriendQrPayload(userId, username),
         allowFriendSuggestions: true,
         showOnlineStatus: true,
         allowDirectMessages: true
@@ -61,24 +52,77 @@ export class UserProfileService {
    * Get user profile
    */
   async getProfile(userId: string): Promise<IUserProfile | null> {
-    return await UserProfile.findOne({ userId: new Types.ObjectId(userId) }).populate('userId', 'name email');
+    try {
+      const profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) })
+        .populate('userId', 'firstName lastName email')
+        .lean();
+      log.info(`getProfile: Found profile for user ${userId}:`, profile ? 'yes' : 'no');
+      return profile as any;
+    } catch (error: any) {
+      log.error(`getProfile: Error fetching profile for user ${userId}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Get profile by username
    */
   async getProfileByUsername(username: string): Promise<IUserProfile | null> {
-    return await UserProfile.findOne({ username: username.toLowerCase() }).populate('userId', 'name email');
+    return (await UserProfile.findOne({ username: username.toLowerCase() })
+      .populate('userId', 'firstName lastName email')
+      .lean()) as any;
   }
 
   /**
-   * Update user profile
+   * Update user profile (creates if doesn't exist)
    */
   async updateProfile(userId: string, updates: Partial<IUserProfile>): Promise<IUserProfile> {
-    const profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
+    let profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
 
+    // If profile doesn't exist, create it first
     if (!profile) {
-      throw new Error('Profile not found');
+      log.info(`Profile not found for user ${userId}, creating new profile`);
+
+      // Generate default username if not provided (only lowercase, numbers, underscores)
+      const defaultUsername = updates.username || `user_${userId.slice(-8).replace(/[^a-z0-9_]/gi, '')}`;
+
+      // Check if username is taken
+      const existingUsername = await UserProfile.findOne({ username: defaultUsername.toLowerCase() });
+      if (existingUsername) {
+        throw new Error('Username already taken');
+      }
+
+      // Build initial friend QR payload
+      const qrPayload = this.buildFriendQrPayload(userId, defaultUsername);
+
+      profile = new UserProfile({
+        userId: new Types.ObjectId(userId),
+        username: defaultUsername.toLowerCase(),
+        social: {
+          qrCode: qrPayload,
+          allowFriendSuggestions: true,
+          showOnlineStatus: true,
+          allowDirectMessages: true
+        },
+        privacy: {
+          profileVisibility: 'friends-only',
+          leaderboardOptIn: false,
+          showStatistics: true,
+          showActivity: true,
+          showStudyGoals: true
+        }
+      });
+
+      // Initialize user stats
+      const existingStats = await UserStats.findOne({ userId: new Types.ObjectId(userId) });
+      if (!existingStats) {
+        const stats = new UserStats({
+          userId: new Types.ObjectId(userId),
+          leaderboardOptIn: false,
+          profileVisibility: 'friends-only'
+        });
+        await stats.save();
+      }
     }
 
     // Handle username change (check availability)
@@ -114,22 +158,33 @@ export class UserProfileService {
     // Update last active
     profile.lastActive = new Date();
 
-    await profile.save();
-    log.info(`Profile updated for user ${userId}`);
-    return profile;
+    try {
+      await profile.save();
+      log.info(`Profile ${profile._id ? 'updated' : 'created'} for user ${userId}`);
+      return profile;
+    } catch (saveError: any) {
+      log.error(`Error saving profile for user ${userId}:`, saveError);
+      throw new Error(saveError.message || 'Failed to save profile');
+    }
   }
 
   /**
-   * Update privacy settings
+   * Update privacy settings (creates profile if doesn't exist)
    */
   async updatePrivacySettings(
     userId: string,
     privacySettings: Partial<IUserProfile['privacy']>
   ): Promise<IUserProfile> {
-    const profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
+    let profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
 
+    // If profile doesn't exist, create it first with minimal data
     if (!profile) {
-      throw new Error('Profile not found');
+      log.info(`Profile not found for user ${userId}, creating new profile for privacy settings`);
+      await this.updateProfile(userId, {});
+      profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
+      if (!profile) {
+        throw new Error('Failed to create profile');
+      }
     }
 
     profile.privacy = { ...profile.privacy, ...privacySettings };
@@ -141,7 +196,8 @@ export class UserProfileService {
         {
           leaderboardOptIn: privacySettings.leaderboardOptIn,
           profileVisibility: privacySettings.profileVisibility || profile.privacy.profileVisibility
-        }
+        },
+        { upsert: true }
       );
     }
 
@@ -203,28 +259,40 @@ export class UserProfileService {
   }
 
   /**
-   * Generate new QR code for user
+   * Generate new QR payload for the requested purpose
    */
-  async generateQRCode(userId: string): Promise<string> {
+  async generateQRCode(userId: string, purpose: 'friend' | 'referral' = 'friend'): Promise<string> {
     const profile = await UserProfile.findOne({ userId: new Types.ObjectId(userId) });
 
     if (!profile) {
       throw new Error('Profile not found');
     }
 
-    const qrData = JSON.stringify({
-      userId,
-      username: profile.username,
-      type: 'friend_request',
-      timestamp: Date.now()
-    });
+    const username = profile.username;
+    let payload: string;
 
-    const qrCode = await QRCode.toDataURL(qrData);
-    profile.social.qrCode = qrCode;
-    await profile.save();
+    if (purpose === 'referral') {
+      const { referralService } = await import('./ReferralService');
+      const referralCode = await referralService.getUserReferralCode(userId);
+      const referralLink = await referralService.createReferralLink(userId);
 
-    log.info(`QR code generated for user ${userId}`);
-    return qrCode;
+      payload = JSON.stringify({
+        version: 1,
+        type: 'referral',
+        userId,
+        username,
+        referralCode,
+        referralLink,
+        ts: Date.now()
+      });
+    } else {
+      payload = this.buildFriendQrPayload(userId, username);
+      profile.social.qrCode = payload;
+      await profile.save();
+    }
+
+    log.info(`QR payload generated for user ${userId} (purpose=${purpose})`);
+    return payload;
   }
 
   /**
@@ -352,6 +420,100 @@ export class UserProfileService {
     // Consider online if active within last 5 minutes
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     return profile.lastActive > fiveMinutesAgo;
+  }
+
+  /**
+   * Resolve QR payload scanned by requester
+   */
+  async resolveQRCodePayload(code: string, requesterId: string) {
+    const payload = this.parseQrPayload(code);
+
+    if (payload.type === 'friend_invite') {
+      if (!payload.userId) {
+        throw new Error('Invalid friend QR payload');
+      }
+
+      if (payload.userId === requesterId) {
+        throw new Error('You cannot scan your own QR code');
+      }
+
+      const profile = await UserProfile.findOne({
+        userId: new Types.ObjectId(payload.userId)
+      })
+        .select('username avatar bio level xp')
+        .lean();
+
+      if (!profile) {
+        throw new Error('User not found');
+      }
+
+      const { friendService } = await import('./FriendService');
+      const status = await friendService.getRelationshipStatus(requesterId, payload.userId);
+
+      return {
+        type: 'friend_invite',
+        user: {
+          userId: payload.userId,
+          username: profile.username,
+          avatar: profile.avatar,
+          bio: profile.bio,
+          level: profile.level,
+          xp: profile.xp
+        },
+        status
+      };
+    }
+
+    if (payload.type === 'referral') {
+      if (!payload.referralCode) {
+        throw new Error('Invalid referral QR payload');
+      }
+
+      const profile = await UserProfile.findOne({
+        userId: new Types.ObjectId(payload.userId)
+      })
+        .select('username avatar')
+        .lean();
+
+      return {
+        type: 'referral',
+        referrer: {
+          userId: payload.userId,
+          username: profile?.username || payload.username,
+          avatar: profile?.avatar
+        },
+        referralCode: payload.referralCode,
+        referralLink: payload.referralLink
+      };
+    }
+
+    throw new Error('Unsupported QR code type');
+  }
+
+  private buildFriendQrPayload(userId: string, username: string): string {
+    return JSON.stringify({
+      version: 1,
+      type: 'friend_invite',
+      userId,
+      username,
+      ts: Date.now()
+    });
+  }
+
+  private parseQrPayload(code: string): any {
+    if (!code || typeof code !== 'string') {
+      throw new Error('Invalid QR code data');
+    }
+
+    try {
+      const payload = JSON.parse(code);
+      if (!payload.type) {
+        throw new Error('Missing QR code type');
+      }
+      return payload;
+    } catch (error) {
+      throw new Error('Invalid QR code format');
+    }
   }
 }
 

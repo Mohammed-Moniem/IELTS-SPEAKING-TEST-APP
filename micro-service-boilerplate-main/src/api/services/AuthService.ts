@@ -2,10 +2,12 @@ import { LoginRequest, RefreshTokenRequest, RegisterRequest } from '@dto/AuthDto
 import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
+import { userRepository } from '@lib/db/repositories';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '@lib/auth/token';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { SubscriptionPlan, UserDocument, UserModel } from '@models/UserModel';
+import { SubscriptionPlan, UserDocument } from '@models/UserModel';
+import { referralService } from '@services/ReferralService';
 import { Service } from 'typedi';
 
 interface AuthResult {
@@ -22,21 +24,49 @@ export class AuthService {
     const logMessage = constructLogMessage(__filename, 'register', headers);
     this.log.info(`${logMessage} :: Attempting to register user ${payload.email}`);
 
-    const existingUser = await UserModel.findOne({ email: payload.email });
+    const existingUser = await userRepository.findByEmail(payload.email);
     if (existingUser) {
       throw new CSError(HTTP_STATUS_CODES.CONFLICT, CODES.UserAlreadyExists, 'Email already registered');
     }
 
-    const createdUser = await UserModel.create({
-      email: payload.email,
-      phone: payload.phone,
-      firstName: payload.firstName,
-      lastName: payload.lastName,
-      password: payload.password,
-      subscriptionPlan: 'free' as SubscriptionPlan
-    });
+    const normalizedReferral = payload.referralCode?.trim().toUpperCase();
 
-    const sanitizedUser = await UserModel.findById(createdUser._id);
+    // Create user and handle referral redemption atomically
+    let createdUser: UserDocument | null = null;
+    try {
+      createdUser = await userRepository.create({
+        email: payload.email,
+        phone: payload.phone,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        password: payload.password,
+        subscriptionPlan: 'free' as SubscriptionPlan
+      });
+
+      if (normalizedReferral) {
+        await referralService.redeemReferralCode(normalizedReferral, createdUser._id.toString(), payload.email);
+      }
+    } catch (error: any) {
+      if (createdUser) {
+        await userRepository.deleteById(createdUser._id.toString());
+      }
+
+      if (normalizedReferral) {
+        throw new CSError(
+          HTTP_STATUS_CODES.BAD_REQUEST,
+          CODES.InvalidBody,
+          error?.message || 'Unable to apply referral code'
+        );
+      }
+
+      throw error;
+    }
+
+    if (!createdUser) {
+      throw new CSError(HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR, CODES.GenericErrorMessage, 'Registration failed');
+    }
+
+    const sanitizedUser = await userRepository.findById(createdUser._id.toString());
     const tokens = this.generateTokens(sanitizedUser!);
 
     await this.appendRefreshToken(createdUser._id.toString(), tokens.refreshToken);
@@ -51,7 +81,7 @@ export class AuthService {
     const logMessage = constructLogMessage(__filename, 'login', headers);
     this.log.info(`${logMessage} :: Login attempt ${payload.email}`);
 
-    const user = await UserModel.findOne({ email: payload.email }).select('+password +refreshTokens');
+    const user = await userRepository.findByEmailWithSecrets(payload.email);
     if (!user) {
       throw new CSError(HTTP_STATUS_CODES.UNAUTHORIZED, CODES.InvalidCredentials, 'Invalid credentials');
     }
@@ -61,10 +91,11 @@ export class AuthService {
       throw new CSError(HTTP_STATUS_CODES.UNAUTHORIZED, CODES.InvalidCredentials, 'Invalid credentials');
     }
 
-    user.lastLoginAt = new Date();
-    await user.save();
+    const now = new Date();
+    await userRepository.updateOne({ _id: user._id.toString() }, { $set: { lastLoginAt: now } });
+    user.lastLoginAt = now;
 
-    const sanitizedUser = await UserModel.findById(user._id);
+    const sanitizedUser = await userRepository.findById(user._id.toString());
     const tokens = this.generateTokens(user);
 
     await this.appendRefreshToken(user._id.toString(), tokens.refreshToken);
@@ -80,7 +111,7 @@ export class AuthService {
     this.log.info(`${logMessage} :: Refresh token requested`);
 
     const decoded = verifyRefreshToken(payload.refreshToken);
-    const user = await UserModel.findById(decoded.sub).select('+refreshTokens');
+    const user = await userRepository.findByIdWithRefreshTokens(decoded.sub);
 
     if (!user) {
       throw new CSError(HTTP_STATUS_CODES.UNAUTHORIZED, CODES.NotAuthorized, 'Invalid refresh token');
@@ -94,7 +125,7 @@ export class AuthService {
 
     await this.rotateRefreshToken(user, payload.refreshToken, tokens.refreshToken);
 
-    const sanitizedUser = await UserModel.findById(user._id);
+    const sanitizedUser = await userRepository.findById(user._id.toString());
 
     return {
       ...tokens,
@@ -104,7 +135,7 @@ export class AuthService {
 
   public async logout(refreshToken: string, headers: IRequestHeaders): Promise<void> {
     const decoded = verifyRefreshToken(refreshToken);
-    await UserModel.updateOne({ _id: decoded.sub }, { $pull: { refreshTokens: refreshToken } });
+    await userRepository.updateOne({ _id: decoded.sub }, { $pull: { refreshTokens: refreshToken } });
 
     const logMessage = constructLogMessage(__filename, 'logout', headers);
     this.log.info(`${logMessage} :: Refresh token revoked`);
@@ -124,7 +155,7 @@ export class AuthService {
   }
 
   private async appendRefreshToken(userId: string, refreshToken: string) {
-    await UserModel.updateOne(
+    await userRepository.updateOne(
       { _id: userId },
       {
         $addToSet: {
@@ -136,16 +167,19 @@ export class AuthService {
 
   private async rotateRefreshToken(user: UserDocument, oldToken: string, newToken: string) {
     // Remove old token first (if it exists)
-    await UserModel.updateOne({ _id: user._id }, { $pull: { refreshTokens: oldToken } });
+    await userRepository.updateOne({ _id: user._id.toString() }, { $pull: { refreshTokens: oldToken } });
 
     // Then add new token
-    await UserModel.updateOne({ _id: user._id }, { $addToSet: { refreshTokens: newToken } });
+    await userRepository.updateOne({ _id: user._id.toString() }, { $addToSet: { refreshTokens: newToken } });
 
     // Enforce storage limit to prevent unbounded growth
     // Re-fetch user to get updated refreshTokens array
-    const updatedUser = await UserModel.findById(user._id).select('+refreshTokens');
+    const updatedUser = await userRepository.findByIdWithRefreshTokens(user._id.toString());
     if (updatedUser && (updatedUser.refreshTokens?.length || 0) > 10) {
-      await UserModel.updateOne({ _id: user._id }, { $set: { refreshTokens: updatedUser.refreshTokens.slice(-10) } });
+      await userRepository.updateOne(
+        { _id: user._id.toString() },
+        { $set: { refreshTokens: updatedUser.refreshTokens.slice(-10) } }
+      );
     }
   }
 }

@@ -3,9 +3,10 @@
  * Provides comprehensive progress tracking and performance analytics
  */
 
-import { Db, MongoClient, ObjectId } from 'mongodb';
+import { generateMongoStyleId } from '@lib/db/id';
+import { deleteRowsByIds, loadTableRows, upsertRow } from '@lib/db/documentStore';
+import { EXTRA_TABLES } from '@lib/db/tableMappings';
 import { Service } from 'typedi';
-import { env } from '../../env';
 import { Logger } from '../../lib/logger';
 import { TestHistory, TestHistoryModel, TestType } from '../models/TestHistory';
 
@@ -33,7 +34,7 @@ export interface ProgressStats {
 }
 
 export interface MonthlyProgress {
-  month: string; // 'YYYY-MM'
+  month: string;
   testCount: number;
   averageBand: number;
   practiceCount: number;
@@ -64,34 +65,34 @@ export interface CriteriaComparison {
 @Service()
 export class AnalyticsService {
   private log = new Logger(__filename);
-  private db: Db;
 
-  async initializeMongoDB(): Promise<void> {
-    try {
-      const client = await MongoClient.connect(env.db.mongoURL);
-      this.db = client.db();
-      this.log.info('✅ Analytics MongoDB initialized');
-    } catch (error) {
-      this.log.error('❌ Failed to initialize Analytics MongoDB:', error);
-      throw error;
-    }
+  private async listRows(): Promise<TestHistory[]> {
+    const rows = await loadTableRows(EXTRA_TABLES.testHistory);
+    return rows.map(row => {
+      const data = row.data as TestHistory;
+      return {
+        ...data,
+        _id: row.id,
+        createdAt: new Date(data.createdAt || row.createdAt),
+        completedAt: new Date(data.completedAt || data.createdAt || row.createdAt)
+      };
+    });
   }
 
   /**
    * Save test result to history
    */
   async saveTestResult(testData: Partial<TestHistory>): Promise<TestHistory> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
     const testHistory = TestHistoryModel.create(testData);
+    testHistory._id = generateMongoStyleId();
 
-    const result = await collection.insertOne(testHistory as any);
-    testHistory._id = result.insertedId.toString();
+    await upsertRow(EXTRA_TABLES.testHistory, testHistory._id, {
+      ...testHistory,
+      createdAt: new Date(testHistory.createdAt).toISOString(),
+      completedAt: new Date(testHistory.completedAt).toISOString()
+    });
 
-    this.log.info(`📊 Test result saved: ${testHistory._id} - Band ${testHistory.overallBand}`);
+    this.log.info(`Test result saved: ${testHistory._id} - Band ${testHistory.overallBand}`);
     return testHistory;
   }
 
@@ -105,27 +106,20 @@ export class AnalyticsService {
       includeTests?: number;
     }
   ): Promise<ProgressStats> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    let tests = (await this.listRows()).filter(test => test.userId === userId);
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-
-    // Query parameters
-    const query: any = { userId };
     if (options?.daysBack) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - options.daysBack);
-      query.createdAt = { $gte: cutoffDate };
+      tests = tests.filter(test => test.createdAt >= cutoffDate);
     }
 
-    const tests = await collection.find(query).sort({ createdAt: -1 }).toArray();
+    tests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     if (tests.length === 0) {
       return this.getEmptyStats();
     }
 
-    // Calculate statistics
     const practiceTests = tests.filter(t => t.testType === TestType.PRACTICE);
     const simulationTests = tests.filter(t => t.testType === TestType.SIMULATION);
 
@@ -134,19 +128,10 @@ export class AnalyticsService {
     const highestBand = Math.max(...bands);
     const lowestBand = Math.min(...bands);
 
-    // Calculate band trend
     const bandTrend = this.calculateBandTrend(tests);
-
-    // Calculate criteria averages
     const criteriaAverages = this.calculateCriteriaAverages(tests);
-
-    // Identify strengths and weaknesses
     const { strengths, weaknesses } = this.identifyStrengthsWeaknesses(criteriaAverages);
-
-    // Recent tests
     const recentTests = tests.slice(0, options?.includeTests || 10);
-
-    // Monthly progress
     const monthlyProgress = this.calculateMonthlyProgress(tests);
 
     return {
@@ -165,56 +150,33 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Get band distribution
-   */
   async getBandDistribution(userId: string): Promise<BandDistribution[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const tests = await collection.find({ userId }).toArray();
-
+    const tests = (await this.listRows()).filter(test => test.userId === userId);
     if (tests.length === 0) {
       return [];
     }
 
-    // Group by band (rounded to 0.5)
     const bandCounts = new Map<number, number>();
     tests.forEach(test => {
       const roundedBand = Math.round(test.overallBand * 2) / 2;
       bandCounts.set(roundedBand, (bandCounts.get(roundedBand) || 0) + 1);
     });
 
-    // Convert to array and calculate percentages
-    const distribution: BandDistribution[] = Array.from(bandCounts.entries())
+    return Array.from(bandCounts.entries())
       .map(([band, count]) => ({
         band,
         count,
         percentage: Math.round((count / tests.length) * 100)
       }))
       .sort((a, b) => b.band - a.band);
-
-    return distribution;
   }
 
-  /**
-   * Get performance by topic
-   */
   async getTopicPerformance(userId: string, limit: number = 10): Promise<TopicPerformance[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const tests = await collection.find({ userId }).toArray();
-
+    const tests = (await this.listRows()).filter(test => test.userId === userId);
     if (tests.length === 0) {
       return [];
     }
 
-    // Group by topic
     const topicStats = new Map<string, { bands: number[]; dates: Date[] }>();
     tests.forEach(test => {
       if (!test.topic) return;
@@ -228,8 +190,7 @@ export class AnalyticsService {
       stats.dates.push(test.createdAt);
     });
 
-    // Calculate averages and sort by test count
-    const performance: TopicPerformance[] = Array.from(topicStats.entries())
+    return Array.from(topicStats.entries())
       .map(([topic, stats]) => ({
         topic,
         testCount: stats.bands.length,
@@ -238,32 +199,19 @@ export class AnalyticsService {
       }))
       .sort((a, b) => b.testCount - a.testCount)
       .slice(0, limit);
-
-    return performance;
   }
 
-  /**
-   * Compare criteria performance (current vs previous period)
-   */
   async compareCriteriaPerformance(userId: string, daysBack: number = 30): Promise<CriteriaComparison[]> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    const tests = (await this.listRows()).filter(test => test.userId === userId);
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-
-    const currentDate = new Date();
     const midpoint = new Date();
     midpoint.setDate(midpoint.getDate() - daysBack / 2);
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Get current period tests
-    const currentTests = await collection.find({ userId, createdAt: { $gte: midpoint } }).toArray();
-
-    // Get previous period tests
-    const previousTests = await collection.find({ userId, createdAt: { $gte: startDate, $lt: midpoint } }).toArray();
+    const currentTests = tests.filter(test => test.createdAt >= midpoint);
+    const previousTests = tests.filter(test => test.createdAt >= startDate && test.createdAt < midpoint);
 
     if (currentTests.length === 0 || previousTests.length === 0) {
       return [];
@@ -272,7 +220,7 @@ export class AnalyticsService {
     const currentAvg = this.calculateCriteriaAverages(currentTests);
     const previousAvg = this.calculateCriteriaAverages(previousTests);
 
-    const comparisons: CriteriaComparison[] = [
+    return [
       {
         criterion: 'Fluency & Coherence',
         currentAverage: currentAvg.fluencyCoherence,
@@ -302,13 +250,8 @@ export class AnalyticsService {
         trend: this.getTrend(currentAvg.pronunciation, previousAvg.pronunciation)
       }
     ];
-
-    return comparisons;
   }
 
-  /**
-   * Get test history with pagination
-   */
   async getTestHistory(
     userId: string,
     options?: {
@@ -317,63 +260,37 @@ export class AnalyticsService {
       testType?: TestType;
     }
   ): Promise<{ tests: TestHistory[]; total: number }> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
+    let tests = (await this.listRows()).filter(test => test.userId === userId);
 
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-
-    const query: any = { userId };
     if (options?.testType) {
-      query.testType = options.testType;
+      tests = tests.filter(test => test.testType === options.testType);
     }
 
-    const total = await collection.countDocuments(query);
-    const tests = await collection
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(options?.skip || 0)
-      .limit(options?.limit || 20)
-      .toArray();
+    tests.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    return { tests: tests as TestHistory[], total };
+    const total = tests.length;
+    const skip = options?.skip || 0;
+    const limit = options?.limit || 20;
+
+    return {
+      tests: tests.slice(skip, skip + limit),
+      total
+    };
   }
 
-  /**
-   * Get single test details
-   */
   async getTestDetails(testId: string): Promise<TestHistory | null> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    const test = await collection.findOne({ _id: new ObjectId(testId) as any });
-
-    return test as TestHistory | null;
+    const tests = await this.listRows();
+    return tests.find(test => test._id === testId) || null;
   }
 
-  /**
-   * Delete test from history
-   */
   async deleteTest(testId: string): Promise<void> {
-    if (!this.db) {
-      await this.initializeMongoDB();
-    }
-
-    const collection = this.db.collection<TestHistory>(TestHistoryModel.collectionName);
-    await collection.deleteOne({ _id: new ObjectId(testId) as any });
-
-    this.log.info(`🗑️  Deleted test: ${testId}`);
+    await deleteRowsByIds(EXTRA_TABLES.testHistory, [testId]);
+    this.log.info(`Deleted test: ${testId}`);
   }
 
-  /**
-   * Helper: Calculate band trend
-   */
   private calculateBandTrend(tests: TestHistory[]): 'improving' | 'declining' | 'stable' {
     if (tests.length < 5) return 'stable';
 
-    // Compare average of recent 5 vs previous 5
     const recent = tests.slice(0, 5).map(t => t.overallBand);
     const previous = tests.slice(5, 10).map(t => t.overallBand);
 
@@ -389,9 +306,6 @@ export class AnalyticsService {
     return 'stable';
   }
 
-  /**
-   * Helper: Calculate criteria averages
-   */
   private calculateCriteriaAverages(tests: TestHistory[]): ProgressStats['criteriaAverages'] {
     const sums = {
       fluencyCoherence: 0,
@@ -416,9 +330,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Helper: Identify strengths and weaknesses
-   */
   private identifyStrengthsWeaknesses(averages: ProgressStats['criteriaAverages']): {
     strengths: string[];
     weaknesses: string[];
@@ -438,14 +349,11 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Helper: Calculate monthly progress
-   */
   private calculateMonthlyProgress(tests: TestHistory[]): MonthlyProgress[] {
     const monthlyData = new Map<string, { bands: number[]; practice: number; simulation: number }>();
 
     tests.forEach(test => {
-      const month = test.createdAt.toISOString().substring(0, 7); // 'YYYY-MM'
+      const month = test.createdAt.toISOString().substring(0, 7);
 
       if (!monthlyData.has(month)) {
         monthlyData.set(month, { bands: [], practice: 0, simulation: 0 });
@@ -455,13 +363,13 @@ export class AnalyticsService {
       data.bands.push(test.overallBand);
 
       if (test.testType === TestType.PRACTICE) {
-        data.practice++;
+        data.practice += 1;
       } else {
-        data.simulation++;
+        data.simulation += 1;
       }
     });
 
-    const progress: MonthlyProgress[] = Array.from(monthlyData.entries())
+    return Array.from(monthlyData.entries())
       .map(([month, data]) => ({
         month,
         testCount: data.bands.length,
@@ -470,13 +378,8 @@ export class AnalyticsService {
         simulationCount: data.simulation
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
-
-    return progress;
   }
 
-  /**
-   * Helper: Get trend direction
-   */
   private getTrend(current: number, previous: number): 'up' | 'down' | 'stable' {
     const diff = current - previous;
     if (diff > 0.2) return 'up';
@@ -484,9 +387,6 @@ export class AnalyticsService {
     return 'stable';
   }
 
-  /**
-   * Helper: Get empty stats structure
-   */
   private getEmptyStats(): ProgressStats {
     return {
       totalTests: 0,

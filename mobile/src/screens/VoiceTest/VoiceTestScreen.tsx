@@ -1,4 +1,8 @@
-import React, { useEffect, useState } from "react";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -7,12 +11,9 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  checkUsageLimit,
-  getSubscriptionPlans,
-  SubscriptionPlan,
-  upgradeSubscription,
-} from "../../api/subscriptionApi";
+
+import { subscriptionApi } from "../../api/services";
+import { useAuth } from "../../auth/AuthContext";
 import { GeneratedTopic, getCachedRandomTopic } from "../../api/topicApi";
 import { AuthenticFullTest } from "../../components/AuthenticFullTest";
 import { AuthenticFullTestV2 } from "../../components/AuthenticFullTestV2";
@@ -21,17 +22,34 @@ import { Card } from "../../components/Card";
 import { PartSelectionModal } from "../../components/PartSelectionModal";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SimulationMode } from "../../components/SimulationMode";
-import { SubscriptionPlansModal } from "../../components/SubscriptionPlansModal";
+import {
+  SubscriptionPlanOption,
+  SubscriptionPlansModal,
+} from "../../components/SubscriptionPlansModal";
 import { UsageLimitModal } from "../../components/UsageLimitModal";
 import { VoiceConversation } from "../../components/VoiceConversationV2";
+import { useTheme } from "../../context";
+import { useThemedStyles, useUsageGuard } from "../../hooks";
+import { DEFAULT_SUBSCRIPTION_PLANS } from "../../constants/subscriptionPlans";
+import { AppTabParamList } from "../../navigation/AppNavigator";
 import { resultsStorage } from "../../services/resultsStorage";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { EvaluationResultsScreen } from "../EvaluationResults/EvaluationResultsScreen";
 
-// For demo purposes - in production, get this from auth context
-const DEMO_USER_ID = "demo-user-123";
+type VoiceTestScreenRouteProp = RouteProp<AppTabParamList, "VoiceTest">;
+type VoiceTestNavigationProp = BottomTabNavigationProp<
+  AppTabParamList,
+  "VoiceTest"
+>;
 
 export const VoiceTestScreen: React.FC = () => {
+  const navigation = useNavigation<VoiceTestNavigationProp>();
+  const route = useRoute<VoiceTestScreenRouteProp>();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [showVoiceUI, setShowVoiceUI] = useState(false);
   const [showPartSelection, setShowPartSelection] = useState(false);
   const [selectedPart, setSelectedPart] = useState<1 | 2 | 3>(1);
@@ -47,47 +65,107 @@ export const VoiceTestScreen: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number>(0);
 
-  // Subscription state
-  const [currentTier, setCurrentTier] = useState<string>("free");
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [showPlansModal, setShowPlansModal] = useState(false);
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [limitInfo, setLimitInfo] = useState<any>(null);
+  const autoStartHandled = useRef(false);
 
-  // Load subscription plans on mount
-  useEffect(() => {
-    loadPlans();
-  }, []);
+  const {
+    ensureCanStart,
+    limitState,
+    dismissLimit,
+    refreshUsage,
+    subscriptionInfo,
+  } = useUsageGuard();
 
-  const loadPlans = async () => {
-    try {
-      const subscriptionPlans = await getSubscriptionPlans();
-      setPlans(subscriptionPlans);
-    } catch (error) {
-      console.error("Failed to load plans:", error);
+  const subscriptionConfigQuery = useQuery({
+    queryKey: ["subscription-config"],
+    queryFn: subscriptionApi.config,
+  });
+
+  const planOptions = useMemo<SubscriptionPlanOption[]>(() => {
+    const configPlans = subscriptionConfigQuery.data?.plans;
+    if (configPlans?.length) {
+      return configPlans.map((plan) => ({
+        tier: plan.tier,
+        name: plan.name,
+        price: plan.price,
+        currency: plan.currency,
+        description: plan.description,
+        features: plan.features,
+        limits: plan.limits,
+      }));
     }
+    return DEFAULT_SUBSCRIPTION_PLANS;
+  }, [subscriptionConfigQuery.data]);
+
+  const currentPlanTier = subscriptionInfo?.planType ?? "free";
+
+  // Handle retry from results screen
+  useEffect(() => {
+    const params = route.params as any;
+    if (params?.retryData) {
+      const { part, topic, question } = params.retryData;
+
+      // Create a topic object for retry
+      const retryTopic: GeneratedTopic = {
+        question: question,
+        category: `part${part}` as "part1" | "part2" | "part3",
+        difficulty: "medium",
+        keywords: [topic],
+        cueCard:
+          part === 2
+            ? {
+                mainTopic: topic,
+                bulletPoints: [],
+                timeToSpeak: 120,
+                preparationTime: 60,
+              }
+            : undefined,
+      };
+
+      setCurrentTopic(retryTopic);
+      setSelectedPart(part);
+      setMode("practice");
+      setShowVoiceUI(true);
+
+      // Clear the params after handling
+      // Note: In a real app, you might want to use navigation.setParams({})
+    }
+  }, [route.params]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const modeParam = route.params?.autoStartMode;
+    if (!modeParam || autoStartHandled.current) {
+      return;
+    }
+    autoStartHandled.current = true;
+    navigation.setParams({ autoStartMode: undefined } as any);
+
+    if (modeParam === "fulltest") {
+      void startFullTest();
+    } else if (modeParam === "fulltest-v2") {
+      setMode("fulltest-v2");
+      setShowVoiceUI(true);
+    } else if (modeParam === "practice") {
+      void startPractice();
+    } else if (modeParam === "simulation") {
+      void startSimulation();
+    }
+  }, [navigation, route.params?.autoStartMode]);
+
+  const requireAuthenticatedUser = () => {
+    if (!user?._id) {
+      Alert.alert("Please sign in", "You need an account to start a session.");
+      return false;
+    }
+    return true;
   };
 
-  const startPractice = async () => {
-    try {
-      // Check usage limit first
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "practice");
-
-      if (!limitCheck.allowed) {
-        // Show limit modal
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
-
-      // Show part selection modal
-      setShowPartSelection(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start practice. Please try again.", [
-        { text: "OK" },
-      ]);
+  const startPractice = () => {
+    if (!requireAuthenticatedUser() || !ensureCanStart("practice")) {
+      return;
     }
+    setShowPartSelection(true);
   };
 
   const handlePartSelected = async (part: 1 | 2 | 3) => {
@@ -129,69 +207,35 @@ export const VoiceTestScreen: React.FC = () => {
     }
   };
 
-  const startSimulation = async () => {
-    try {
-      // Check usage limit first
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "simulation");
-
-      if (!limitCheck.allowed) {
-        // Show limit modal
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
-
-      setMode("simulation");
-
-      // Start session tracking
-      const newSessionId = `session_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      setSessionId(newSessionId);
-      setSessionStartTime(Date.now());
-
-      setShowVoiceUI(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start simulation. Please try again.", [
-        { text: "OK" },
-      ]);
+  const startSimulation = () => {
+    if (!requireAuthenticatedUser() || !ensureCanStart("simulation")) {
+      return;
     }
+    setMode("simulation");
+    const newSessionId = `session_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    setSessionId(newSessionId);
+    setSessionStartTime(Date.now());
+    setShowVoiceUI(true);
   };
 
-  const startFullTest = async () => {
-    try {
-      // Full test uses simulation quota
-      const limitCheck = await checkUsageLimit(DEMO_USER_ID, "simulation");
-
-      if (!limitCheck.allowed) {
-        setLimitInfo(limitCheck);
-        setShowLimitModal(true);
-        return;
-      }
-
-      setMode("fulltest");
-
-      // Start session tracking
-      const newSessionId = `fulltest_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      setSessionId(newSessionId);
-      setSessionStartTime(Date.now());
-
-      setShowVoiceUI(true);
-    } catch (error: any) {
-      console.error("Failed to check limit:", error);
-      Alert.alert("Error", "Failed to start full test. Please try again.", [
-        { text: "OK" },
-      ]);
+  const startFullTest = () => {
+    if (!requireAuthenticatedUser() || !ensureCanStart("simulation")) {
+      return;
     }
+    setMode("fulltest");
+    const newSessionId = `fulltest_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    setSessionId(newSessionId);
+    setSessionStartTime(Date.now());
+    setShowVoiceUI(true);
   };
 
   const handleSessionEnd = async () => {
     setShowVoiceUI(false);
-    // Note: Usage logging is handled by the backend automatically
-    // through practice session completion endpoints
+    await refreshUsage();
   };
 
   const handleEvaluationComplete = async (data: {
@@ -479,6 +523,9 @@ export const VoiceTestScreen: React.FC = () => {
       };
 
       await resultsStorage.savePracticeResult(result);
+      queryClient
+        .invalidateQueries({ queryKey: ["local-results"] })
+        .catch(() => undefined);
       console.log("✅ Result saved to storage:", result.id);
 
       // Store evaluation data for immediate display
@@ -504,21 +551,43 @@ export const VoiceTestScreen: React.FC = () => {
     }
   };
 
-  const handleSelectPlan = async (tier: "free" | "premium" | "pro") => {
+  const handleSelectPlan = async (
+    plan: SubscriptionPlanOption,
+    options?: { couponCode?: string }
+  ) => {
+    if (!requireAuthenticatedUser()) {
+      return;
+    }
+
+    if (plan.tier === "free") {
+      Alert.alert(
+        "Plan already active",
+        "You are already on the Free plan. Manage downgrades from Settings."
+      );
+      return;
+    }
+
     try {
-      await upgradeSubscription(DEMO_USER_ID, tier);
-      setCurrentTier(tier);
+      const response = await subscriptionApi.checkout({
+        planType: plan.tier,
+        couponCode: options?.couponCode,
+      });
       setShowPlansModal(false);
 
-      Alert.alert(
-        "Success!",
-        `You've been upgraded to ${tier}. Enjoy unlimited access!`,
-        [{ text: "OK" }]
-      );
+      if (response.checkoutUrl) {
+        await WebBrowser.openBrowserAsync(response.checkoutUrl);
+      } else {
+        Alert.alert(
+          "Checkout created",
+          "Complete your upgrade from the web dashboard."
+        );
+      }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to upgrade subscription", [
-        { text: "OK" },
-      ]);
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to start checkout.";
+      Alert.alert("Unable to start checkout", message);
     }
   };
 
@@ -557,46 +626,6 @@ export const VoiceTestScreen: React.FC = () => {
         </Card>
 
         <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Full Test Simulation</Text>
-          <Text style={styles.cardDescription}>
-            Real-time conversation with AI examiner. Complete all 3 parts of
-            IELTS Speaking Test.
-          </Text>
-          <Button
-            title="Start Full Simulation"
-            onPress={startSimulation}
-            variant="secondary"
-            style={styles.button}
-            disabled={showVoiceUI || isLoadingTopic}
-          />
-          {(showVoiceUI || isLoadingTopic) && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
-        </Card>
-
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>🎯 Authentic Full Test (NEW)</Text>
-          <Text style={styles.cardDescription}>
-            Experience the REAL IELTS Speaking Test! No buttons, automatic flow,
-            just like the actual exam. All 3 parts with strict timing.
-          </Text>
-          <Button
-            title="Start Authentic Test"
-            onPress={startFullTest}
-            variant="primary"
-            style={styles.button}
-            disabled={showVoiceUI || isLoadingTopic}
-          />
-          {(showVoiceUI || isLoadingTopic) && (
-            <Text style={styles.disabledText}>
-              Complete your current session first
-            </Text>
-          )}
-        </Card>
-
-        <Card style={styles.card}>
           <Text style={styles.cardTitle}>🎤 Simple Mic Test (V2)</Text>
           <Text style={styles.cardDescription}>
             NEW APPROACH: Simple mic button control. Press mic → Speak → Press
@@ -619,17 +648,6 @@ export const VoiceTestScreen: React.FC = () => {
             </Text>
           )}
         </Card>
-
-        <View style={styles.features}>
-          <Text style={styles.featuresTitle}>✨ New Features:</Text>
-          <Text style={styles.feature}>
-            • Animated voice orb (like ChatGPT)
-          </Text>
-          <Text style={styles.feature}>• Real-time audio recording</Text>
-          <Text style={styles.feature}>• Premium dark UI design</Text>
-          <Text style={styles.feature}>• Smooth animations</Text>
-          <Text style={styles.feature}>• Mute/unmute controls</Text>
-        </View>
       </View>
 
       <Modal
@@ -656,8 +674,73 @@ export const VoiceTestScreen: React.FC = () => {
         onRequestClose={handleSessionEnd}
       >
         <AuthenticFullTest
-          onComplete={(results) => {
+          onComplete={async (results) => {
             console.log("Full test complete:", results);
+            try {
+              const legacyQuestions: Array<{
+                questionId?: string;
+                question: string;
+                category: string;
+                difficulty?: string;
+                topic?: string;
+              }> = [];
+
+              if (Array.isArray(results?.part1?.questions)) {
+                legacyQuestions.push(
+                  ...results.part1.questions.map((q: any) => ({
+                    questionId: q?.questionId,
+                    question: typeof q?.question === "string" ? q.question : "",
+                    category: q?.category || "part1",
+                    difficulty: q?.difficulty,
+                    topic: Array.isArray(q?.keywords)
+                      ? q.keywords[0]
+                      : undefined,
+                  }))
+                );
+              }
+
+              if (results?.part2?.topic) {
+                const topic = results.part2.topic;
+                legacyQuestions.push({
+                  questionId: topic.questionId,
+                  question:
+                    typeof topic.question === "string" ? topic.question : "",
+                  category: "part2",
+                  difficulty: topic.difficulty,
+                  topic:
+                    topic.cueCard?.mainTopic ||
+                    (typeof topic.question === "string"
+                      ? topic.question
+                      : undefined),
+                });
+              }
+
+              if (Array.isArray(results?.part3?.questions)) {
+                legacyQuestions.push(
+                  ...results.part3.questions.map((q: any) => ({
+                    questionId: q?.questionId,
+                    question: typeof q?.question === "string" ? q.question : "",
+                    category: q?.category || "part3",
+                    difficulty: q?.difficulty,
+                    topic: Array.isArray(q?.keywords)
+                      ? q.keywords[0]
+                      : undefined,
+                  }))
+                );
+              }
+
+              await resultsStorage.saveFullTestResult({
+                timestamp: Date.now(),
+                durationSeconds: Number(results?.totalDuration) || 0,
+                questions: legacyQuestions,
+                source: "fulltest-legacy",
+              });
+              queryClient
+                .invalidateQueries({ queryKey: ["full-test-results"] })
+                .catch(() => undefined);
+            } catch (error) {
+              console.error("Failed to store legacy full test result", error);
+            }
             handleSessionEnd();
             // TODO: Show results screen
             Alert.alert(
@@ -678,14 +761,112 @@ export const VoiceTestScreen: React.FC = () => {
         onRequestClose={handleSessionEnd}
       >
         <AuthenticFullTestV2
-          onComplete={(results) => {
+          onComplete={async (results) => {
             console.log("Full test V2 complete:", results);
+            const evaluation = results?.evaluation;
+
+            if (evaluation) {
+              const suggestionStrings = Array.isArray(evaluation.suggestions)
+                ? evaluation.suggestions
+                    .map((item: any) => {
+                      if (!item) {
+                        return null;
+                      }
+                      if (typeof item === "string") {
+                        return item;
+                      }
+                      if (typeof item.suggestion === "string") {
+                        const base = item.suggestion.trim();
+                        if (!base) {
+                          return null;
+                        }
+                        return item.category
+                          ? `${item.category}: ${base}`
+                          : base;
+                      }
+                      return null;
+                    })
+                    .filter(
+                      (value: unknown): value is string =>
+                        typeof value === "string" && value.trim().length > 0
+                    )
+                : [];
+
+              try {
+                await resultsStorage.saveFullTestResult({
+                  id: results?.testSessionId,
+                  timestamp: Date.parse(results?.timestamp || "") || Date.now(),
+                  durationSeconds: Number(results?.duration) || 0,
+                  overallBand:
+                    Number(results?.overallBand) ||
+                    Number(evaluation.overallBand) ||
+                    undefined,
+                  partScores: results?.partScores || evaluation.partScores,
+                  spokenSummary:
+                    results?.spokenSummary ?? evaluation.spokenSummary,
+                  fullTranscript: results?.fullTranscript,
+                  evaluation,
+                  questions: Array.isArray(results?.questions)
+                    ? results.questions
+                    : undefined,
+                  source: "fulltest-v2",
+                  testSessionId: results?.testSessionId,
+                });
+                queryClient
+                  .invalidateQueries({ queryKey: ["full-test-results"] })
+                  .catch(() => undefined);
+              } catch (error) {
+                console.error("Failed to store full test v2 result", error);
+              }
+
+              setEvaluationData({
+                overallBand: results?.overallBand ?? evaluation.overallBand,
+                criteria: evaluation.criteria,
+                corrections: Array.isArray(evaluation.corrections)
+                  ? evaluation.corrections
+                  : [],
+                suggestions: suggestionStrings,
+                bandComparison: (evaluation as any).bandComparison,
+                testPart: "full",
+                durationSeconds: results?.duration,
+                sessionId: results?.testSessionId,
+                topic: "Full IELTS Speaking Test",
+                partScores: results?.partScores,
+                spokenSummary:
+                  results?.spokenSummary ?? evaluation.spokenSummary,
+                fullTranscript: results?.fullTranscript,
+              });
+              setShowEvaluation(true);
+            } else {
+              try {
+                await resultsStorage.saveFullTestResult({
+                  id: results?.testSessionId,
+                  timestamp: Date.parse(results?.timestamp || "") || Date.now(),
+                  durationSeconds: Number(results?.duration) || 0,
+                  questions: Array.isArray(results?.questions)
+                    ? results.questions
+                    : undefined,
+                  source: "fulltest-v2",
+                  testSessionId: results?.testSessionId,
+                });
+                queryClient
+                  .invalidateQueries({ queryKey: ["full-test-results"] })
+                  .catch(() => undefined);
+              } catch (error) {
+                console.error(
+                  "Failed to store fallback full test result",
+                  error
+                );
+              }
+
+              Alert.alert(
+                "Test Complete!",
+                "Your IELTS test has been completed. We'll process the evaluation shortly.",
+                [{ text: "OK" }]
+              );
+            }
+
             handleSessionEnd();
-            Alert.alert(
-              "Test Complete!",
-              "Your IELTS test has been completed. Well done!",
-              [{ text: "OK" }]
-            );
           }}
           onExit={handleSessionEnd}
         />
@@ -741,17 +922,19 @@ export const VoiceTestScreen: React.FC = () => {
               setShowVoiceUI(true);
             }}
             // Analytics data
-            userId={DEMO_USER_ID}
-            sessionId={sessionId || undefined}
+            userId={user?._id}
+            sessionId={evaluationData.sessionId || sessionId || undefined}
             testType={
               mode === "fulltest" || mode === "fulltest-v2"
                 ? "simulation"
                 : mode
             }
-            topic={currentTopic?.question || undefined}
+            topic={evaluationData.topic || currentTopic?.question || undefined}
             testPart={evaluationData.testPart}
             durationSeconds={
-              sessionStartTime
+              evaluationData.durationSeconds !== undefined
+                ? evaluationData.durationSeconds
+                : sessionStartTime
                 ? Math.floor((Date.now() - sessionStartTime) / 1000)
                 : undefined
             }
@@ -762,26 +945,24 @@ export const VoiceTestScreen: React.FC = () => {
       {/* Subscription Plans Modal */}
       <SubscriptionPlansModal
         visible={showPlansModal}
-        plans={plans}
-        currentTier={currentTier}
+        plans={planOptions}
+        currentTier={currentPlanTier}
+        loading={subscriptionConfigQuery.isLoading}
         onClose={() => setShowPlansModal(false)}
         onSelectPlan={handleSelectPlan}
       />
 
-      {/* Usage Limit Modal */}
-      {limitInfo && (
+      {limitState && (
         <UsageLimitModal
-          visible={showLimitModal}
-          sessionType={
-            mode === "fulltest" || mode === "fulltest-v2" ? "simulation" : mode
-          }
-          currentTier={limitInfo.tier}
-          used={limitInfo.used}
-          limit={limitInfo.limit}
-          resetDate={new Date(limitInfo.resetDate)}
-          onClose={() => setShowLimitModal(false)}
+          visible
+          sessionType={limitState.sessionType}
+          currentTier={limitState.currentTier}
+          used={limitState.used}
+          limit={limitState.limit}
+          resetDate={limitState.resetDate}
+          onClose={dismissLimit}
           onUpgrade={() => {
-            setShowLimitModal(false);
+            dismissLimit();
             setShowPlansModal(true);
           }}
         />
@@ -790,7 +971,8 @@ export const VoiceTestScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     padding: spacing.lg,
@@ -824,24 +1006,6 @@ const styles = StyleSheet.create({
   button: {
     marginTop: spacing.sm,
   },
-  features: {
-    marginTop: spacing.xl,
-    padding: spacing.md,
-    backgroundColor: colors.backgroundMuted,
-    borderRadius: 12,
-  },
-  featuresTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  feature: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    lineHeight: 20,
-  },
   loadingContainer: {
     paddingVertical: spacing.md,
     alignItems: "center",
@@ -858,4 +1022,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontStyle: "italic",
   },
-});
+  });

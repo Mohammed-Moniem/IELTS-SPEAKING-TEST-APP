@@ -1,4 +1,4 @@
-import { HydratedDocument, Schema, Types, model } from 'mongoose';
+import { HydratedDocument, Schema, Types, model } from '@lib/db/mongooseCompat';
 
 export interface IUsageRecord {
   user: Types.ObjectId;

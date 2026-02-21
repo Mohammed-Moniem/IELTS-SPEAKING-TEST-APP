@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { HydratedDocument, Schema, model } from 'mongoose';
+import { HydratedDocument, Schema, model } from '@lib/db/mongooseCompat';
 
 export type SubscriptionPlan = 'free' | 'premium' | 'pro';
 
@@ -96,7 +96,7 @@ UserSchema.pre('save', async function (this: UserDocument, next) {
 });
 
 UserSchema.methods.comparePassword = async function (candidate: string) {
-  return bcrypt.compare(candidate, this.password);
+  return bcrypt.compare(candidate, (this as any).password as string);
 };
 
 export const UserModel = model<IUser>('User', UserSchema);

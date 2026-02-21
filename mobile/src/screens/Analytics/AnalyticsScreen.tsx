@@ -9,31 +9,85 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import { getBandDistribution, getProgressStats } from "../../api/analyticsApi";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
-import { colors, spacing } from "../../theme/tokens";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 
-const DEMO_USER_ID = "677bf5d97c1a5481e0f98abc";
 const { width: screenWidth } = Dimensions.get("window");
 
 type TimePeriod = "7" | "30" | "90" | "all";
 
 export const AnalyticsScreen = () => {
+  const { user, initializing: authInitializing } = useAuth();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("30");
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const userId = user?._id ?? null;
+  const renderCriteriaBar = (label: string, score: number) => {
+    const percentage = (score / 9) * 100;
+    return (
+      <View key={label} style={styles.criteriaRow}>
+        <Text style={styles.criteriaLabel}>{label}</Text>
+        <View style={styles.criteriaBarContainer}>
+          <View
+            style={[
+              styles.criteriaBarFill,
+              {
+                width: `${percentage}%`,
+                backgroundColor: getBandColor(score),
+              },
+            ]}
+          />
+        </View>
+        <Text style={styles.criteriaScore}>{score.toFixed(1)}</Text>
+      </View>
+    );
+  };
 
   const daysBack = timePeriod === "all" ? undefined : parseInt(timePeriod, 10);
 
   const progressQuery = useQuery({
-    queryKey: ["progress-stats", daysBack],
-    queryFn: () => getProgressStats(DEMO_USER_ID, { daysBack }),
+    queryKey: ["progress-stats", userId, daysBack],
+    queryFn: () => getProgressStats(userId!, { daysBack }),
+    enabled: Boolean(userId),
   });
 
   const bandDistQuery = useQuery({
-    queryKey: ["band-distribution", DEMO_USER_ID],
-    queryFn: () => getBandDistribution(DEMO_USER_ID),
+    queryKey: ["band-distribution", userId],
+    queryFn: () => getBandDistribution(userId!),
+    enabled: Boolean(userId),
   });
+
+  if (authInitializing) {
+    return (
+      <ScreenContainer>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading analytics...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <ScreenContainer>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="lock-closed-outline" size={64} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>Sign in to view analytics</Text>
+          <Text style={styles.emptyText}>
+            Log in to sync your IELTS progress and unlock insights
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   if (progressQuery.isLoading) {
     return (
@@ -175,22 +229,22 @@ export const AnalyticsScreen = () => {
       {/* Criteria Performance */}
       <SectionHeading title="Performance by Criteria" />
       <Card>
-        <CriteriaBar
-          label="Fluency & Coherence"
-          score={stats.criteriaAverages.fluencyCoherence}
-        />
-        <CriteriaBar
-          label="Lexical Resource"
-          score={stats.criteriaAverages.lexicalResource}
-        />
-        <CriteriaBar
-          label="Grammatical Range"
-          score={stats.criteriaAverages.grammaticalRange}
-        />
-        <CriteriaBar
-          label="Pronunciation"
-          score={stats.criteriaAverages.pronunciation}
-        />
+        {renderCriteriaBar(
+          "Fluency & Coherence",
+          stats.criteriaAverages.fluencyCoherence
+        )}
+        {renderCriteriaBar(
+          "Lexical Resource",
+          stats.criteriaAverages.lexicalResource
+        )}
+        {renderCriteriaBar(
+          "Grammatical Range",
+          stats.criteriaAverages.grammaticalRange
+        )}
+        {renderCriteriaBar(
+          "Pronunciation",
+          stats.criteriaAverages.pronunciation
+        )}
       </Card>
 
       {/* Monthly Progress */}
@@ -308,27 +362,6 @@ export const AnalyticsScreen = () => {
   );
 };
 
-const CriteriaBar = ({ label, score }: { label: string; score: number }) => {
-  const percentage = (score / 9) * 100;
-  return (
-    <View style={styles.criteriaRow}>
-      <Text style={styles.criteriaLabel}>{label}</Text>
-      <View style={styles.criteriaBarContainer}>
-        <View
-          style={[
-            styles.criteriaBarFill,
-            {
-              width: `${percentage}%`,
-              backgroundColor: getBandColor(score),
-            },
-          ]}
-        />
-      </View>
-      <Text style={styles.criteriaScore}>{score.toFixed(1)}</Text>
-    </View>
-  );
-};
-
 const getBandColor = (band: number): string => {
   if (band >= 8) return "#10B981"; // Green
   if (band >= 7) return "#3B82F6"; // Blue
@@ -340,7 +373,8 @@ const getBandColor = (band: number): string => {
 const capitalizeFirst = (str: string): string =>
   str.charAt(0).toUpperCase() + str.slice(1);
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -582,4 +616,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textMuted,
   },
-});
+  });

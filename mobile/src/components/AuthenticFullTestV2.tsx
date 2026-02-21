@@ -12,7 +12,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { GeneratedTopic, getCachedRandomTopic, topicCache } from "../api/topicApi";
+import { evaluateFullTest, transcribeAudio } from "../api/speechApi";
+import {
+  GeneratedTopic,
+  getCachedRandomTopic,
+  topicCache,
+} from "../api/topicApi";
 import { ttsService } from "../services/textToSpeechService";
 import { colors, spacing } from "../theme/tokens";
 
@@ -45,6 +50,35 @@ interface TestProps {
   onExit: () => void;
 }
 
+type ResponseRecord = {
+  partNumber: 1 | 2 | 3;
+  questionIndex: number;
+  questionId?: string;
+  question: string;
+  category: "part1" | "part2" | "part3";
+  difficulty?: "easy" | "medium" | "hard";
+  topic?: string;
+  recordingUri: string;
+  transcript?: string;
+  durationSeconds?: number;
+};
+
+type QuestionPayload = {
+  questionId?: string;
+  question: string;
+  category: "part1" | "part2" | "part3";
+  difficulty?: "easy" | "medium" | "hard";
+  topic?: string;
+};
+
+type RecordingPayload = {
+  partNumber: 1 | 2 | 3;
+  questionIndex: number;
+  transcript: string;
+  durationSeconds: number;
+  recordingUri?: string;
+};
+
 export const AuthenticFullTestV2: React.FC<TestProps> = ({
   onComplete,
   onExit,
@@ -53,6 +87,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   const [phase, setPhase] = useState<TestPhase>("loading");
   const [isRecording, setIsRecording] = useState(false);
   const [isExaminerSpeaking, setIsExaminerSpeaking] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Questions
   const [part1Questions, setPart1Questions] = useState<GeneratedTopic[]>([]);
@@ -60,18 +95,287 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   const [part3Questions, setPart3Questions] = useState<GeneratedTopic[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [questionsReady, setQuestionsReady] = useState(false);
+  const [welcomePrompt, setWelcomePrompt] = useState<string | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   // Recordings
   const recording = useRef<Audio.Recording | null>(null);
   const part1Answers = useRef<string[]>([]);
   const part2Answer = useRef<string | null>(null);
   const part3Answers = useRef<string[]>([]);
+  const responsesRef = useRef<ResponseRecord[]>([]);
+  const transcriptionPromisesRef = useRef<Promise<void>[]>([]);
+  const testSessionIdRef = useRef<string | undefined>(undefined);
+  const isExitingRef = useRef(false);
+  const scheduledTimeouts = useRef<NodeJS.Timeout[]>([]);
 
   // Timing
   const [recordingTime, setRecordingTime] = useState(0);
   const [prepTime, setPrepTime] = useState(60); // 60 seconds prep for Part 2
   const timerInterval = useRef<NodeJS.Timeout | null>(null);
   const testStartTime = useRef<number>(0);
+
+  const scheduleTimeout = (
+    callback: () => void,
+    delay: number
+  ): NodeJS.Timeout | null => {
+    if (isExitingRef.current) {
+      return null;
+    }
+
+    const timeout = setTimeout(() => {
+      scheduledTimeouts.current = scheduledTimeouts.current.filter(
+        (t) => t !== timeout
+      );
+      if (!isExitingRef.current) {
+        callback();
+      }
+    }, delay);
+
+    scheduledTimeouts.current.push(timeout);
+    return timeout;
+  };
+
+  const clearScheduledTimeouts = () => {
+    scheduledTimeouts.current.forEach(clearTimeout);
+    scheduledTimeouts.current = [];
+  };
+
+  const waitFor = (ms: number) =>
+    new Promise<void>((resolve) => {
+      const timeout = scheduleTimeout(resolve, ms);
+      if (!timeout) {
+        resolve();
+      }
+    });
+
+  const enqueueTranscription = (
+    record: ResponseRecord,
+    uri: string,
+    fallbackDuration: number
+  ) => {
+    const promise = transcribeAudio(uri)
+      .then((result) => {
+        if (isExitingRef.current) {
+          return;
+        }
+
+        record.transcript = result.text ?? "";
+        if (typeof result.duration === "number") {
+          record.durationSeconds = Math.max(0, Math.round(result.duration));
+        } else if (record.durationSeconds === undefined) {
+          record.durationSeconds = fallbackDuration;
+        }
+      })
+      .catch((error) => {
+        console.error("❌ Transcription failed:", error);
+        if (record.transcript === undefined) {
+          record.transcript = "";
+        }
+        if (record.durationSeconds === undefined) {
+          record.durationSeconds = fallbackDuration;
+        }
+      });
+
+    transcriptionPromisesRef.current.push(promise);
+  };
+
+  const buildQuestionPayload = (): QuestionPayload[] => {
+    const payload: QuestionPayload[] = [];
+
+    part1Questions.forEach((question) => {
+      if (!question) {
+        return;
+      }
+
+      payload.push({
+        questionId: question.questionId,
+        question: question.question,
+        category: "part1",
+        difficulty: question.difficulty,
+        topic: question.keywords?.[0],
+      });
+    });
+
+    if (part2Topic) {
+      payload.push({
+        questionId: part2Topic.questionId,
+        question: part2Topic.question,
+        category: "part2",
+        difficulty: part2Topic.difficulty,
+        topic: part2Topic.cueCard?.mainTopic || part2Topic.question,
+      });
+    }
+
+    part3Questions.forEach((question) => {
+      if (!question) {
+        return;
+      }
+
+      payload.push({
+        questionId: question.questionId,
+        question: question.question,
+        category: "part3",
+        difficulty: question.difficulty,
+        topic: question.keywords?.[0],
+      });
+    });
+
+    return payload;
+  };
+
+  const mapDifficultyToLevel = (
+    difficulty?: "easy" | "medium" | "hard"
+  ): "beginner" | "intermediate" | "advanced" => {
+    switch (difficulty) {
+      case "easy":
+        return "beginner";
+      case "hard":
+        return "advanced";
+      default:
+        return "intermediate";
+    }
+  };
+
+  const determineOverallDifficulty = (
+    questions: QuestionPayload[]
+  ): "beginner" | "intermediate" | "advanced" => {
+    const encountered = questions
+      .map((question) => question.difficulty)
+      .filter(Boolean) as Array<"easy" | "medium" | "hard">;
+
+    if (encountered.includes("hard")) {
+      return "advanced";
+    }
+
+    if (encountered.includes("medium")) {
+      return "intermediate";
+    }
+
+    if (encountered.includes("easy")) {
+      return "beginner";
+    }
+
+    const firstDifficulty = questions.find(
+      (question) => question.difficulty
+    )?.difficulty;
+    return mapDifficultyToLevel(firstDifficulty);
+  };
+
+  const buildFullTranscript = (responses: ResponseRecord[]): string => {
+    if (!responses.length) {
+      return "";
+    }
+
+    return responses
+      .map((response) => {
+        const questionLabel =
+          response.partNumber === 2
+            ? "Long turn topic"
+            : `Question ${response.questionIndex + 1}`;
+        const examinerLine = `Examiner: ${response.question}`;
+        const candidateLine =
+          response.transcript && response.transcript.trim().length > 0
+            ? `Candidate: ${response.transcript}`
+            : "Candidate: [No transcript captured]";
+
+        return `Part ${response.partNumber} - ${questionLabel}\n${examinerLine}\n${candidateLine}`;
+      })
+      .join("\n\n");
+  };
+
+  const ensureNumber = (value: unknown, fallback = 0): number => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const ensureString = (value: unknown): string => {
+    return typeof value === "string" ? value : "";
+  };
+
+  const ensureStringArray = (value: unknown): string[] => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter((item) => item.length > 0);
+  };
+
+  const normalizeCriteriaBlock = (block: any) => {
+    return {
+      band: ensureNumber(block?.band),
+      feedback: ensureString(block?.feedback),
+      strengths: ensureStringArray(block?.strengths),
+      improvements: ensureStringArray(block?.improvements),
+      detailedExamples: Array.isArray(block?.detailedExamples)
+        ? block.detailedExamples
+        : [],
+      linkingPhrases: Array.isArray(block?.linkingPhrases)
+        ? block.linkingPhrases
+        : [],
+      vocabularyAlternatives: Array.isArray(block?.vocabularyAlternatives)
+        ? block.vocabularyAlternatives
+        : [],
+      collocations: Array.isArray(block?.collocations)
+        ? block.collocations
+        : [],
+    };
+  };
+
+  const normalizeCriteria = (criteria: any) => {
+    return {
+      fluencyCoherence: normalizeCriteriaBlock(
+        criteria?.fluencyCoherence ?? {}
+      ),
+      lexicalResource: normalizeCriteriaBlock(criteria?.lexicalResource ?? {}),
+      grammaticalRange: normalizeCriteriaBlock(
+        criteria?.grammaticalRange ?? {}
+      ),
+      pronunciation: normalizeCriteriaBlock(criteria?.pronunciation ?? {}),
+    };
+  };
+
+  const normalizeCorrections = (
+    corrections: unknown
+  ): Array<{
+    original: string;
+    corrected: string;
+    explanation: string;
+  }> => {
+    if (!Array.isArray(corrections)) {
+      return [];
+    }
+
+    return corrections
+      .map((item) => ({
+        original: ensureString((item as any)?.original),
+        corrected: ensureString((item as any)?.corrected),
+        explanation: ensureString((item as any)?.explanation),
+      }))
+      .filter(
+        (entry) => entry.original.length > 0 && entry.corrected.length > 0
+      );
+  };
+
+  const normalizePartScores = (scores: unknown) => {
+    if (typeof scores !== "object" || scores === null) {
+      return undefined;
+    }
+
+    const typedScores = scores as Record<string, unknown>;
+    const normalized: Record<string, number> = {};
+
+    ["part1", "part2", "part3"].forEach((key) => {
+      const numeric = ensureNumber(typedScores[key]);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        normalized[key] = numeric;
+      }
+    });
+
+    return Object.keys(normalized).length ? normalized : undefined;
+  };
 
   // ==================== INITIALIZATION ====================
 
@@ -87,7 +391,9 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     );
 
     return () => {
-      cleanup();
+      isExitingRef.current = true;
+      clearScheduledTimeouts();
+      void cleanup();
       backHandler.remove();
     };
   }, []);
@@ -105,6 +411,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   const initializeTest = async () => {
     try {
       console.log("🎬 Initializing IELTS Full Test V2...");
+      responsesRef.current = [];
+      transcriptionPromisesRef.current = [];
+      testSessionIdRef.current = undefined;
+      setIsEvaluating(false);
 
       // Request audio permissions upfront
       console.log("🔐 Requesting microphone permissions...");
@@ -126,7 +436,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         playThroughEarpieceAndroid: false,
-      });
+        duckOthers: false,
+      } as any);
       console.log("✅ Audio mode configured");
 
       // Clear topic cache to get fresh questions for each test
@@ -195,42 +506,116 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     }
   };
 
-  const cleanup = () => {
-    if (recording.current) {
-      recording.current.stopAndUnloadAsync().catch(() => {});
-    }
+  const cleanup = async () => {
+    clearScheduledTimeouts();
+
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
+      timerInterval.current = null;
+    }
+
+    if (recording.current) {
+      try {
+        await recording.current.stopAndUnloadAsync();
+      } catch (error) {
+        console.log("Recording cleanup error:", error);
+      } finally {
+        recording.current = null;
+      }
+    }
+
+    try {
+      await ttsService.stop();
+    } catch (error) {
+      console.log("TTS cleanup error:", error);
+    }
+
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+        duckOthers: false,
+      } as any);
+    } catch (error) {
+      console.log("Audio mode reset error:", error);
     }
   };
 
   const handleExit = () => {
     Alert.alert("Exit Test?", "Your progress will not be saved.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Exit", onPress: onExit, style: "destructive" },
+      {
+        text: "Exit",
+        style: "destructive",
+        onPress: () => {
+          isExitingRef.current = true;
+          setIsExaminerSpeaking(false);
+          setPhase("loading");
+          setWelcomePrompt(null);
+          setIsEvaluating(false);
+          clearScheduledTimeouts();
+          void cleanup().finally(onExit);
+        },
+      },
     ]);
   };
 
   // ==================== PART 1: INTRODUCTION (4-5 minutes) ====================
 
   const startWelcome = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     setPhase("welcome");
+    setWelcomePrompt(
+      "Good morning. My name is Dr. Smith and I will be your examiner today. Can you tell me your full name please?"
+    );
     setIsExaminerSpeaking(true);
 
-    const welcome =
-      "Good morning. My name is Dr. Smith and I will be your examiner today. Can you tell me your full name please?";
-
-    await speakAndWait(welcome);
+    await speakAndWait(
+      "Good morning. My name is Dr. Smith and I will be your examiner today. Can you tell me your full name please?"
+    );
 
     setIsExaminerSpeaking(false);
 
-    // Pause, then start Part 1
-    setTimeout(() => {
+    await waitFor(3000);
+    if (isExitingRef.current) {
+      return;
+    }
+
+    setIsExaminerSpeaking(true);
+    setWelcomePrompt(
+      "Thank you. Could you please show me your identification document?"
+    );
+    await speakAndWait(
+      "Thank you. Could you please show me your identification document?"
+    );
+    setIsExaminerSpeaking(false);
+
+    await waitFor(3000);
+    if (isExitingRef.current) {
+      return;
+    }
+
+    setIsExaminerSpeaking(true);
+    setWelcomePrompt("Great, let's begin with Part 1 of the test.");
+    await speakAndWait("Thank you. Let's begin with Part 1 of the test.");
+    setIsExaminerSpeaking(false);
+
+    scheduleTimeout(() => {
+      setWelcomePrompt(null);
       startPart1();
-    }, 2000);
+    }, 1500);
   };
 
   const startPart1 = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n🚀 startPart1 called");
     console.log("📊 Current part1Questions state:", part1Questions);
     console.log("📏 part1Questions.length:", part1Questions?.length);
@@ -249,11 +634,16 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     console.log("✅ Part 1 validation passed!");
     setPhase("part1");
+    setWelcomePrompt(null);
     setCurrentQuestionIndex(0);
     askPart1Question(0);
   };
 
   const askPart1Question = async (index: number) => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log(`\n📝 askPart1Question called with index: ${index}`);
     console.log(`part1Questions array length: ${part1Questions.length}`);
     console.log(`part1Questions:`, part1Questions);
@@ -279,8 +669,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
             onPress: () => {
               setCurrentQuestionIndex(index + 1);
               if (index + 1 < part1Questions.length) {
-                askPart1Question(index + 1);
-              } else {
+                if (!isExitingRef.current) {
+                  askPart1Question(index + 1);
+                }
+              } else if (!isExitingRef.current) {
                 finishPart1();
               }
             },
@@ -290,6 +682,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
       return;
     }
 
+    setCurrentQuestionIndex(index);
+    setIsTransitioning(false);
     setIsExaminerSpeaking(true);
 
     console.log(`\n📝 Part 1 - Question ${index + 1}/${part1Questions.length}`);
@@ -305,6 +699,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   };
 
   const finishPart1 = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n✅ Part 1 complete!");
 
     setIsExaminerSpeaking(true);
@@ -313,7 +711,11 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     await speakAndWait(transition);
     setIsExaminerSpeaking(false);
 
-    setTimeout(() => {
+    if (isExitingRef.current) {
+      return;
+    }
+
+    scheduleTimeout(() => {
       startPart2();
     }, 2000);
   };
@@ -321,6 +723,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   // ==================== PART 2: LONG TURN (3-4 minutes) ====================
 
   const startPart2 = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n📝 Starting Part 2...");
     console.log("part2Topic:", part2Topic);
 
@@ -377,7 +783,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
           clearInterval(timerInterval.current!);
           timerInterval.current = null;
           // Preparation complete
-          setTimeout(() => {
+          scheduleTimeout(() => {
             promptPart2Speaking();
           }, 500);
           return 0;
@@ -401,6 +807,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   };
 
   const finishPart2 = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n✅ Part 2 complete!");
 
     setIsExaminerSpeaking(true);
@@ -410,8 +820,12 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     await speakAndWait(transition);
     setIsExaminerSpeaking(false);
 
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n➡️ Moving to Part 3...\n");
-    setTimeout(() => {
+    scheduleTimeout(() => {
       startPart3();
     }, 2000);
   };
@@ -419,6 +833,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   // ==================== PART 3: DISCUSSION (4-5 minutes) ====================
 
   const startPart3 = () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     // Validate questions loaded
     if (!part3Questions || part3Questions.length === 0) {
       console.error("❌ No Part 3 questions available!");
@@ -434,6 +852,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   };
 
   const askPart3Question = async (index: number) => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log(`\n📝 askPart3Question called with index: ${index}`);
     console.log(`part3Questions array length: ${part3Questions.length}`);
 
@@ -457,8 +879,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
             onPress: () => {
               setCurrentQuestionIndex(index + 1);
               if (index + 1 < part3Questions.length) {
-                askPart3Question(index + 1);
-              } else {
+                if (!isExitingRef.current) {
+                  askPart3Question(index + 1);
+                }
+              } else if (!isExitingRef.current) {
                 finishPart3();
               }
             },
@@ -468,6 +892,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
       return;
     }
 
+    setCurrentQuestionIndex(index);
+    setIsTransitioning(false);
     setIsExaminerSpeaking(true);
 
     console.log(`\n📝 Part 3 - Question ${index + 1}/${part3Questions.length}`);
@@ -483,27 +909,43 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   };
 
   const finishPart3 = async () => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n✅ Part 3 complete!");
 
     setIsExaminerSpeaking(true);
     const closing =
-      "Thank you very much. That's the end of the speaking test. You may leave now.";
+      "Thank you for your responses. That's the end of the speaking test. Please allow me a moment to evaluate your progress.";
     console.log(`\n❓ EXAMINER SAYS: "${closing}"`);
     await speakAndWait(closing);
     setIsExaminerSpeaking(false);
 
+    if (isExitingRef.current) {
+      return;
+    }
+
     console.log("\n➡️ Test Complete!\n");
-    setTimeout(() => {
-      completeTest();
-    }, 2000);
+    setWelcomePrompt("Evaluating your performance...");
+    await waitFor(500);
+    completeTest();
   };
 
   // ==================== TEST COMPLETION ====================
 
   const completeTest = async () => {
-    setPhase("complete");
+    if (isExitingRef.current) {
+      return;
+    }
 
-    const duration = Math.round((Date.now() - testStartTime.current) / 1000);
+    setPhase("complete");
+    setIsEvaluating(true);
+
+    const duration = Math.max(
+      0,
+      Math.round((Date.now() - testStartTime.current) / 1000)
+    );
     console.log(
       `\n🎉 Test complete! Total duration: ${Math.floor(duration / 60)}:${(
         duration % 60
@@ -512,22 +954,155 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         .padStart(2, "0")}`
     );
 
-    // Prepare results
-    const results = {
-      type: "authentic-full-test",
-      timestamp: new Date().toISOString(),
-      duration,
-      part1Recordings: part1Answers.current,
-      part2Recording: part2Answer.current,
-      part3Recordings: part3Answers.current,
+    const orderedResponses = [...responsesRef.current].sort((a, b) => {
+      if (a.partNumber !== b.partNumber) {
+        return a.partNumber - b.partNumber;
+      }
+      return a.questionIndex - b.questionIndex;
+    });
+
+    try {
+      await Promise.all(transcriptionPromisesRef.current);
+    } catch (error) {
+      console.error("❌ Error waiting for transcriptions:", error);
+    }
+
+    orderedResponses.forEach((record) => {
+      if (!record.transcript) {
+        record.transcript = "";
+      }
+      if (record.durationSeconds === undefined) {
+        record.durationSeconds = 0;
+      }
+    });
+
+    const questionsPayload = buildQuestionPayload();
+    const recordingsPayload: RecordingPayload[] = orderedResponses.map(
+      (record) => ({
+        partNumber: record.partNumber,
+        questionIndex: record.questionIndex,
+        transcript: record.transcript || "",
+        durationSeconds: record.durationSeconds ?? 0,
+        recordingUri: record.recordingUri,
+      })
+    );
+
+    const evaluationRecordings = recordingsPayload.map(
+      ({ recordingUri, ...rest }) => rest
+    );
+
+    let fullTranscript = buildFullTranscript(orderedResponses);
+    if (!fullTranscript.trim().length) {
+      fullTranscript =
+        "Candidate did not provide verbal responses during the session.";
+    }
+
+    const metadataDifficulty = determineOverallDifficulty(questionsPayload);
+
+    const evaluationPayload = {
+      testSessionId: testSessionIdRef.current,
+      fullTranscript,
+      durationSeconds: duration,
+      questions: questionsPayload,
+      recordings: evaluationRecordings,
+      metadata: {
+        difficulty: metadataDifficulty,
+        testStartedAt: new Date(testStartTime.current).toISOString(),
+        testCompletedAt: new Date().toISOString(),
+      },
     };
 
-    console.log("💾 Results:", results);
+    try {
+      const evaluationResponse = await evaluateFullTest(evaluationPayload);
 
-    // Call completion callback
-    setTimeout(() => {
-      onComplete(results);
-    }, 3000);
+      testSessionIdRef.current =
+        evaluationResponse.testSessionId ||
+        evaluationResponse.evaluation?.testSessionId ||
+        testSessionIdRef.current;
+
+      setIsEvaluating(false);
+
+      if (isExitingRef.current) {
+        return;
+      }
+
+      const summary =
+        evaluationResponse.spokenSummary ||
+        evaluationResponse.evaluation?.spokenSummary ||
+        "";
+
+      if (summary.trim().length > 0) {
+        setWelcomePrompt(summary);
+        setIsExaminerSpeaking(true);
+        await speakAndWait(summary);
+        setIsExaminerSpeaking(false);
+        setWelcomePrompt(null);
+      }
+
+      setWelcomePrompt(null);
+
+      if (isExitingRef.current) {
+        return;
+      }
+
+      const normalizedCriteria = normalizeCriteria(
+        evaluationResponse.evaluation?.criteria
+      );
+      const normalizedCorrections = normalizeCorrections(
+        evaluationResponse.evaluation?.corrections
+      );
+      const normalizedPartScores = normalizePartScores(
+        evaluationResponse.partScores ||
+          evaluationResponse.evaluation?.partScores
+      );
+
+      onComplete({
+        type: "authentic-full-test",
+        timestamp: new Date().toISOString(),
+        duration,
+        fullTranscript,
+        questions: questionsPayload,
+        recordings: recordingsPayload,
+        evaluation: evaluationResponse.evaluation
+          ? {
+              ...evaluationResponse.evaluation,
+              overallBand: ensureNumber(
+                evaluationResponse.evaluation.overallBand
+              ),
+              criteria: normalizedCriteria,
+              corrections: normalizedCorrections,
+              partScores: normalizedPartScores,
+            }
+          : undefined,
+        overallBand: ensureNumber(
+          evaluationResponse.overallBand ??
+            evaluationResponse.evaluation?.overallBand
+        ),
+        partScores: normalizedPartScores,
+        spokenSummary: ensureString(
+          evaluationResponse.spokenSummary ??
+            evaluationResponse.evaluation?.spokenSummary
+        ),
+        testSessionId: testSessionIdRef.current,
+      });
+    } catch (error) {
+      console.error("❌ Full test evaluation failed:", error);
+      setIsExaminerSpeaking(false);
+      setWelcomePrompt(null);
+      setIsEvaluating(false);
+
+      if (!isExitingRef.current) {
+        onComplete({
+          type: "authentic-full-test",
+          timestamp: new Date().toISOString(),
+          duration,
+          fullTranscript,
+          questions: questionsPayload,
+          recordings: recordingsPayload,
+          testSessionId: testSessionIdRef.current,
+        });
+      }
+    }
   };
 
   // ==================== RECORDING CONTROL ====================
@@ -551,7 +1126,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         playsInSilentModeIOS: true,
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: true,
-      });
+      } as any);
       console.log("✅ Audio mode re-configured");
 
       // Create new recording
@@ -607,6 +1182,57 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
       console.log(`⏱️  Duration: ${recordingTime}s`);
       console.log(`💬 [USER ANSWERED - Recording saved]`);
 
+      const currentDuration = recordingTime;
+      setRecordingTime(0);
+
+      let responseRecord: ResponseRecord | null = null;
+
+      if (phase === "part1") {
+        const questionMeta = part1Questions[currentQuestionIndex];
+        responseRecord = {
+          partNumber: 1,
+          questionIndex: currentQuestionIndex,
+          questionId: questionMeta?.questionId,
+          question: questionMeta?.question || "",
+          category: "part1",
+          difficulty: questionMeta?.difficulty,
+          topic: questionMeta?.keywords?.[0],
+          recordingUri: uri,
+          durationSeconds: currentDuration,
+        };
+      } else if (phase === "part2-speaking") {
+        const questionMeta = part2Topic;
+        responseRecord = {
+          partNumber: 2,
+          questionIndex: 0,
+          questionId: questionMeta?.questionId,
+          question: questionMeta?.question || "",
+          category: "part2",
+          difficulty: questionMeta?.difficulty,
+          topic: questionMeta?.cueCard?.mainTopic || questionMeta?.question,
+          recordingUri: uri,
+          durationSeconds: currentDuration,
+        };
+      } else if (phase === "part3") {
+        const questionMeta = part3Questions[currentQuestionIndex];
+        responseRecord = {
+          partNumber: 3,
+          questionIndex: currentQuestionIndex,
+          questionId: questionMeta?.questionId,
+          question: questionMeta?.question || "",
+          category: "part3",
+          difficulty: questionMeta?.difficulty,
+          topic: questionMeta?.keywords?.[0],
+          recordingUri: uri,
+          durationSeconds: currentDuration,
+        };
+      }
+
+      if (responseRecord) {
+        responsesRef.current.push(responseRecord);
+        enqueueTranscription(responseRecord, uri, currentDuration);
+      }
+
       // Save to appropriate array
       if (phase === "part1") {
         part1Answers.current.push(uri);
@@ -615,9 +1241,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
         // Move to next question
         const nextIndex = currentQuestionIndex + 1;
-        setCurrentQuestionIndex(nextIndex);
-
-        setTimeout(() => {
+        setIsTransitioning(true);
+        scheduleTimeout(() => {
           askPart1Question(nextIndex);
         }, 1500);
       } else if (phase === "part2-speaking") {
@@ -625,6 +1250,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         console.log(`💾 Saved Part 2 long turn`);
         console.log(`\n➡️  Part 2 complete, moving to Part 3...\n`);
 
+        setIsTransitioning(true);
         finishPart2();
       } else if (phase === "part3") {
         part3Answers.current.push(uri);
@@ -633,9 +1259,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
         // Move to next question
         const nextIndex = currentQuestionIndex + 1;
-        setCurrentQuestionIndex(nextIndex);
-
-        setTimeout(() => {
+        setIsTransitioning(true);
+        scheduleTimeout(() => {
           askPart3Question(nextIndex);
         }, 1500);
       }
@@ -649,12 +1274,20 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   // ==================== TTS HELPER ====================
 
   const speakAndWait = async (text: string): Promise<void> => {
+    if (isExitingRef.current) {
+      return;
+    }
+
     return new Promise((resolve) => {
       console.log(`🗣️  Examiner: "${text.substring(0, 50)}..."`);
 
       ttsService.speak(text, {
         onDone: () => {
           console.log("✅ Speech complete");
+          resolve();
+        },
+        onStopped: () => {
+          console.log("🛑 Speech stopped");
           resolve();
         },
         onError: (error) => {
@@ -712,7 +1345,12 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
           }`,
         };
       case "complete":
-        return { title: "Test Complete", subtitle: "Well done!" };
+        return isEvaluating
+          ? {
+              title: "Evaluating",
+              subtitle: "Please wait while we review your performance",
+            }
+          : { title: "Test Complete", subtitle: "Well done!" };
       default:
         return { title: "", subtitle: "" };
     }
@@ -721,13 +1359,69 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   const canRecord = (): boolean => {
     return (
       !isExaminerSpeaking &&
+      !isTransitioning &&
       (phase === "part1" || phase === "part2-speaking" || phase === "part3")
     );
+  };
+
+  const getActiveQuestionContent = () => {
+    if (isExaminerSpeaking) {
+      return null;
+    }
+
+    if (phase === "welcome" && welcomePrompt) {
+      return {
+        label: "Examiner",
+        text: welcomePrompt,
+        bulletPoints: undefined,
+      };
+    }
+
+    if (phase === "part1") {
+      const question = part1Questions[currentQuestionIndex];
+      if (!question?.question) {
+        return null;
+      }
+
+      return {
+        label: "Part 1 Question",
+        text: question.question,
+        bulletPoints: undefined,
+      };
+    }
+
+    if (phase === "part2-prep" || phase === "part2-speaking") {
+      if (!part2Topic?.question) {
+        return null;
+      }
+
+      return {
+        label: phase === "part2-prep" ? "Part 2 Topic" : "Part 2 Question",
+        text: part2Topic.question,
+        bulletPoints: part2Topic.cueCard?.bulletPoints ?? [],
+      };
+    }
+
+    if (phase === "part3") {
+      const question = part3Questions[currentQuestionIndex];
+      if (!question?.question) {
+        return null;
+      }
+
+      return {
+        label: "Part 3 Question",
+        text: question.question,
+        bulletPoints: undefined,
+      };
+    }
+
+    return null;
   };
 
   // ==================== RENDER ====================
 
   const { title, subtitle } = getPhaseDisplay();
+  const activeQuestion = getActiveQuestionContent();
 
   if (phase === "loading") {
     return (
@@ -741,7 +1435,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     );
   }
 
-  if (phase === "complete") {
+  if (phase === "complete" && !isEvaluating) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -764,13 +1458,47 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
+      {/* Question prompt */}
+      {activeQuestion && (
+        <View style={styles.questionCard}>
+          <Text style={styles.questionLabel}>{activeQuestion.label}</Text>
+          <Text style={styles.questionText}>{activeQuestion.text}</Text>
+          {activeQuestion.bulletPoints &&
+          activeQuestion.bulletPoints.length > 0 ? (
+            <View style={styles.cueList}>
+              {activeQuestion.bulletPoints.map((point, index) => (
+                <Text key={`${index}-${point}`} style={styles.cueItem}>
+                  • {point}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {phase === "part2-prep" && (
+            <Text style={styles.prepHint}>
+              You have 1 minute to prepare your answer.
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* Center - Mic Button or Status */}
       <View style={styles.centerContainer}>
-        {isExaminerSpeaking ? (
+        {isExaminerSpeaking || isTransitioning ? (
           <View style={styles.speakingContainer}>
             <Ionicons name="volume-high" size={60} color={colors.primary} />
-            <Text style={styles.speakingText}>Examiner is speaking...</Text>
+            <Text style={styles.speakingText}>
+              {isExaminerSpeaking
+                ? "Examiner is speaking..."
+                : "Please wait..."}
+            </Text>
             <Text style={styles.speakingSubtext}>Please listen carefully</Text>
+          </View>
+        ) : phase === "complete" && isEvaluating ? (
+          <View style={styles.evaluatingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.evaluatingText}>
+              Evaluating your performance...
+            </Text>
           </View>
         ) : phase === "part2-prep" ? (
           <View style={styles.prepContainer}>
@@ -885,6 +1613,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.xl,
   },
+  questionCard: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  questionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.primary,
+    textTransform: "uppercase",
+    marginBottom: spacing.xs,
+  },
+  questionText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.textPrimary,
+  },
+  cueList: {
+    marginTop: spacing.md,
+  },
+  cueItem: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.textSecondary,
+  },
+  prepHint: {
+    marginTop: spacing.md,
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: "italic",
+  },
   speakingContainer: {
     alignItems: "center",
   },
@@ -898,6 +1664,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: spacing.sm,
+  },
+  evaluatingContainer: {
+    alignItems: "center",
+  },
+  evaluatingText: {
+    marginTop: spacing.lg,
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   prepContainer: {
     alignItems: "center",

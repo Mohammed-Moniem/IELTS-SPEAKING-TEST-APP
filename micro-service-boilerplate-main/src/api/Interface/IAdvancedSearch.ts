@@ -1,4 +1,4 @@
-import { FilterQuery, Model, PopulateOptions } from 'mongoose';
+import { FilterQuery, Model, PopulateOptions } from '@lib/db/mongooseCompat';
 
 /**
  * Advanced search options configuration

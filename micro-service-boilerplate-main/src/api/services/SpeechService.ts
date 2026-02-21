@@ -1,3 +1,4 @@
+import { FullTestEvaluationPayload, FullTestEvaluationResult } from '@interfaces/ITestEvaluation';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import OpenAI from 'openai';
@@ -75,16 +76,6 @@ export class SpeechService {
     if (!trimmed) {
       throw new Error('Text is required for synthesis');
     }
-
-    if (!env.elevenlabs?.apiKey) {
-      throw new Error('ElevenLabs API key is not configured on the server');
-    }
-
-    const voiceId = options.voiceId || env.elevenlabs.voiceId;
-    if (!voiceId) {
-      throw new Error('No ElevenLabs voice ID configured');
-    }
-
     const modelId = options.modelId || env.elevenlabs.modelId || 'eleven_v3';
     const rawStability = options.stability ?? env.elevenlabs.stability ?? 0.5;
     // ElevenLabs TTD stability must be exactly 0.0, 0.5, or 1.0
@@ -93,82 +84,193 @@ export class SpeechService {
     const useSpeakerBoost = options.useSpeakerBoost ?? true;
     const optimizeStreamingLatency = options.optimizeStreamingLatency ?? env.elevenlabs.optimizeStreamingLatency ?? 0;
     const cacheTtlMs = Math.max(0, (env.elevenlabs.cacheTtlSeconds ?? 0) * 1000);
+    const now = Date.now();
 
-    const cacheKey =
-      options.cacheKey || this.getSynthesisCacheKey(trimmed, voiceId, modelId, stability, speed, useSpeakerBoost);
+    const elevenLabsVoiceId = options.voiceId || env.elevenlabs.voiceId;
+    const elevenLabsCacheKey = options.cacheKey
+      || this.getSynthesisCacheKey(trimmed, `elevenlabs:${elevenLabsVoiceId || 'default'}`, modelId, stability, speed, useSpeakerBoost);
 
     this.pruneExpiredCache();
-    const cached = this.audioCache.get(cacheKey);
-    const now = Date.now();
-    if (cached && cached.expiresAt > now) {
-      this.log.info(`Returning cached ElevenLabs audio (voice: ${voiceId})`);
+    const cachedElevenLabs = this.audioCache.get(elevenLabsCacheKey);
+    if (cachedElevenLabs && cachedElevenLabs.expiresAt > now) {
+      this.log.info(`Returning cached ElevenLabs audio (voice: ${elevenLabsVoiceId})`);
       return {
-        buffer: cached.buffer,
+        buffer: cachedElevenLabs.buffer,
         cacheHit: true,
-        voiceId,
-        cacheExpiresAt: cached.expiresAt
+        voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
+        cacheExpiresAt: cachedElevenLabs.expiresAt
       };
     }
 
-    this.log.info(`Synthesizing speech via ElevenLabs voice=${voiceId} text="${trimmed.substring(0, 60)}..."`);
-
-    const requestPayload: Record<string, unknown> = {
+    const elevenLabsError = await this.tryElevenLabsSynthesis({
       text: trimmed,
-      model_id: modelId,
-      voice_settings: {
-        stability,
-        use_speaker_boost: useSpeakerBoost
-      },
-      voice_speed: speed
-    };
-
-    if (optimizeStreamingLatency > 0) {
-      requestPayload.optimize_streaming_latency = optimizeStreamingLatency;
-    }
-
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': env.elevenlabs.apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'audio/mpeg'
-      },
-      body: JSON.stringify(requestPayload)
+      voiceId: elevenLabsVoiceId,
+      modelId,
+      stability,
+      speed,
+      useSpeakerBoost,
+      optimizeStreamingLatency,
+      cacheKey: elevenLabsCacheKey,
+      cacheTtlMs,
+      now
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      this.log.error('ElevenLabs synthesis failed', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorBody
-      });
-      throw new Error(`ElevenLabs synthesis failed (${response.status}): ${errorBody}`);
+    if (!elevenLabsError) {
+      const synthesized = this.audioCache.get(elevenLabsCacheKey);
+      if (!synthesized) {
+        throw new Error('ElevenLabs synthesis completed but no audio buffer was returned');
+      }
+
+      return {
+        buffer: synthesized.buffer,
+        cacheHit: false,
+        voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
+        cacheExpiresAt: cacheTtlMs > 0 ? now + cacheTtlMs : null
+      };
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    if (!this.shouldFallbackToOpenAi(elevenLabsError)) {
+      throw elevenLabsError;
+    }
 
-    this.log.info(
-      `ElevenLabs synthesis completed (voice=${voiceId}, bytes=${buffer.length}, cacheTtlMs=${cacheTtlMs})`
-    );
+    this.log.warn(`Falling back to OpenAI TTS due to ElevenLabs failure: ${elevenLabsError.message}`);
 
-    let cacheExpiresAt: number | null = null;
+    const openAiVoice = env.openai.ttsVoice || 'alloy';
+    const openAiModel = env.openai.ttsModel || 'gpt-4o-mini-tts';
+    const openAiSpeed = this.clamp(options.speed ?? 1.0, 0.25, 4.0);
+    const openAiCacheKey = options.cacheKey
+      || this.getSynthesisCacheKey(trimmed, `openai:${openAiVoice}`, openAiModel, 0, openAiSpeed, false);
+
+    const cachedOpenAi = this.audioCache.get(openAiCacheKey);
+    if (cachedOpenAi && cachedOpenAi.expiresAt > now) {
+      this.log.info(`Returning cached OpenAI audio (voice: ${openAiVoice})`);
+      return {
+        buffer: cachedOpenAi.buffer,
+        cacheHit: true,
+        voiceId: `openai:${openAiVoice}`,
+        cacheExpiresAt: cachedOpenAi.expiresAt
+      };
+    }
+
+    const openAiResponse = await this.openai.audio.speech.create({
+      model: openAiModel,
+      voice: openAiVoice as any,
+      input: trimmed,
+      response_format: 'mp3' as any,
+      speed: openAiSpeed
+    });
+
+    const openAiArrayBuffer = await openAiResponse.arrayBuffer();
+    const openAiBuffer = Buffer.from(openAiArrayBuffer);
+
+    let openAiCacheExpiresAt: number | null = null;
     if (cacheTtlMs > 0) {
-      cacheExpiresAt = now + cacheTtlMs;
-      this.audioCache.set(cacheKey, {
-        buffer,
-        expiresAt: cacheExpiresAt
+      openAiCacheExpiresAt = now + cacheTtlMs;
+      this.audioCache.set(openAiCacheKey, {
+        buffer: openAiBuffer,
+        expiresAt: openAiCacheExpiresAt
       });
       this.enforceCacheSizeLimit();
     }
 
+    this.log.info(`OpenAI TTS synthesis completed (voice=${openAiVoice}, bytes=${openAiBuffer.length})`);
+
     return {
-      buffer,
+      buffer: openAiBuffer,
       cacheHit: false,
-      voiceId,
-      cacheExpiresAt
+      voiceId: `openai:${openAiVoice}`,
+      cacheExpiresAt: openAiCacheExpiresAt
     };
+  }
+
+  private async tryElevenLabsSynthesis(params: {
+    text: string;
+    voiceId?: string;
+    modelId: string;
+    stability: number;
+    speed: number;
+    useSpeakerBoost: boolean;
+    optimizeStreamingLatency: number;
+    cacheKey: string;
+    cacheTtlMs: number;
+    now: number;
+  }): Promise<Error | null> {
+    const {
+      text,
+      voiceId,
+      modelId,
+      stability,
+      speed,
+      useSpeakerBoost,
+      optimizeStreamingLatency,
+      cacheKey,
+      cacheTtlMs,
+      now
+    } = params;
+
+    if (!env.elevenlabs?.apiKey) {
+      return new Error('ElevenLabs API key is not configured on the server');
+    }
+
+    if (!voiceId) {
+      return new Error('No ElevenLabs voice ID configured');
+    }
+
+    try {
+      this.log.info(`Synthesizing speech via ElevenLabs voice=${voiceId} text="${text.substring(0, 60)}..."`);
+
+      const requestPayload: Record<string, unknown> = {
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability,
+          use_speaker_boost: useSpeakerBoost
+        },
+        voice_speed: speed
+      };
+
+      if (optimizeStreamingLatency > 0) {
+        requestPayload.optimize_streaming_latency = optimizeStreamingLatency;
+      }
+
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'xi-api-key': env.elevenlabs.apiKey,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg'
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        this.log.error('ElevenLabs synthesis failed', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody
+        });
+        return new Error(`ElevenLabs synthesis failed (${response.status}): ${errorBody}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      this.log.info(
+        `ElevenLabs synthesis completed (voice=${voiceId}, bytes=${buffer.length}, cacheTtlMs=${cacheTtlMs})`
+      );
+
+      const expiresAt = cacheTtlMs > 0 ? now + cacheTtlMs : now + 1000;
+      this.audioCache.set(cacheKey, {
+        buffer,
+        expiresAt
+      });
+      this.enforceCacheSizeLimit();
+
+      return null;
+    } catch (error: any) {
+      return error instanceof Error ? error : new Error(error?.message || 'ElevenLabs synthesis failed');
+    }
   }
 
   /**
@@ -481,6 +583,240 @@ Return only the JSON object.`;
     }
   }
 
+  public async evaluateFullTest(payload: FullTestEvaluationPayload): Promise<FullTestEvaluationResult> {
+    if (!env.openai.apiKey) {
+      throw new Error('OpenAI API key is not configured on the server');
+    }
+
+    const fullTranscript = payload.fullTranscript?.trim();
+    if (!fullTranscript) {
+      throw new Error('Full transcript is required for full test evaluation');
+    }
+
+    const prompt = this.buildFullTestEvaluationPrompt(payload);
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: env.openai.model || 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.25,
+        response_format: { type: 'json_object' }
+      });
+
+      const content = completion.choices[0].message.content || '{}';
+      const rawEvaluation = JSON.parse(content) as FullTestEvaluationResult;
+
+      const normalizedEvaluation = this.normalizeFullTestEvaluation(rawEvaluation);
+      normalizedEvaluation.evaluatorModel = env.openai.model || 'gpt-4o-mini';
+
+      this.log.info(`Full test evaluation completed. Overall band: ${normalizedEvaluation.overallBand}`, {
+        userId: payload.userId,
+        partScores: normalizedEvaluation.partScores
+      });
+
+      return normalizedEvaluation;
+    } catch (error) {
+      this.log.error('Full test evaluation failed:', error);
+      throw new Error(`Failed to evaluate full test: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private buildFullTestEvaluationPrompt(payload: FullTestEvaluationPayload): string {
+    const metaLines: string[] = [];
+    if (payload.metadata?.candidateName) {
+      metaLines.push(`Candidate Name: ${payload.metadata.candidateName}`);
+    }
+    if (payload.metadata?.difficulty) {
+      metaLines.push(`Difficulty: ${payload.metadata.difficulty}`);
+    }
+    if (payload.metadata?.testStartedAt) {
+      metaLines.push(`Started At: ${payload.metadata.testStartedAt}`);
+    }
+    if (payload.metadata?.testCompletedAt) {
+      metaLines.push(`Completed At: ${payload.metadata.testCompletedAt}`);
+    }
+    if (payload.durationSeconds) {
+      metaLines.push(`Duration (seconds): ${payload.durationSeconds}`);
+    }
+
+    const partsSection = payload.parts
+      .map(part => {
+        const partHeader = `Part ${part.partNumber}`;
+
+        const questions = part.questions
+          .map((question, index) => {
+            const topicSegment = question.topic ? ` (Topic: ${question.topic})` : '';
+            const idSegment = question.questionId ? ` [ID: ${question.questionId}]` : '';
+            const difficultySegment = question.difficulty ? ` [Difficulty: ${question.difficulty}]` : '';
+            return `Q${index + 1}${idSegment}${topicSegment}${difficultySegment}: ${question.question}`;
+          })
+          .join('\n');
+
+        const responses = part.responses
+          .map(response => {
+            const transcript = response.transcript?.trim() || '';
+            const duration = typeof response.durationSeconds === 'number' ? ` (${response.durationSeconds}s)` : '';
+            const recordingInfo = response.recordingUrl ? ` [Recording: ${response.recordingUrl}]` : '';
+            const cleaned = transcript.length ? transcript : '[No response provided]';
+            return `A${response.questionIndex + 1}${duration}${recordingInfo}: ${cleaned}`;
+          })
+          .join('\n');
+
+        return `${partHeader}\nQuestions:\n${questions || 'None'}\nResponses:\n${responses || 'None'}`;
+      })
+      .join('\n\n');
+
+    return `You are an experienced IELTS Speaking examiner. Evaluate the ENTIRE IELTS speaking test and provide a holistic assessment aligned with official IELTS descriptors. Consider fluency, lexical resource, grammar, pronunciation, and consistency across all parts.
+
+CANDIDATE CONTEXT:
+- User ID: ${payload.userId}
+${metaLines.length ? `- ${metaLines.join('\n- ')}` : ''}
+
+FULL TEST TRANSCRIPT:
+${payload.fullTranscript.trim()}
+
+PER-PART BREAKDOWN:
+${partsSection}
+
+Produce JSON ONLY that matches this EXACT schema:
+{
+  "overallBand": 6.5,
+  "spokenSummary": "2-3 sentences that mention the overall score and main takeaway.",
+  "detailedFeedback": "Multi-paragraph summary weaving together key findings from all criteria.",
+  "criteria": {
+    "fluencyCoherence": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific transcript-based strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "lexicalResource": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "grammaticalRange": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    },
+    "pronunciation": {
+      "band": 6.5,
+      "feedback": "Narrative summary",
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Actionable improvement 1", "Actionable improvement 2"]
+    }
+  },
+  "corrections": [
+    { "original": "Exact quoted error", "corrected": "Corrected version", "explanation": "Why it matters", "category": "grammar" },
+    { "original": "Another quote", "corrected": "Correction", "explanation": "Explanation", "category": "lexical" },
+    { "original": "Another quote", "corrected": "Correction", "explanation": "Explanation", "category": "pronunciation" }
+  ],
+  "suggestions": [
+    { "category": "fluency", "suggestion": "Actionable plan with practice idea", "priority": "high" },
+    { "category": "lexical", "suggestion": "Actionable plan", "priority": "medium" },
+    { "category": "pronunciation", "suggestion": "Practice technique", "priority": "medium" }
+  ],
+  "partScores": {
+    "part1": 6.5,
+    "part2": 6.5,
+    "part3": 6.5
+  }
+}
+
+MANDATORY RULES:
+1. All strengths/improvements must reference specific ideas or phrases from the transcript.
+2. Do not invent content that contradicts the provided transcript.
+3. Use the category field in corrections to label the primary issue (grammar, vocabulary, pronunciation, fluency, coherence, etc.).
+4. Suggestions must be concrete practice actions the candidate can take.
+5. If the candidate skipped a question, note this explicitly and adjust feedback accordingly.
+6. Return strictly valid JSON with double quotes and no trailing commas.`;
+  }
+
+  private normalizeFullTestEvaluation(evaluation: FullTestEvaluationResult): FullTestEvaluationResult {
+    const ensureArray = <T>(value: T[] | undefined, fallback: T[]): T[] => {
+      if (!Array.isArray(value)) {
+        return fallback;
+      }
+      return value;
+    };
+
+    const normalizedCorrections = ensureArray(evaluation.corrections, []).map(correction => ({
+      ...correction,
+      category: correction.category || this.inferCorrectionCategory(correction.explanation)
+    }));
+
+    const normalizedSuggestions = ensureArray(evaluation.suggestions, []).map(suggestion => ({
+      category: suggestion.category || 'general',
+      suggestion: suggestion.suggestion,
+      priority: suggestion.priority === 'high' || suggestion.priority === 'low' ? suggestion.priority : 'medium'
+    }));
+
+    const defaultCriteria = () => ({
+      fluencyCoherence: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      lexicalResource: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      grammaticalRange: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      },
+      pronunciation: {
+        band: evaluation.overallBand,
+        feedback: '',
+        strengths: [],
+        improvements: []
+      }
+    });
+
+    const criteria = evaluation.criteria ? evaluation.criteria : defaultCriteria();
+
+    return {
+      ...evaluation,
+      corrections: normalizedCorrections,
+      suggestions: normalizedSuggestions,
+      criteria: {
+        fluencyCoherence: criteria.fluencyCoherence,
+        lexicalResource: criteria.lexicalResource,
+        grammaticalRange: criteria.grammaticalRange,
+        pronunciation: criteria.pronunciation
+      }
+    };
+  }
+
+  private inferCorrectionCategory(explanation: string | undefined): string {
+    if (!explanation) {
+      return 'general';
+    }
+
+    const normalized = explanation.toLowerCase();
+    if (normalized.includes('pronunciation') || normalized.includes('sound')) {
+      return 'pronunciation';
+    }
+    if (normalized.includes('vocabulary') || normalized.includes('word choice') || normalized.includes('lexical')) {
+      return 'vocabulary';
+    }
+    if (normalized.includes('fluency') || normalized.includes('coherence')) {
+      return 'fluency';
+    }
+    if (normalized.includes('grammar') || normalized.includes('tense') || normalized.includes('agreement')) {
+      return 'grammar';
+    }
+    return 'general';
+  }
+
   private getExaminerSystemPrompt(
     testPart: 1 | 2 | 3,
     context?: { topic?: string; timeRemaining?: number; userLevel?: string }
@@ -519,6 +855,15 @@ ${context?.topic ? `Related to: ${context.topic}` : ''}`;
       default:
         return basePr;
     }
+  }
+
+  private shouldFallbackToOpenAi(error: Error): boolean {
+    if (!env.openai?.apiKey) {
+      return false;
+    }
+
+    const message = (error.message || '').toLowerCase();
+    return message.includes('elevenlabs');
   }
 
   private pruneExpiredCache(): void {

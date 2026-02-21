@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface Coupon {
   _id: string;
@@ -44,18 +42,6 @@ export interface CouponUsageHistory {
   createdAt: string;
 }
 
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
-
 class CouponService {
   /**
    * Validate a coupon code
@@ -65,12 +51,11 @@ class CouponService {
     originalAmount: number,
     subscriptionTier?: string
   ): Promise<CouponValidation> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/coupons/validate`,
-      { code, originalAmount, subscriptionTier },
-      { headers }
-    );
+    const response = await apiClient.post(`/coupons/validate`, {
+      code,
+      originalAmount,
+      subscriptionTier,
+    });
     return response.data.data;
   }
 
@@ -87,12 +72,12 @@ class CouponService {
     finalAmount: number;
     coupon: Coupon;
   }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/coupons/apply`,
-      { code, originalAmount, subscriptionTier, orderId },
-      { headers }
-    );
+    const response = await apiClient.post(`/coupons/apply`, {
+      code,
+      originalAmount,
+      subscriptionTier,
+      orderId,
+    });
     return response.data.data;
   }
 
@@ -100,10 +85,7 @@ class CouponService {
    * Get coupon usage history
    */
   async getCouponHistory(): Promise<CouponUsageHistory[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/coupons/history`, {
-      headers,
-    });
+    const response = await apiClient.get(`/coupons/history`);
     return response.data.data;
   }
 }

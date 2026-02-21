@@ -1,7 +1,13 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
+import { emitToUser } from '../../loaders/SocketIOLoader';
+import { env } from '@env';
+import { POINTS_REWARDS } from '../models/DiscountRedemptionModel';
 import { IReferral, IUserReferralStats, Referral, UserReferralStats } from '../models/ReferralModel';
+import { UserProfile } from '../models/UserProfileModel';
+import { UserModel } from '../models/UserModel';
 import { encryptionService } from './EncryptionService';
+import { PointsService } from './PointsService';
 
 const log = new Logger(__filename);
 
@@ -41,7 +47,8 @@ export class ReferralService {
     email: string
   ): Promise<{ practiceReward: number; simulationReward: number }> {
     // Find the referrer
-    const referrerStats = await UserReferralStats.findOne({ referralCode });
+    const normalizedCode = referralCode.trim().toUpperCase();
+    const referrerStats = await UserReferralStats.findOne({ referralCode: normalizedCode });
 
     if (!referrerStats) {
       throw new Error('Invalid referral code');
@@ -95,7 +102,7 @@ export class ReferralService {
       referral = new Referral({
         referrerId: referrerStats.userId,
         referredUserId: new Types.ObjectId(newUserId),
-        referralCode,
+        referralCode: normalizedCode,
         email: email.toLowerCase(),
         status: 'completed',
         metadata: {
@@ -132,13 +139,53 @@ export class ReferralService {
     await this.grantRewards(referrerId, practiceReward, simulationReward);
 
     log.info(
-      `Referral completed: ${referralCode} -> ${newUserId}. Rewards: ${practiceReward} practices, ${simulationReward} simulations`
+      `Referral completed: ${normalizedCode} -> ${newUserId}. Rewards: ${practiceReward} practices, ${simulationReward} simulations`
     );
 
     return {
       practiceReward,
       simulationReward
     };
+  }
+
+  async getReferralLandingInfo(referralCode: string) {
+    if (!referralCode) {
+      return null;
+    }
+
+    const normalizedCode = referralCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,20}$/.test(normalizedCode)) {
+      return null;
+    }
+
+    const stats = await UserReferralStats.findOne({ referralCode: normalizedCode }).populate('userId');
+    if (!stats) {
+      return null;
+    }
+
+    const referrerUser = await UserModel.findById(stats.userId);
+    const referrerProfile = await UserProfile.findOne({ userId: stats.userId });
+
+    const displayName = referrerProfile?.username
+      ? `@${referrerProfile.username}`
+      : [referrerUser?.firstName, referrerUser?.lastName].filter(Boolean).join(' ').trim() || referrerUser?.email || 'A fellow learner';
+
+    return {
+      referralCode: stats.referralCode,
+      referrer: {
+        id: stats.userId.toString(),
+        name: displayName,
+        avatar: referrerProfile?.avatar ?? null,
+        totalReferrals: stats.totalReferrals,
+        successfulReferrals: stats.successfulReferrals
+      },
+      rewards: {
+        practicePerReferral: this.PRACTICE_REWARD_PER_REFERRAL,
+        simulationThreshold: this.SIMULATION_REWARD_THRESHOLD,
+        referrerPoints: POINTS_REWARDS.REFERRAL_REFERRER,
+        refereePoints: POINTS_REWARDS.REFERRAL_REFEREE
+      }
+    } as const;
   }
 
   /**
@@ -200,9 +247,10 @@ export class ReferralService {
   /**
    * Create a referral link
    */
-  async createReferralLink(userId: string, baseUrl: string = 'https://app.ielts-practice.com'): Promise<string> {
+  async createReferralLink(userId: string, baseUrl?: string): Promise<string> {
     const referralCode = await this.getUserReferralCode(userId);
-    return `${baseUrl}/register?ref=${referralCode}`;
+    const configuredBase = (baseUrl ?? env.referral?.baseUrl ?? 'https://app.ielts-practice.com').replace(/\/$/, '');
+    return `${configuredBase}/referral/${referralCode}`;
   }
 
   /**
@@ -265,10 +313,74 @@ export class ReferralService {
   }
 
   /**
+   * Grant referral points (Phase 2: Gamification)
+   * Called when referee completes their first practice session
+   */
+  async grantReferralPoints(refereeId: string): Promise<void> {
+    try {
+      // Find the referral record for this user
+      const referral = await Referral.findOne({
+        referredUserId: new Types.ObjectId(refereeId),
+        status: 'completed'
+      }).populate('referrerId');
+
+      if (!referral) {
+        log.debug(`No referral found for user ${refereeId}`);
+        return;
+      }
+
+      // Check if points were already granted
+      if (referral.rewards?.pointsGranted) {
+        log.debug(`Referral points already granted for referee ${refereeId}`);
+        return;
+      }
+
+      const referrerId = referral.referrerId.toString();
+      const referralCode = referral.referralCode;
+
+      // Grant points to both users
+      const result = await PointsService.grantReferralRewards(referrerId, refereeId, referralCode);
+
+      // Update referral record to mark points as granted
+      referral.rewards = {
+        ...referral.rewards,
+        pointsGranted: true,
+        pointsGrantedAt: new Date()
+      };
+      await referral.save();
+
+      // Emit socket events to both users
+      emitToUser(referrerId, 'points:granted', {
+        points: result.referrerPoints,
+        source: 'referral',
+        role: 'referrer',
+        refereeId
+      });
+
+      emitToUser(refereeId, 'points:granted', {
+        points: result.refereePoints,
+        source: 'referral',
+        role: 'referee',
+        referrerId
+      });
+
+      log.info(
+        `💰 Referral points granted: ${result.referrerPoints} to referrer ${referrerId}, ${result.refereePoints} to referee ${refereeId}`
+      );
+    } catch (error: any) {
+      log.error('❌ Error granting referral points:', {
+        error: error.message,
+        refereeId
+      });
+      // Don't throw - referral points are a bonus feature
+    }
+  }
+
+  /**
    * Track referral click (optional analytics)
    */
   async trackReferralClick(referralCode: string): Promise<void> {
-    const stats = await UserReferralStats.findOne({ referralCode });
+    const stats = await UserReferralStats.findOne({ referralCode: referralCode.trim().toUpperCase() });
 
     if (stats) {
       // You could add click tracking here if needed

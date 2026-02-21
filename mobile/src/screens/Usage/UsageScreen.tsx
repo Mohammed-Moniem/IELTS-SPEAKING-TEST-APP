@@ -2,9 +2,13 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ScreenContainer } from "../../components/ScreenContainer";
-import { colors } from "../../theme/tokens";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 export const UsageScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <ScreenContainer>
       <ScrollView
@@ -28,7 +32,8 @@ export const UsageScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -64,4 +69,4 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
-});
+  });

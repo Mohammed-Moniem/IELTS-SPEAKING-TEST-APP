@@ -103,7 +103,7 @@ export class TestSimulationService {
       return simulation;
     }
 
-    const preferences = await TestPreferenceModel.findOne({ user: userId }).lean<{ targetBand?: string }>();
+    const preferences = await TestPreferenceModel.findOne({ user: userId }).lean();
 
     const partMap = new Map(simulation.parts.map(part => [part.part, part] as const));
 
@@ -171,7 +171,7 @@ export class TestSimulationService {
 
     try {
       // Get user's target band to determine difficulty
-      const preferences = await TestPreferenceModel.findOne({ user: userId }).lean<{ targetBand?: string }>();
+      const preferences = await TestPreferenceModel.findOne({ user: userId }).lean();
       const difficulty = this.determineDifficulty(preferences?.targetBand);
 
       // Generate AI-powered test questions

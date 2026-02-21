@@ -14,9 +14,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GeneratedTopic, getCachedRandomTopic } from "../api/topicApi";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
 import { resultsStorage } from "../services/resultsStorage";
 import { ttsService } from "../services/textToSpeechService";
-import { colors, spacing } from "../theme/tokens";
+import type { ColorTokens } from "../theme/tokens";
+import { spacing } from "../theme/tokens";
 import { VoiceOrb } from "./VoiceOrb";
 
 /**
@@ -54,6 +57,8 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
   onComplete,
   onExit,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [state, setState] = useState<TestState>("loading");
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [timer, setTimer] = useState(0);
@@ -985,149 +990,150 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.md,
-    backgroundColor: colors.primary,
-  },
-  exitButton: {
-    padding: spacing.xs,
-  },
-  headerContent: {
-    flex: 1,
-    alignItems: "center",
-  },
-  placeholder: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#ffffff",
-    opacity: 0.9,
-    marginTop: 2,
-  },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.lg,
-  },
-  timerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: spacing.xl,
-    padding: spacing.sm,
-    backgroundColor: colors.surfaceSubtle,
-    borderRadius: 20,
-  },
-  tapHintContainer: {
-    marginTop: spacing.lg,
-    alignItems: "center",
-  },
-  tapHint: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.primary,
-    textAlign: "center",
-  },
-  tapHintSub: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: spacing.xs,
-  },
-  timerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#ef4444",
-    marginRight: spacing.xs,
-  },
-  timerText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    fontVariant: ["tabular-nums"],
-  },
-  questionCard: {
-    position: "absolute",
-    bottom: spacing.xxl,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  partLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.primary,
-    textTransform: "uppercase",
-    marginBottom: spacing.xs,
-  },
-  questionText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    lineHeight: 24,
-  },
-  prepText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-    fontStyle: "italic",
-  },
-  promptOverlay: {
-    position: "absolute",
-    top: 100,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  promptBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  promptText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
-    marginLeft: spacing.xs,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: spacing.lg,
-    textAlign: "center",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: spacing.md,
+      backgroundColor: colors.primary,
+    },
+    exitButton: {
+      padding: spacing.xs,
+    },
+    headerContent: {
+      flex: 1,
+      alignItems: "center",
+    },
+    placeholder: {
+      width: 40,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#ffffff",
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: "#ffffff",
+      opacity: 0.9,
+      marginTop: 2,
+    },
+    content: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    timerContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: spacing.xl,
+      padding: spacing.sm,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 20,
+    },
+    tapHintContainer: {
+      marginTop: spacing.lg,
+      alignItems: "center",
+    },
+    tapHint: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.primary,
+      textAlign: "center",
+    },
+    tapHintSub: {
+      fontSize: 13,
+      color: colors.textMuted,
+      textAlign: "center",
+      marginTop: spacing.xs,
+    },
+    timerDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: "#ef4444",
+      marginRight: spacing.xs,
+    },
+    timerText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      fontVariant: ["tabular-nums"],
+    },
+    questionCard: {
+      position: "absolute",
+      bottom: spacing.xxl,
+      left: spacing.lg,
+      right: spacing.lg,
+      backgroundColor: colors.surface,
+      padding: spacing.lg,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    partLabel: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.primary,
+      textTransform: "uppercase",
+      marginBottom: spacing.xs,
+    },
+    questionText: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      lineHeight: 24,
+    },
+    prepText: {
+      fontSize: 14,
+      color: colors.textMuted,
+      marginTop: spacing.sm,
+      fontStyle: "italic",
+    },
+    promptOverlay: {
+      position: "absolute",
+      top: 100,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+    },
+    promptBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 6,
+    },
+    promptText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#ffffff",
+      marginLeft: spacing.xs,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    loadingText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: spacing.lg,
+      textAlign: "center",
+    },
+  });

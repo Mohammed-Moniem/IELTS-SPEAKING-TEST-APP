@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
 import {
   Achievement,
@@ -268,6 +268,18 @@ export class AchievementService {
       groupCount?: number;
       referralCount?: number;
       leaderboardRank?: number;
+      // Speed achievements
+      speedCompletion?: boolean;
+      partNumber?: number;
+      duration?: number;
+      // Time-based achievements
+      timeRange?: string; // 'morning' | 'night'
+      dayType?: string; // 'weekend' | 'weekday'
+      practiceDate?: Date;
+      // Topic mastery
+      topicMastery?: string; // topic key
+      // Seasonal
+      seasonalMonth?: number;
     }
   ): Promise<IUserAchievement[]> {
     const unlockedAchievements: IUserAchievement[] = [];

@@ -7,7 +7,10 @@ import {
   View,
 } from "react-native";
 
-import { colors, radii, spacing } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { radii, spacing } from "../theme/tokens";
 
 interface FormTextInputProps extends TextInputProps {
   label: string;
@@ -19,22 +22,27 @@ export const FormTextInput: React.FC<FormTextInputProps> = ({
   errorMessage,
   style,
   ...props
-}) => (
-  <View style={styles.container}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput
-      style={[styles.input, style, errorMessage ? styles.inputError : null]}
-      placeholderTextColor={colors.textMuted}
-      {...props}
-    />
-    {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-  </View>
-);
+}) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.container}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={[styles.input, style, errorMessage ? styles.inputError : null]}
+        placeholderTextColor={colors.textMuted}
+        {...props}
+      />
+      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.md,
-  },
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
   label: {
     fontSize: 14,
     fontWeight: "600",
@@ -58,4 +66,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     color: colors.danger,
   },
-});
+  });

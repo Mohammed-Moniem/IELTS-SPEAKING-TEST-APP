@@ -64,6 +64,11 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
     part: 1,
     currentQuestionIndex: 0,
   });
+  const [activePrompt, setActivePrompt] = useState<{
+    part: 1 | 2 | 3;
+    question: string;
+    cuePoints?: string[];
+  } | null>(null);
 
   // Audio recordings for each part
   const part1Recordings = useRef<string[]>([]);
@@ -248,6 +253,10 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
     }
 
     const question = part1Questions[questionIndex];
+    setActivePrompt({
+      part: 1,
+      question: question.question,
+    });
     setState("part1-examiner");
 
     await ttsService.speak(question.question, {
@@ -363,6 +372,11 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
       onDone: async () => {
         // Read the cue card
         if (part2Topic) {
+          setActivePrompt({
+            part: 2,
+            question: part2Topic.question,
+            cuePoints: part2Topic.cueCard?.bulletPoints,
+          });
           await ttsService.speak(part2Topic.question, {
             onDone: () => {
               // Start preparation timer
@@ -449,6 +463,10 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
     }
 
     const question = part3Questions[questionIndex];
+    setActivePrompt({
+      part: 3,
+      question: question.question,
+    });
     setState("part3-examiner");
 
     await ttsService.speak(question.question, {
@@ -471,6 +489,7 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
 
   const completeTest = async () => {
     setState("test-complete");
+    setActivePrompt(null);
 
     const closing =
       "Thank you. That's the end of the speaking test. We'll send your results shortly.";
@@ -568,6 +587,37 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const renderActiveQuestion = () => {
+    if (!activePrompt) return null;
+
+    const partLabelMap = {
+      1: "Part 1 Question",
+      2: "Part 2 Topic",
+      3: "Part 3 Question",
+    } as const;
+
+    return (
+      <View style={styles.questionCard}>
+        <Text style={styles.partLabel}>{partLabelMap[activePrompt.part]}</Text>
+        <Text style={styles.questionText}>{activePrompt.question}</Text>
+        {activePrompt.part === 2 && activePrompt.cuePoints?.length ? (
+          <View style={styles.cueList}>
+            {activePrompt.cuePoints.map((point, index) => (
+              <Text key={`${index}-${point}`} style={styles.cueItem}>
+                - {point}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+        {activePrompt.part === 2 && state === "part2-prep" && (
+          <Text style={styles.prepText}>You have 1 minute to prepare</Text>
+        )}
+      </View>
+    );
+  };
+
+  const activeQuestionCard = renderActiveQuestion();
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -586,51 +636,24 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
 
       {/* Main content */}
       <View style={styles.content}>
-        <VoiceOrb
-          isListening={recording !== null}
-          isSpeaking={state.includes("examiner")}
-        />
-
-        {/* Timer */}
-        {recording && (
-          <View style={styles.timerContainer}>
-            <View style={styles.timerDot} />
-            <Text style={styles.timerText}>{formatTime(timer)}</Text>
-          </View>
+        {activeQuestionCard && (
+          <View style={styles.questionSection}>{activeQuestionCard}</View>
         )}
 
-        {/* Current question display */}
-        {currentQuestion.part === 1 &&
-          part1Questions[currentQuestion.currentQuestionIndex] && (
-            <View style={styles.questionCard}>
-              <Text style={styles.questionText}>
-                {part1Questions[currentQuestion.currentQuestionIndex].question}
-              </Text>
-            </View>
-          )}
+        <View style={styles.orbSection}>
+          <VoiceOrb
+            isListening={recording !== null}
+            isSpeaking={state.includes("examiner")}
+          />
 
-        {currentQuestion.part === 2 &&
-          part2Topic &&
-          state.includes("part2") && (
-            <View style={styles.questionCard}>
-              <Text style={styles.partLabel}>Part 2 Topic</Text>
-              <Text style={styles.questionText}>{part2Topic.question}</Text>
-              {state === "part2-prep" && (
-                <Text style={styles.prepText}>
-                  You have 1 minute to prepare
-                </Text>
-              )}
+          {/* Timer */}
+          {recording && (
+            <View style={styles.timerContainer}>
+              <View style={styles.timerDot} />
+              <Text style={styles.timerText}>{formatTime(timer)}</Text>
             </View>
           )}
-
-        {currentQuestion.part === 3 &&
-          part3Questions[currentQuestion.currentQuestionIndex] && (
-            <View style={styles.questionCard}>
-              <Text style={styles.questionText}>
-                {part3Questions[currentQuestion.currentQuestionIndex].question}
-              </Text>
-            </View>
-          )}
+        </View>
       </View>
 
       {/* Prompt overlay */}
@@ -683,9 +706,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    padding: spacing.lg,
+  },
+  questionSection: {
+    width: "100%",
+    marginBottom: spacing.xl,
+  },
+  orbSection: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.lg,
   },
   timerContainer: {
     flexDirection: "row",
@@ -709,10 +739,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   questionCard: {
-    position: "absolute",
-    bottom: spacing.xxl,
-    left: spacing.lg,
-    right: spacing.lg,
+    width: "100%",
     backgroundColor: colors.surface,
     padding: spacing.lg,
     borderRadius: 16,
@@ -733,6 +760,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textPrimary,
     lineHeight: 24,
+  },
+  cueList: {
+    marginTop: spacing.md,
+  },
+  cueItem: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 22,
   },
   prepText: {
     fontSize: 14,

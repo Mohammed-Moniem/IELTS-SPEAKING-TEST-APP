@@ -1,8 +1,9 @@
 import { env } from '@env';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
+import { checkPgConnection } from '@lib/db/pgClient';
+import { checkSupabaseStorageConnection } from '@lib/db/supabaseClient';
 import { constructLogMessage, isEmptyOrNull } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import mongoose from 'mongoose';
 import os from 'os';
 import { performance } from 'perf_hooks';
 import { Service } from 'typedi';
@@ -122,7 +123,13 @@ export class HealthService {
       this.log.debug(`${logMessage} :: Dependency checks disabled via configuration`);
       const skippedDependencies: IHealthDependencyCheck[] = [
         {
-          name: 'mongo',
+          name: 'supabase_db',
+          status: 'skipped',
+          message: 'Dependency checks disabled',
+          lastUpdated: new Date().toISOString()
+        },
+        {
+          name: 'supabase_storage',
           status: 'skipped',
           message: 'Dependency checks disabled',
           lastUpdated: new Date().toISOString()
@@ -148,7 +155,8 @@ export class HealthService {
     }
 
     const dependencyResults = await Promise.all([
-      this.checkMongo(headers),
+      this.checkSupabaseDB(headers),
+      this.checkSupabaseStorage(headers),
       this.checkRabbitMQ(headers),
       this.checkCache(headers)
     ]);
@@ -175,45 +183,65 @@ export class HealthService {
     };
   }
 
-  private async checkMongo(headers: IRequestHeaders): Promise<IHealthDependencyCheck> {
-    const logMessage = constructLogMessage(__filename, 'checkMongo', headers);
+  private async checkSupabaseDB(headers: IRequestHeaders): Promise<IHealthDependencyCheck> {
+    const logMessage = constructLogMessage(__filename, 'checkSupabaseDB', headers);
     const start = process.hrtime();
 
     try {
-      const state = mongoose.connection.readyState;
-      let status: DependencyStatus = 'fail';
-      let message = 'MongoDB connection is not established';
-
-      switch (state) {
-        case 1:
-          status = 'pass';
-          message = 'MongoDB connection established';
-          break;
-        case 2:
-          status = 'warn';
-          message = 'MongoDB connection is in progress';
-          break;
-        default:
-          status = 'fail';
-          message = 'MongoDB connection is not established';
-      }
+      await checkPgConnection();
+      const status: DependencyStatus = 'pass';
+      const message = 'Supabase Postgres connection established';
 
       const latency = toMilliseconds(process.hrtime(start));
-      this.log.debug(`${logMessage} :: MongoDB readiness status: ${status}`);
+      this.log.debug(`${logMessage} :: Supabase DB readiness status: ${status}`);
 
       return {
-        name: 'mongo',
+        name: 'supabase_db',
         status,
         message,
         latencyMs: latency,
         lastUpdated: new Date().toISOString()
       };
     } catch (error) {
-      this.log.error(`${logMessage} :: MongoDB readiness check failed`, { error });
+      this.log.error(`${logMessage} :: Supabase DB readiness check failed`, { error });
       return {
-        name: 'mongo',
+        name: 'supabase_db',
         status: 'fail',
-        message: 'Unexpected error while checking MongoDB',
+        message: 'Unexpected error while checking Supabase Postgres',
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  }
+
+  private async checkSupabaseStorage(headers: IRequestHeaders): Promise<IHealthDependencyCheck> {
+    const logMessage = constructLogMessage(__filename, 'checkSupabaseStorage', headers);
+    const start = process.hrtime();
+
+    if (env.storage.provider !== 'supabase') {
+      return {
+        name: 'supabase_storage',
+        status: 'skipped',
+        message: 'Supabase storage integration disabled',
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    try {
+      await checkSupabaseStorageConnection();
+      const latency = toMilliseconds(process.hrtime(start));
+      return {
+        name: 'supabase_storage',
+        status: 'pass',
+        message: 'Supabase storage connection established',
+        latencyMs: latency,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      this.log.error(`${logMessage} :: Supabase storage readiness check failed`, { error });
+      return {
+        name: 'supabase_storage',
+        status: 'fail',
+        message: 'Unexpected error while checking Supabase storage',
         lastUpdated: new Date().toISOString()
       };
     }

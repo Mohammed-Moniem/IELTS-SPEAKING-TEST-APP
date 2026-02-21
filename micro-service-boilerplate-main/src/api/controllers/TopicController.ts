@@ -5,7 +5,9 @@ import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestCo
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { topicGenerationRateLimiter } from '@middlewares/rateLimitMiddleware';
+import { AuthMiddleware } from '@middlewares/AuthMiddleware';
 import { StandardResponse } from '@responses/StandardResponse';
+import { IELTSQuestionService } from '@services/IELTSQuestionService';
 import { TopicGenerationService } from '@services/TopicGenerationService';
 import { TopicService } from '@services/TopicService';
 import { Container } from 'typedi';
@@ -13,9 +15,11 @@ import { Container } from 'typedi';
 @JsonController('/topics')
 export class TopicController {
   private topicGenerationService: TopicGenerationService;
+  private questionBankService: IELTSQuestionService;
 
   constructor(private readonly topicService: TopicService) {
     this.topicGenerationService = Container.get(TopicGenerationService);
+    this.questionBankService = Container.get(IELTSQuestionService);
   }
 
   @Get('/')
@@ -91,9 +95,10 @@ export class TopicController {
    * Get a single random topic
    * GET /api/v1/topics/get-random?category=part1&difficulty=medium
    * Note: Using /get-random instead of /random to avoid conflicts with /:slug route
-   */
+  */
   @Get('/get-random')
   @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  @UseBefore(AuthMiddleware)
   public async getRandomTopic(
     @QueryParam('category') category: 'part1' | 'part2' | 'part3',
     @QueryParam('difficulty') difficulty: 'easy' | 'medium' | 'hard' = 'medium',
@@ -112,12 +117,32 @@ export class TopicController {
         });
       }
 
-      // Generate single random topic
-      const topic = await this.topicGenerationService.generateRandomTopic(category, difficulty || 'medium');
+      const userId = (req as any).currentUser?.id;
+
+      // Try pulling from question bank first for authentic content
+      const bankTopic = await this.questionBankService.getRandomTopicFromBank(
+        category,
+        difficulty || 'medium',
+        userId,
+        headers
+      );
+
+      if (bankTopic) {
+        return StandardResponse.success(
+          res,
+          bankTopic,
+          'Random topic retrieved from question bank',
+          HTTP_STATUS_CODES.SUCCESS,
+          headers
+        );
+      }
+
+      // Fall back to AI generation if bank has no data
+      const generatedTopic = await this.topicGenerationService.generateRandomTopic(category, difficulty || 'medium');
 
       return StandardResponse.success(
         res,
-        topic,
+        generatedTopic,
         'Random topic generated successfully',
         HTTP_STATUS_CODES.SUCCESS,
         headers

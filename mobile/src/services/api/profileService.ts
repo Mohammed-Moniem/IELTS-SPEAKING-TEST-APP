@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface UserProfile {
   _id: string;
@@ -49,27 +47,40 @@ export interface UserStatistics {
   achievementPoints: number;
 }
 
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
+export type ResolvedQRCode =
+  | {
+      type: "friend_invite";
+      user: {
+        userId: string;
+        username: string;
+        avatar?: string;
+        bio?: string;
+        level?: number;
+        xp?: number;
+      };
+      status: {
+        isFriend: boolean;
+        hasPendingRequest: boolean;
+        pendingDirection: "outgoing" | "incoming" | null;
+      };
+    }
+  | {
+      type: "referral";
+      referrer: {
+        userId: string;
+        username: string;
+        avatar?: string;
+      };
+      referralCode: string;
+      referralLink?: string;
+    };
 
 class ProfileService {
   /**
    * Get current user's profile
    */
   async getMyProfile(): Promise<UserProfile> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/profile/me`, {
-      headers,
-    });
+    const response = await apiClient.get(`/profile/me`);
     return response.data.data;
   }
 
@@ -77,10 +88,7 @@ class ProfileService {
    * Get another user's profile
    */
   async getUserProfile(userId: string): Promise<UserProfile> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/profile/${userId}`, {
-      headers,
-    });
+    const response = await apiClient.get(`/profile/${userId}`);
     return response.data.data;
   }
 
@@ -106,10 +114,7 @@ class ProfileService {
       showOnlineStatus?: boolean;
     };
   }): Promise<UserProfile> {
-    const headers = await getAuthHeaders();
-    const response = await axios.put(`${API_BASE_URL}/profile`, updates, {
-      headers,
-    });
+    const response = await apiClient.put(`/profile`, updates);
     return response.data.data;
   }
 
@@ -122,14 +127,7 @@ class ProfileService {
     showStatistics?: boolean;
     showActivity?: boolean;
   }): Promise<UserProfile> {
-    const headers = await getAuthHeaders();
-    const response = await axios.put(
-      `${API_BASE_URL}/profile/settings`,
-      privacySettings,
-      {
-        headers,
-      }
-    );
+    const response = await apiClient.put(`/profile/settings`, privacySettings);
     return response.data.data;
   }
 
@@ -137,24 +135,26 @@ class ProfileService {
    * Get user statistics
    */
   async getUserStatistics(userId?: string): Promise<UserStatistics> {
-    const headers = await getAuthHeaders();
-    const endpoint = userId
-      ? `${API_BASE_URL}/profile/stats/${userId}`
-      : `${API_BASE_URL}/profile/stats/me`;
-    const response = await axios.get(endpoint, { headers });
+    const endpoint = userId ? `/profile/stats/${userId}` : `/profile/stats/me`;
+    const response = await apiClient.get(endpoint);
     return response.data.data;
   }
 
   /**
    * Generate/refresh QR code
    */
-  async generateQRCode(): Promise<{ qrCode: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/profile/qr-code`,
-      {},
-      { headers }
-    );
+  async generateQRCode(
+    purpose: "friend" | "referral" = "friend"
+  ): Promise<{ qrCode: string; purpose: "friend" | "referral" }> {
+    const response = await apiClient.post(`/profile/qr-code`, { purpose });
+    return response.data.data;
+  }
+
+  /**
+   * Resolve QR payload scanned by user
+   */
+  async resolveQRCode(code: string): Promise<ResolvedQRCode> {
+    const response = await apiClient.post(`/profile/qr-code/resolve`, { code });
     return response.data.data;
   }
 }

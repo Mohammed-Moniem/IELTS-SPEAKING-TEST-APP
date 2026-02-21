@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import profileService, {
+  ResolvedQRCode,
   UserProfile,
   UserStatistics,
 } from "../services/api/profileService";
@@ -86,19 +87,39 @@ export const useProfile = () => {
     }
   }, []);
 
-  const generateQRCode = useCallback(async (): Promise<string | null> => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await profileService.generateQRCode();
-      return data.qrCode;
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to generate QR code");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const generateQRCode = useCallback(
+    async (purpose: "friend" | "referral" = "friend"): Promise<string | null> => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await profileService.generateQRCode(purpose);
+        return data.qrCode;
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to generate QR code");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const resolveQRCode = useCallback(
+    async (code: string): Promise<ResolvedQRCode | null> => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await profileService.resolveQRCode(code);
+        return data;
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Invalid QR code");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   return {
     profile,
@@ -111,5 +132,6 @@ export const useProfile = () => {
     updatePrivacySettings,
     loadStatistics,
     generateQRCode,
+    resolveQRCode,
   };
 };

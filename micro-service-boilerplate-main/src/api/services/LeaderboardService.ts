@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
 import { UserStats } from '../models/AchievementModel';
 import { UserProfile } from '../models/UserProfileModel';
@@ -8,7 +8,51 @@ const log = new Logger(__filename);
 export type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all-time';
 export type LeaderboardMetric = 'score' | 'practices' | 'achievements' | 'streak';
 
+// Simple in-memory cache
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const leaderboardCache = new Map<string, CacheEntry>();
+
 export class LeaderboardService {
+  /**
+   * Get cached data or fetch if expired
+   */
+  private getFromCache(key: string): any | null {
+    const cached = leaderboardCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      log.info(`✅ Cache hit for ${key}`);
+      return cached.data;
+    }
+    if (cached) {
+      log.info(`⏰ Cache expired for ${key}`);
+      leaderboardCache.delete(key);
+    }
+    return null;
+  }
+
+  /**
+   * Store data in cache
+   */
+  private setCache(key: string, data: any): void {
+    leaderboardCache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+    log.info(`💾 Cached ${key}`);
+  }
+
+  /**
+   * Clear cache (call after stats updates)
+   */
+  clearCache(): void {
+    leaderboardCache.clear();
+    log.info('🗑️ Leaderboard cache cleared');
+  }
+
   /**
    * Get leaderboard for a specific period
    */
@@ -18,6 +62,15 @@ export class LeaderboardService {
     limit: number = 100,
     userId?: string
   ): Promise<any[]> {
+    // Check cache first (only for non-user-specific queries)
+    const cacheKey = `leaderboard:${period}:${metric}:${limit}`;
+    if (!userId) {
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     // Build query based on filters
     const query: any = {
       leaderboardOptIn: true // Only users who opted in
@@ -34,12 +87,16 @@ export class LeaderboardService {
       sortField = this.getMetricField(metric);
     }
 
+    log.info(`📊 Fetching leaderboard: period=${period}, metric=${metric}, sortField=${sortField}`);
+
     // Get leaderboard data
     const leaderboard = await UserStats.find(query)
       .sort({ [sortField]: -1 })
       .limit(limit)
       .populate('userId', 'name email')
       .lean();
+
+    log.info(`✅ Found ${leaderboard.length} leaderboard entries`);
 
     // Add user profiles
     const enrichedLeaderboard = [];
@@ -57,9 +114,15 @@ export class LeaderboardService {
         score: this.getMetricValue(stats, metric, period),
         totalSessions: stats.totalPracticeSessions + stats.totalSimulations,
         achievements: stats.totalAchievements,
+        achievementPoints: stats.achievementPoints || 0,
         streak: stats.currentStreak,
         isCurrentUser: userId ? stats.userId.toString() === userId : false
       });
+    }
+
+    // Cache the result (only if no userId filter)
+    if (!userId) {
+      this.setCache(cacheKey, enrichedLeaderboard);
     }
 
     return enrichedLeaderboard;
@@ -255,6 +318,9 @@ export class LeaderboardService {
     stats.lastPracticeDate = new Date();
     await stats.save();
 
+    // Clear cache when stats update
+    this.clearCache();
+
     log.info(`Stats updated for user ${userId}: Score=${score}, Streak=${stats.currentStreak}`);
   }
 
@@ -272,6 +338,9 @@ export class LeaderboardService {
       }
     );
 
+    // Clear cache after reset
+    this.clearCache();
+
     log.info('Weekly stats reset completed');
   }
 
@@ -288,6 +357,9 @@ export class LeaderboardService {
         }
       }
     );
+
+    // Clear cache after reset
+    this.clearCache();
 
     log.info('Monthly stats reset completed');
   }

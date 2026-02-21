@@ -2,7 +2,12 @@ import { env } from '@env';
 import { Server as HTTPServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { Socket, Server as SocketIOServer } from 'socket.io';
-import { encryptionService } from '../api/services/EncryptionService';
+import Container from 'typedi';
+import { Conversation, IChatMessage } from '../api/models/ChatMessageModel';
+import { UserStatus } from '../api/models/UserStatusModel';
+import { chatService } from '../api/services/ChatService';
+import { NotificationService } from '../api/services/NotificationService';
+import { friendService } from '../api/services/FriendService';
 import { Logger } from '../lib/logger';
 
 const log = new Logger(__filename);
@@ -33,22 +38,32 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     try {
       const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
 
+      log.info(`Socket auth attempt - Token present: ${!!token}, Length: ${token?.length || 0}`);
+
       if (!token) {
         return next(new Error('Authentication token required'));
       }
 
-      // Verify JWT token
-      const decoded = jwt.verify(token, env.auth.jwtSecret || 'your-secret-key') as any;
+      // Verify JWT token with issuer check
+      const decoded = jwt.verify(token, env.jwt.accessSecret, {
+        issuer: env.app.name
+      }) as any;
 
-      if (!decoded || !decoded.userId) {
+      log.info(`Socket JWT decoded successfully:`, JSON.stringify(decoded, null, 2));
+
+      if (!decoded || !decoded.sub) {
+        log.error(
+          'Socket auth failed - Invalid decoded token structure. Full token:',
+          JSON.stringify(decoded, null, 2)
+        );
         return next(new Error('Invalid token'));
       }
 
-      // Attach user info to socket
-      socket.data.userId = decoded.userId;
+      // Attach user info to socket (sub is the userId in JWT)
+      socket.data.userId = decoded.sub;
       socket.data.email = decoded.email;
 
-      log.info(`Socket authenticated for user: ${decoded.userId}`);
+      log.info(`Socket authenticated for user: ${decoded.sub}`);
       next();
     } catch (error) {
       log.error('Socket authentication error:', error);
@@ -57,7 +72,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
   });
 
   // Connection handler
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', async (socket: Socket) => {
+    const notificationService = Container.get(NotificationService);
     const userId = socket.data.userId;
     log.info(`User connected: ${userId} (Socket: ${socket.id})`);
 
@@ -68,11 +84,35 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     userSockets.get(userId)!.add(socket.id);
     activeUsers.set(userId, socket.id);
 
+    // Update user status in database
+    try {
+      await UserStatus.findOneAndUpdate(
+        { userId },
+        {
+          $set: { isOnline: true, lastSeen: new Date() },
+          $addToSet: { socketIds: socket.id },
+          $setOnInsert: { userId, currentlyTypingIn: [] }
+        },
+        { upsert: true, new: true }
+      );
+
+      // Notify user's friends that they're online
+      const friends = await friendService.getFriends(userId);
+      friends.forEach(friend => {
+        const friendUserId = (friend as any).userId?.toString() || (friend as any)._id?.toString();
+        if (friendUserId) {
+          io!.to(`user:${friendUserId}`).emit('user:online', {
+            userId,
+            timestamp: new Date()
+          });
+        }
+      });
+    } catch (error) {
+      log.error('Error updating user status:', error);
+    }
+
     // Join user's personal room
     socket.join(`user:${userId}`);
-
-    // Notify user's friends that they're online
-    socket.broadcast.emit('user:online', { userId });
 
     // Handle direct messages (1-on-1 chat)
     socket.on(
@@ -85,33 +125,37 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
         metadata?: any;
       }) => {
         try {
-          // Encrypt message content
-          const { encryptedContent, iv } = encryptionService.encryptMessage(data.content);
+          const savedMessage = await chatService.sendDirectMessage(
+            userId,
+            data.recipientId,
+            data.content,
+            data.messageType || 'text',
+            data.metadata
+          );
 
-          const encryptedMessage = {
-            senderId: userId,
-            recipientId: data.recipientId,
-            encryptedContent,
-            iv,
-            messageType: data.messageType || 'text',
-            metadata: data.metadata,
-            timestamp: new Date(),
-            conversationId: data.conversationId || generateConversationId(userId, data.recipientId)
-          };
+          const payload = buildSocketMessagePayload(savedMessage, data.content);
 
-          // Emit to recipient(s)
-          io!.to(`user:${data.recipientId}`).emit('message:receive', encryptedMessage);
+          io!.to(`user:${data.recipientId}`).emit('message:receive', payload);
 
-          // Send confirmation to sender
-          socket.emit('message:sent', {
-            ...encryptedMessage,
-            status: 'delivered'
-          });
+          socket.emit('message:sent', payload);
 
           log.info(`Message sent from ${userId} to ${data.recipientId}`);
+
+          if (getUserConnectionCount(data.recipientId) === 0) {
+            notificationService
+              .notifyDirectMessage({
+                recipientId: data.recipientId,
+                senderId: userId,
+                message: data.content,
+                conversationId: payload.conversationId
+              })
+              .catch(error => log.error('Failed to enqueue direct message notification', error));
+          }
         } catch (error) {
-          log.error('Error sending message:', error);
-          socket.emit('message:error', { error: 'Failed to send message' });
+          const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          log.error('Error sending message:', errorMessage, errorStack);
+          socket.emit('message:error', { error: errorMessage || 'Failed to send message' });
         }
       }
     );
@@ -126,27 +170,47 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
         metadata?: any;
       }) => {
         try {
-          // Encrypt message content
-          const { encryptedContent, iv } = encryptionService.encryptMessage(data.content);
+          const conversationId = `group_${data.groupId}`;
+          const conversation = await Conversation.findOne({ conversationId });
+          const participantIds = conversation
+            ? conversation.participants.map(participant => participant.toString())
+            : [userId];
 
-          const encryptedMessage = {
-            senderId: userId,
-            groupId: data.groupId,
-            encryptedContent,
-            iv,
-            messageType: data.messageType || 'text',
-            metadata: data.metadata,
-            timestamp: new Date(),
-            conversationId: `group_${data.groupId}`
-          };
+          const savedMessage = await chatService.sendGroupMessage(
+            userId,
+            data.groupId,
+            data.content,
+            participantIds,
+            data.messageType || 'text',
+            data.metadata
+          );
 
-          // Emit to all group members
-          io!.to(`group:${data.groupId}`).emit('group:message:receive', encryptedMessage);
+          const payload = buildSocketMessagePayload(savedMessage, data.content);
+
+          // Emit only to the group room (includes sender if they've joined)
+          io!.to(`group:${data.groupId}`).emit('group:message:receive', payload);
 
           log.info(`Group message sent by ${userId} to group ${data.groupId}`);
+
+          const offlineMembers = participantIds.filter(
+            memberId => memberId !== userId && getUserConnectionCount(memberId) === 0
+          );
+
+          if (offlineMembers.length > 0) {
+            notificationService
+              .notifyGroupMessage({
+                recipientIds: offlineMembers,
+                senderId: userId,
+                message: data.content,
+                groupId: data.groupId
+              })
+              .catch(error => log.error('Failed to enqueue group message notification', error));
+          }
         } catch (error) {
-          log.error('Error sending group message:', error);
-          socket.emit('group:message:error', { error: 'Failed to send group message' });
+          const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          log.error('Error sending group message:', errorMessage, errorStack);
+          socket.emit('group:message:error', { error: errorMessage || 'Failed to send group message' });
         }
       }
     );
@@ -177,34 +241,52 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       });
     });
 
-    // Typing indicators
-    socket.on('typing:start', (data: { recipientId?: string; groupId?: string }) => {
-      if (data.recipientId) {
-        io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
-          userId,
-          isTyping: true
-        });
-      } else if (data.groupId) {
-        socket.to(`group:${data.groupId}`).emit('typing:indicator', {
-          userId,
-          groupId: data.groupId,
-          isTyping: true
-        });
+    // Typing indicators with database tracking
+    socket.on('typing:start', async (data: { conversationId: string; recipientId?: string; groupId?: string }) => {
+      try {
+        // Update typing status in database
+        await UserStatus.findOneAndUpdate({ userId }, { $addToSet: { currentlyTypingIn: data.conversationId } });
+
+        if (data.recipientId) {
+          io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
+            userId,
+            conversationId: data.conversationId,
+            isTyping: true
+          });
+        } else if (data.groupId) {
+          socket.to(`group:${data.groupId}`).emit('typing:indicator', {
+            userId,
+            groupId: data.groupId,
+            conversationId: data.conversationId,
+            isTyping: true
+          });
+        }
+      } catch (error) {
+        log.error('Error handling typing:start:', error);
       }
     });
 
-    socket.on('typing:stop', (data: { recipientId?: string; groupId?: string }) => {
-      if (data.recipientId) {
-        io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
-          userId,
-          isTyping: false
-        });
-      } else if (data.groupId) {
-        socket.to(`group:${data.groupId}`).emit('typing:indicator', {
-          userId,
-          groupId: data.groupId,
-          isTyping: false
-        });
+    socket.on('typing:stop', async (data: { conversationId: string; recipientId?: string; groupId?: string }) => {
+      try {
+        // Remove typing status from database
+        await UserStatus.findOneAndUpdate({ userId }, { $pull: { currentlyTypingIn: data.conversationId } });
+
+        if (data.recipientId) {
+          io!.to(`user:${data.recipientId}`).emit('typing:indicator', {
+            userId,
+            conversationId: data.conversationId,
+            isTyping: false
+          });
+        } else if (data.groupId) {
+          socket.to(`group:${data.groupId}`).emit('typing:indicator', {
+            userId,
+            groupId: data.groupId,
+            conversationId: data.conversationId,
+            isTyping: false
+          });
+        }
+      } catch (error) {
+        log.error('Error handling typing:stop:', error);
       }
     });
 
@@ -232,7 +314,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     });
 
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       log.info(`User disconnected: ${userId} (Socket: ${socket.id})`);
 
       // Remove socket from user's socket set
@@ -240,13 +322,52 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       if (sockets) {
         sockets.delete(socket.id);
 
+        // Update database: remove this socketId
+        try {
+          await UserStatus.findOneAndUpdate(
+            { userId },
+            {
+              $pull: { socketIds: socket.id },
+              $set: { lastSeen: new Date() }
+            }
+          );
+        } catch (error) {
+          log.error('Error updating user status on disconnect:', error);
+        }
+
         // If user has no more active connections, mark as offline
         if (sockets.size === 0) {
           userSockets.delete(userId);
           activeUsers.delete(userId);
 
-          // Notify friends that user is offline
-          socket.broadcast.emit('user:offline', { userId });
+          try {
+            // Update status to offline in database
+            await UserStatus.findOneAndUpdate(
+              { userId },
+              {
+                $set: {
+                  isOnline: false,
+                  lastSeen: new Date(),
+                  currentlyTypingIn: [], // Clear typing indicators
+                  socketIds: []
+                }
+              }
+            );
+
+            // Notify friends that user is offline
+            const friends = await friendService.getFriends(userId);
+            friends.forEach(friend => {
+              const friendUserId = (friend as any).userId?.toString() || (friend as any)._id?.toString();
+              if (friendUserId) {
+                io!.to(`user:${friendUserId}`).emit('user:offline', {
+                  userId,
+                  lastSeen: new Date()
+                });
+              }
+            });
+          } catch (error) {
+            log.error('Error marking user offline:', error);
+          }
         }
       }
     });
@@ -259,15 +380,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
   log.info('Socket.io server initialized successfully');
   return io;
-}
-
-/**
- * Generate a consistent conversation ID for 1-on-1 chats
- * Ensures both users use the same conversation ID regardless of who initiated
- */
-function generateConversationId(userId1: string, userId2: string): string {
-  const sorted = [userId1, userId2].sort();
-  return `${sorted[0]}_${sorted[1]}`;
 }
 
 /**
@@ -300,6 +412,33 @@ export function isUserOnline(userId: string): boolean {
  */
 export function getOnlineUsers(): string[] {
   return Array.from(activeUsers.keys());
+}
+
+function buildSocketMessagePayload(message: IChatMessage, plainContent: string) {
+  const readBy = Array.isArray(message.readBy) ? message.readBy.map(id => id.toString()) : [];
+  const deliveredTo = Array.isArray(message.deliveredTo) ? message.deliveredTo.map(id => id.toString()) : [];
+  const metadata = (message.metadata || {}) as Record<string, any>;
+
+  return {
+    _id: message._id.toString(),
+    senderId: message.senderId?.toString(),
+    recipientId: message.recipientId?.toString(),
+    groupId: message.groupId?.toString(),
+    conversationId: message.conversationId,
+    content: plainContent,
+    encryptedContent: message.encryptedContent,
+    iv: message.iv,
+    messageType: message.messageType,
+    metadata,
+    mediaUrl: metadata.fileUrl,
+    thumbnailUrl: metadata.thumbnailUrl,
+    readBy,
+    deliveredTo,
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt,
+    timestamp: message.createdAt,
+    status: 'delivered'
+  };
 }
 
 /**

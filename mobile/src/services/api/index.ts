@@ -5,6 +5,8 @@ export { default as couponService } from "./couponService";
 export { default as friendService } from "./friendService";
 export { default as groupService } from "./groupService";
 export { default as leaderboardService } from "./leaderboardService";
+export { default as mediaUploadService } from "./mediaUploadService";
+export { default as pointsService } from "./pointsService";
 export { default as profileService } from "./profileService";
 export { default as referralService } from "./referralService";
 
@@ -17,6 +19,13 @@ export type {
 } from "./friendService";
 
 export type { ChatMessage, Conversation } from "./chatService";
+
+export type {
+  MediaType,
+  PickedMedia,
+  UploadProgress,
+  UploadResult,
+} from "./mediaUploadService";
 
 export type { GroupMember, StudyGroup, StudyGroupInvite } from "./groupService";
 
@@ -39,5 +48,12 @@ export type {
   AchievementCategory,
   UserAchievement,
 } from "./achievementService";
+
+export { DiscountTier } from "./pointsService";
+export type {
+  PointsSummary,
+  PointsTransaction,
+  RedeemDiscountResponse,
+} from "./pointsService";
 
 export type { UserProfile, UserStatistics } from "./profileService";

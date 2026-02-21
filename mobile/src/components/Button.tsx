@@ -7,7 +7,10 @@ import {
   ViewStyle,
 } from "react-native";
 
-import { colors, radii, spacing } from "../theme/tokens";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { radii, spacing } from "../theme/tokens";
 
 interface ButtonProps {
   title: string;
@@ -26,6 +29,8 @@ export const Button: React.FC<ButtonProps> = ({
   loading,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const isDisabled = disabled || loading;
 
   return (
@@ -59,38 +64,39 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  base: {
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.xxl,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 6,
-  },
-  primary: {
-    backgroundColor: colors.primary,
-  },
-  secondary: {
-    backgroundColor: colors.secondary,
-  },
-  ghost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  label: {
-    color: colors.primaryOn,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  ghostLabel: {
-    color: colors.textPrimary,
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    base: {
+      paddingVertical: spacing.sm + 2,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.xxl,
+      alignItems: "center",
+      justifyContent: "center",
+      marginVertical: 6,
+    },
+    primary: {
+      backgroundColor: colors.primary,
+    },
+    secondary: {
+      backgroundColor: colors.secondary,
+    },
+    ghost: {
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    label: {
+      color: colors.primaryOn,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    ghostLabel: {
+      color: colors.textPrimary,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+  });

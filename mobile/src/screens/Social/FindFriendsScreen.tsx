@@ -3,7 +3,6 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -13,7 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useFriends } from "../../hooks";
+import { FriendSkeletonList } from "../../components/skeletons/SocialSkeletons";
+import { useTheme } from "../../context";
+import { useFriends, useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 import type { SocialStackParamList } from "../../navigation/SocialNavigator";
 
 export const FindFriendsScreen: React.FC = () => {
@@ -21,6 +23,8 @@ export const FindFriendsScreen: React.FC = () => {
     useNavigation<NativeStackNavigationProp<SocialStackParamList>>();
   const { searchUsers, getFriendSuggestions, sendFriendRequest, loading } =
     useFriends();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -61,64 +65,73 @@ export const FindFriendsScreen: React.FC = () => {
     }
   };
 
-  const renderUserItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.userCard}
-      onPress={() =>
-        navigation.navigate("UserProfile", { userId: item.userId || item._id })
-      }
-    >
-      <View style={styles.userInfo}>
-        {item.avatar ? (
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarText}>
-              {item.displayName?.charAt(0).toUpperCase() || "U"}
-            </Text>
+  const renderUserItem = ({ item }: { item: any }) => {
+    // Extract the actual user ID - handle both populated and unpopulated cases
+    const actualUserId =
+      typeof item.userId === "object" && item.userId?._id
+        ? String(item.userId._id)
+        : String(item.userId || item._id);
+
+    return (
+      <TouchableOpacity
+        style={styles.userCard}
+        onPress={() =>
+          navigation.navigate("UserProfile", { userId: actualUserId })
+        }
+      >
+        <View style={styles.userInfo}>
+          {item.avatar ? (
+            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarText}>
+                {item.displayName?.charAt(0).toUpperCase() || "U"}
+              </Text>
+            </View>
+          )}
+          <View style={styles.textInfo}>
+            <Text style={styles.displayName}>{item.displayName}</Text>
+            <Text style={styles.username}>@{item.username}</Text>
+            {item.mutualFriends > 0 && (
+              <Text style={styles.mutualFriends}>
+                {item.mutualFriends} mutual friend
+                {item.mutualFriends !== 1 ? "s" : ""}
+              </Text>
+            )}
+            {item.reason && (
+              <Text style={styles.suggestionReason}>{item.reason}</Text>
+            )}
+          </View>
+        </View>
+
+        {item.friendshipStatus === "none" && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => handleSendRequest(actualUserId)}
+          >
+            <Ionicons name="person-add" size={20} color={colors.primary} />
+            <Text style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
+        )}
+        {item.friendshipStatus === "pending" && (
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusText}>Pending</Text>
           </View>
         )}
-        <View style={styles.textInfo}>
-          <Text style={styles.displayName}>{item.displayName}</Text>
-          <Text style={styles.username}>@{item.username}</Text>
-          {item.mutualFriends > 0 && (
-            <Text style={styles.mutualFriends}>
-              {item.mutualFriends} mutual friend
-              {item.mutualFriends !== 1 ? "s" : ""}
-            </Text>
-          )}
-          {item.reason && (
-            <Text style={styles.suggestionReason}>{item.reason}</Text>
-          )}
-        </View>
-      </View>
-
-      {item.friendshipStatus === "none" && (
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => handleSendRequest(item.userId || item._id)}
-        >
-          <Ionicons name="person-add" size={20} color="#007AFF" />
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
-      )}
-      {item.friendshipStatus === "pending" && (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Pending</Text>
-        </View>
-      )}
-      {item.friendshipStatus === "friends" && (
-        <View style={[styles.statusBadge, styles.friendsBadge]}>
-          <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-          <Text style={[styles.statusText, styles.friendsText]}>Friends</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+        {item.friendshipStatus === "friends" && (
+          <View style={[styles.statusBadge, styles.friendsBadge]}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            <Text style={[styles.statusText, styles.friendsText]}>Friends</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const displayData =
     searchQuery.trim().length >= 2 ? searchResults : suggestions;
   const isLoading = searching || loading;
+  const isInitialLoading = isLoading && displayData.length === 0;
 
   return (
     <View style={styles.container}>
@@ -127,7 +140,7 @@ export const FindFriendsScreen: React.FC = () => {
           <Ionicons
             name="search"
             size={20}
-            color="#8E8E93"
+            color={colors.textMuted}
             style={styles.searchIcon}
           />
           <TextInput
@@ -137,19 +150,22 @@ export const FindFriendsScreen: React.FC = () => {
             onChangeText={handleSearch}
             autoCapitalize="none"
             autoCorrect={false}
+            placeholderTextColor={colors.textMuted}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => handleSearch("")}>
-              <Ionicons name="close-circle" size={20} color="#8E8E93" />
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {isLoading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
+      {isInitialLoading ? (
+        <FriendSkeletonList />
       ) : (
         <>
           {displayData.length > 0 ? (
@@ -174,7 +190,7 @@ export const FindFriendsScreen: React.FC = () => {
               <Ionicons
                 name={searchQuery ? "search" : "people-outline"}
                 size={64}
-                color="#8E8E93"
+                color={colors.textMuted}
               />
               <Text style={styles.emptyTitle}>
                 {searchQuery ? "No results found" : "No suggestions"}
@@ -192,170 +208,167 @@ export const FindFriendsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  searchContainer: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F2F2F7",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#000000",
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000000",
-  },
-  sectionCount: {
-    fontSize: 15,
-    color: "#8E8E93",
-  },
-  listContent: {
-    padding: 16,
-  },
-  userCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: 12,
-  },
-  avatarPlaceholder: {
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "600",
-  },
-  textInfo: {
-    flex: 1,
-  },
-  displayName: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 2,
-  },
-  username: {
-    fontSize: 15,
-    color: "#8E8E93",
-    marginBottom: 4,
-  },
-  mutualFriends: {
-    fontSize: 13,
-    color: "#007AFF",
-  },
-  suggestionReason: {
-    fontSize: 13,
-    color: "#8E8E93",
-    fontStyle: "italic",
-  },
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E8F4FF",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 4,
-  },
-  addButtonText: {
-    color: "#007AFF",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F2F2F7",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  friendsBadge: {
-    backgroundColor: "#E8F5E9",
-  },
-  statusText: {
-    fontSize: 13,
-    color: "#8E8E93",
-    fontWeight: "600",
-  },
-  friendsText: {
-    color: "#34C759",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#000000",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 15,
-    color: "#8E8E93",
-    textAlign: "center",
-    lineHeight: 22,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    searchContainer: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      height: 40,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    sectionCount: {
+      fontSize: 15,
+      color: colors.textSecondary,
+    },
+    listContent: {
+      padding: 16,
+      paddingBottom: 24,
+    },
+    userCard: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    userInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    avatar: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      marginRight: 12,
+    },
+    avatarPlaceholder: {
+      backgroundColor: colors.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarText: {
+      color: colors.primaryOn,
+      fontSize: 24,
+      fontWeight: "600",
+    },
+    textInfo: {
+      flex: 1,
+    },
+    displayName: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    username: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    },
+    mutualFriends: {
+      fontSize: 13,
+      color: colors.primary,
+    },
+    suggestionReason: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontStyle: "italic",
+    },
+    addButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.primarySoft,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      gap: 4,
+    },
+    addButtonText: {
+      color: colors.primary,
+      fontSize: 15,
+      fontWeight: "600",
+    },
+    statusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surfaceSubtle,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      gap: 4,
+    },
+    friendsBadge: {
+      backgroundColor: colors.successSoft,
+    },
+    statusText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    friendsText: {
+      color: colors.success,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 32,
+    },
+    emptyTitle: {
+      fontSize: 22,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptyDescription: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+  });

@@ -1,6 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { API_BASE_URL } from "../../config";
+import { apiClient } from "../../api/client";
 
 export interface StudyGroup {
   _id: string;
@@ -10,6 +8,9 @@ export interface StudyGroup {
   adminIds: string[];
   memberIds: string[];
   memberCount: number;
+  maxMembers: number;
+  isCreator: boolean;
+  isAdmin: boolean;
   settings: {
     isPrivate: boolean;
     allowMemberInvites: boolean;
@@ -43,26 +44,17 @@ export interface StudyGroupInvite {
 }
 
 export interface GroupMember {
-  _id: string;
-  email: string;
+  id: string;
+  userId: string;
+  displayName?: string;
+  email?: string;
   username?: string;
   avatar?: string;
+  bio?: string;
+  lastActive?: string;
   isAdmin: boolean;
   isCreator: boolean;
-  joinedAt: string;
 }
-
-const getAuthToken = async (): Promise<string | null> => {
-  return await AsyncStorage.getItem("authToken");
-};
-
-const getAuthHeaders = async () => {
-  const token = await getAuthToken();
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
-};
 
 class StudyGroupService {
   /**
@@ -81,11 +73,9 @@ class StudyGroupService {
       allowMemberInvites?: boolean;
       requireApproval?: boolean;
     };
+    memberIds?: string[];
   }): Promise<StudyGroup> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(`${API_BASE_URL}/groups`, data, {
-      headers,
-    });
+    const response = await apiClient.post(`/groups`, data);
     return response.data.data;
   }
 
@@ -93,8 +83,7 @@ class StudyGroupService {
    * Get user's study groups
    */
   async getMyGroups(): Promise<StudyGroup[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/groups`, { headers });
+    const response = await apiClient.get(`/groups`);
     return response.data.data;
   }
 
@@ -102,10 +91,7 @@ class StudyGroupService {
    * Get a specific group
    */
   async getGroup(groupId: string): Promise<StudyGroup> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/groups/${groupId}`, {
-      headers,
-    });
+    const response = await apiClient.get(`/groups/${groupId}`);
     return response.data.data;
   }
 
@@ -121,14 +107,7 @@ class StudyGroupService {
       settings?: any;
     }
   ): Promise<StudyGroup> {
-    const headers = await getAuthHeaders();
-    const response = await axios.put(
-      `${API_BASE_URL}/groups/${groupId}`,
-      updates,
-      {
-        headers,
-      }
-    );
+    const response = await apiClient.put(`/groups/${groupId}`, updates);
     return response.data.data;
   }
 
@@ -136,11 +115,7 @@ class StudyGroupService {
    * Delete a group
    */
   async deleteGroup(groupId: string): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.delete(
-      `${API_BASE_URL}/groups/${groupId}`,
-      { headers }
-    );
+    const response = await apiClient.delete(`/groups/${groupId}`);
     return response.data;
   }
 
@@ -152,12 +127,10 @@ class StudyGroupService {
     inviteeId: string,
     message?: string
   ): Promise<StudyGroupInvite> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/${groupId}/invite`,
-      { inviteeId, message },
-      { headers }
-    );
+    const response = await apiClient.post(`/groups/${groupId}/invite`, {
+      inviteeId,
+      message,
+    });
     return response.data.data;
   }
 
@@ -165,11 +138,9 @@ class StudyGroupService {
    * Accept group invitation
    */
   async acceptInvite(inviteId: string): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/invites/${inviteId}/accept`,
-      {},
-      { headers }
+    const response = await apiClient.post(
+      `/groups/invites/${inviteId}/accept`,
+      {}
     );
     return response.data;
   }
@@ -178,11 +149,9 @@ class StudyGroupService {
    * Decline group invitation
    */
   async declineInvite(inviteId: string): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/invites/${inviteId}/decline`,
-      {},
-      { headers }
+    const response = await apiClient.post(
+      `/groups/invites/${inviteId}/decline`,
+      {}
     );
     return response.data;
   }
@@ -191,36 +160,23 @@ class StudyGroupService {
    * Get pending group invitations
    */
   async getPendingInvites(): Promise<StudyGroupInvite[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/groups/invites`, {
-      headers,
-    });
+    const response = await apiClient.get(`/groups/invites`);
     return response.data.data;
   }
 
   /**
    * Join a public group
    */
-  async joinGroup(groupId: string): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/${groupId}/join`,
-      {},
-      { headers }
-    );
-    return response.data;
+  async joinGroup(groupId: string): Promise<StudyGroup> {
+    const response = await apiClient.post(`/groups/${groupId}/join`, {});
+    return response.data.data;
   }
 
   /**
    * Leave a group
    */
   async leaveGroup(groupId: string): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/${groupId}/leave`,
-      {},
-      { headers }
-    );
+    const response = await apiClient.post(`/groups/${groupId}/leave`, {});
     return response.data;
   }
 
@@ -228,13 +184,7 @@ class StudyGroupService {
    * Get group members
    */
   async getMembers(groupId: string): Promise<GroupMember[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(
-      `${API_BASE_URL}/groups/${groupId}/members`,
-      {
-        headers,
-      }
-    );
+    const response = await apiClient.get(`/groups/${groupId}/members`);
     return response.data.data;
   }
 
@@ -245,12 +195,20 @@ class StudyGroupService {
     groupId: string,
     memberId: string
   ): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.delete(
-      `${API_BASE_URL}/groups/${groupId}/members/${memberId}`,
-      { headers }
+    const response = await apiClient.delete(
+      `/groups/${groupId}/members/${memberId}`
     );
     return response.data;
+  }
+
+  async addMember(
+    groupId: string,
+    memberId: string
+  ): Promise<StudyGroup> {
+    const response = await apiClient.post(`/groups/${groupId}/members`, {
+      memberId,
+    });
+    return response.data.data;
   }
 
   /**
@@ -260,11 +218,9 @@ class StudyGroupService {
     groupId: string,
     memberId: string
   ): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.post(
-      `${API_BASE_URL}/groups/${groupId}/admins/${memberId}`,
-      {},
-      { headers }
+    const response = await apiClient.post(
+      `/groups/${groupId}/admins/${memberId}`,
+      {}
     );
     return response.data;
   }
@@ -276,10 +232,8 @@ class StudyGroupService {
     groupId: string,
     adminId: string
   ): Promise<{ message: string }> {
-    const headers = await getAuthHeaders();
-    const response = await axios.delete(
-      `${API_BASE_URL}/groups/${groupId}/admins/${adminId}`,
-      { headers }
+    const response = await apiClient.delete(
+      `/groups/${groupId}/admins/${adminId}`
     );
     return response.data;
   }
@@ -292,9 +246,7 @@ class StudyGroupService {
     ieltsType?: "academic" | "general";
     targetCountry?: string;
   }): Promise<StudyGroup[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/groups/search`, {
-      headers,
+    const response = await apiClient.get(`/groups/search`, {
       params: filters,
     });
     return response.data.data;
@@ -304,9 +256,7 @@ class StudyGroupService {
    * Get suggested groups
    */
   async getSuggestedGroups(limit: number = 10): Promise<StudyGroup[]> {
-    const headers = await getAuthHeaders();
-    const response = await axios.get(`${API_BASE_URL}/groups/suggestions`, {
-      headers,
+    const response = await apiClient.get(`/groups/suggestions`, {
       params: { limit },
     });
     return response.data.data;

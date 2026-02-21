@@ -13,7 +13,7 @@ import {
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage, isEmptyOrNull } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { FilterQuery, Model, PopulateOptions } from 'mongoose';
+import { FilterQuery, Model, PopulateOptions } from '@lib/db/mongooseCompat';
 import { Service } from 'typedi';
 
 /**

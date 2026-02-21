@@ -208,9 +208,9 @@ export class StandardResponse {
    * @param message - Error message
    * @param headers - Request headers for logging context
    */
-  public static forbidden(res: Response, message: string = 'Access forbidden', headers?: IRequestHeaders): void {
+  public static forbidden(res: Response, message: string = 'Access forbidden', headers?: IRequestHeaders): Response {
     const csError = new CSError(HTTP_STATUS_CODES.FORBIDDEN, CODES.Forbidden, message);
-    this.error(res, csError, headers);
+    return this.error(res, csError, headers);
   }
 
   /**

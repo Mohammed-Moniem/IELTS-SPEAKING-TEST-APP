@@ -10,7 +10,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { evaluateResponse, processConversationTurn } from "../api/speechApi";
+import {
+  evaluateResponse,
+  processConversationTurn,
+  transcribeAudio,
+} from "../api/speechApi";
 import { ttsService } from "../services/textToSpeechService";
 import { colors, radii, shadows, spacing } from "../theme/tokens";
 import { VoiceOrb } from "./VoiceOrb";
@@ -277,7 +281,6 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       setState("processing");
 
       // First, transcribe the audio
-      const { transcribeAudio } = await import("../api/speechApi");
       const transcription = await transcribeAudio(audioUri);
 
       console.log("📝 Transcription:", transcription.text);
@@ -343,11 +346,9 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         typeof error?.message === "string" &&
         error.message.toLowerCase().includes("timeout")
           ? "The evaluation is taking longer than expected, but the server is still working on it. Please give it another moment and check the Results tab if it doesn't appear automatically."
-          : error.message || "Failed to evaluate your response. Please try again.";
-      Alert.alert(
-        "Evaluation Error",
-        errorMessage
-      );
+          : error.message ||
+            "Failed to evaluate your response. Please try again.";
+      Alert.alert("Evaluation Error", errorMessage);
       setState("idle");
     }
   };

@@ -1,4 +1,4 @@
-import { HydratedDocument, Schema, Types, model } from 'mongoose';
+import { HydratedDocument, Schema, Types, model } from '@lib/db/mongooseCompat';
 import { SubscriptionPlan } from './UserModel';
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'incomplete';

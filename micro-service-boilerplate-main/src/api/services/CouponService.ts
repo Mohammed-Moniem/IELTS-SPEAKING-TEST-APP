@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { Types } from '@lib/db/mongooseCompat';
 import { Logger } from '../../lib/logger';
 import { Coupon, CouponType, CouponUsage, ICoupon, ICouponUsage } from '../models/CouponModel';
 

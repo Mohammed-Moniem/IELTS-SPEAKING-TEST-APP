@@ -3,7 +3,7 @@
  * Handles audio recording upload, retrieval, and management
  */
 
-import { Response } from 'express';
+import type { Response } from 'express';
 import {
   Delete,
   Get,
@@ -208,7 +208,8 @@ export class AudioController {
     @HeaderParam('x-user-id') userId?: string
   ): Promise<any> {
     try {
-      this.log.info(`🗑️  Delete recording request: ${recordingId}`);
+      const requester = userId ?? 'unknown';
+      this.log.info(`🗑️  Delete recording request: ${recordingId} by ${requester}`);
 
       // TODO: Add authorization check - verify userId owns this recording
 

@@ -15,40 +15,26 @@ import {
   View,
 } from "react-native";
 
+import { notificationsApi } from "../../api/services";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "../../constants/notifications";
 import notificationService from "../../services/notificationService";
 import { colors, spacing } from "../../theme/tokens";
-
-interface NotificationSettings {
-  dailyReminderEnabled: boolean;
-  dailyReminderHour: number;
-  dailyReminderMinute: number;
-  achievementsEnabled: boolean;
-  streakRemindersEnabled: boolean;
-  inactivityRemindersEnabled: boolean;
-  feedbackNotificationsEnabled: boolean;
-}
-
-const DEFAULT_SETTINGS: NotificationSettings = {
-  dailyReminderEnabled: true,
-  dailyReminderHour: 19, // 7 PM
-  dailyReminderMinute: 0,
-  achievementsEnabled: true,
-  streakRemindersEnabled: true,
-  inactivityRemindersEnabled: true,
-  feedbackNotificationsEnabled: true,
-};
+import { NotificationSettings } from "../../types/api";
+import { extractErrorMessage } from "../../utils/errors";
 
 const STORAGE_KEY = "notification_settings";
 
 export const NotificationSettingsScreen: React.FC = () => {
-  const [settings, setSettings] =
-    useState<NotificationSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<NotificationSettings>(
+    DEFAULT_NOTIFICATION_SETTINGS
+  );
   const [permissionStatus, setPermissionStatus] =
     useState<string>("checking...");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -57,24 +43,62 @@ export const NotificationSettingsScreen: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setSettings(JSON.parse(stored));
-      }
+      const remote = await notificationsApi.getPreferences();
+      setSettings(remote);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
     } catch (error) {
-      console.error("Failed to load notification settings:", error);
+      console.warn("Failed to fetch notification settings:", error);
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setSettings(JSON.parse(stored));
+        } else {
+          setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+          await AsyncStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS)
+          );
+        }
+      } catch (storageError) {
+        console.error("Unable to read cached notification settings", storageError);
+        setSettings(DEFAULT_NOTIFICATION_SETTINGS);
+        await AsyncStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS)
+        );
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const saveSettings = async (newSettings: NotificationSettings) => {
+  const persistSettings = async (
+    nextSettings: NotificationSettings,
+    options?: { skipRemote?: boolean }
+  ) => {
+    const previous = settings;
+    setSettings(nextSettings);
+
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
-      setSettings(newSettings);
+      if (options?.skipRemote) {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextSettings));
+        return nextSettings;
+      }
+
+      setIsSaving(true);
+      const updated = await notificationsApi.updatePreferences(nextSettings);
+      setSettings(updated);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
     } catch (error) {
       console.error("Failed to save notification settings:", error);
-      Alert.alert("Error", "Failed to save settings");
+      setSettings(previous);
+      Alert.alert("Error", extractErrorMessage(error));
+      throw error;
+    } finally {
+      if (!options?.skipRemote) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -101,13 +125,15 @@ export const NotificationSettingsScreen: React.FC = () => {
   };
 
   const toggleDailyReminder = async (enabled: boolean) => {
-    const newSettings = { ...settings, dailyReminderEnabled: enabled };
-    await saveSettings(newSettings);
+    const updated = await persistSettings({
+      ...settings,
+      dailyReminderEnabled: enabled,
+    });
 
     if (permissionStatus === "granted") {
       await notificationService.scheduleDailyReminder(
-        settings.dailyReminderHour,
-        settings.dailyReminderMinute,
+        updated.dailyReminderHour,
+        updated.dailyReminderMinute,
         enabled
       );
     }
@@ -141,14 +167,13 @@ export const NotificationSettingsScreen: React.FC = () => {
   };
 
   const updateReminderTime = async (hour: number, minute: number) => {
-    const newSettings = {
+    const updated = await persistSettings({
       ...settings,
       dailyReminderHour: hour,
       dailyReminderMinute: minute,
-    };
-    await saveSettings(newSettings);
+    });
 
-    if (permissionStatus === "granted" && settings.dailyReminderEnabled) {
+    if (permissionStatus === "granted" && updated.dailyReminderEnabled) {
       await notificationService.scheduleDailyReminder(hour, minute, true);
       Alert.alert(
         "Updated",
@@ -162,7 +187,7 @@ export const NotificationSettingsScreen: React.FC = () => {
     value: boolean
   ) => {
     const newSettings = { ...settings, [key]: value };
-    await saveSettings(newSettings);
+    await persistSettings(newSettings);
   };
 
   const formatTime = (hour: number, minute: number): string => {
@@ -226,8 +251,13 @@ export const NotificationSettingsScreen: React.FC = () => {
       <SectionHeading title="Notification Settings">
         Customize your reminder preferences
       </SectionHeading>
+      {isSaving && (
+        <Text style={styles.savingText}>Saving your preferences...</Text>
+      )}
 
-      {/* Daily Reminder */}
+      <SectionHeading title="Practice Reminders">
+        Keep your study rhythm on track
+      </SectionHeading>
       <Card>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
@@ -239,6 +269,7 @@ export const NotificationSettingsScreen: React.FC = () => {
           <Switch
             value={settings.dailyReminderEnabled}
             onValueChange={toggleDailyReminder}
+            disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           />
@@ -260,7 +291,9 @@ export const NotificationSettingsScreen: React.FC = () => {
         )}
       </Card>
 
-      {/* Achievement Notifications */}
+      <SectionHeading title="Progress & Feedback">
+        Celebrate wins and track feedback
+      </SectionHeading>
       <Card>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
@@ -272,13 +305,13 @@ export const NotificationSettingsScreen: React.FC = () => {
           <Switch
             value={settings.achievementsEnabled}
             onValueChange={(val) => toggleSetting("achievementsEnabled", val)}
+            disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           />
         </View>
       </Card>
 
-      {/* Streak Reminders */}
       <Card>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
@@ -292,19 +325,19 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={(val) =>
               toggleSetting("streakRemindersEnabled", val)
             }
+            disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           />
         </View>
       </Card>
 
-      {/* Inactivity Reminders */}
       <Card>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingTitle}>Inactivity Reminders</Text>
             <Text style={styles.settingDescription}>
-              Get a gentle reminder if you haven't practiced in a while
+              Gentle reminders when you miss a day of practice
             </Text>
           </View>
           <Switch
@@ -312,19 +345,19 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={(val) =>
               toggleSetting("inactivityRemindersEnabled", val)
             }
+            disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           />
         </View>
       </Card>
 
-      {/* Feedback Notifications */}
       <Card>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingTitle}>Feedback Ready</Text>
             <Text style={styles.settingDescription}>
-              Know when your AI feedback is ready to review
+              Know instantly when AI feedback is available
             </Text>
           </View>
           <Switch
@@ -332,15 +365,103 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={(val) =>
               toggleSetting("feedbackNotificationsEnabled", val)
             }
+            disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
           />
         </View>
       </Card>
 
-      {/* Test Notification */}
+      <SectionHeading title="Chat Notifications">
+        Stay in sync with friends and study groups
+      </SectionHeading>
       <Card>
-        <TouchableOpacity style={styles.testButton} onPress={testNotification}>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Direct Messages</Text>
+            <Text style={styles.settingDescription}>
+              Alerts when friends send you private messages
+            </Text>
+          </View>
+          <Switch
+            value={settings.directMessagesEnabled}
+            onValueChange={(val) =>
+              toggleSetting("directMessagesEnabled", val)
+            }
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Group Chats</Text>
+            <Text style={styles.settingDescription}>
+              Notifications for group discussion updates
+            </Text>
+          </View>
+          <Switch
+            value={settings.groupMessagesEnabled}
+            onValueChange={(val) =>
+              toggleSetting("groupMessagesEnabled", val)
+            }
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+          />
+        </View>
+      </Card>
+
+      <SectionHeading title="Announcements & Offers">
+        Hear about product updates and rewards
+      </SectionHeading>
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>System Announcements</Text>
+            <Text style={styles.settingDescription}>
+              Product updates, new features, and important notices
+            </Text>
+          </View>
+          <Switch
+            value={settings.systemAnnouncementsEnabled}
+            onValueChange={(val) =>
+              toggleSetting("systemAnnouncementsEnabled", val)
+            }
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Special Offers</Text>
+            <Text style={styles.settingDescription}>
+              Discounts, bonus sessions, and referral rewards
+            </Text>
+          </View>
+          <Switch
+            value={settings.offersEnabled}
+            onValueChange={(val) => toggleSetting("offersEnabled", val)}
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={testNotification}
+          disabled={isSaving}
+        >
           <Text style={styles.testButtonText}>🔔 Send Test Notification</Text>
         </TouchableOpacity>
       </Card>
@@ -353,6 +474,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: colors.textMuted,
     marginTop: spacing.xl,
+  },
+  savingText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontStyle: "italic",
+    marginBottom: spacing.md,
   },
   permissionTitle: {
     fontSize: 18,

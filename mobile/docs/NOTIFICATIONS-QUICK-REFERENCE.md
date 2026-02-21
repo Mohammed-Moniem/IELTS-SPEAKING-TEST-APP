@@ -127,6 +127,20 @@ await notificationService.setBadgeCount(5);
 await notificationService.clearBadgeCount();
 ```
 
+### Backend Integration
+
+```http
+POST /notifications/device           # Register Expo push token (auth required)
+DELETE /notifications/device         # Remove the current device token
+GET    /notifications/preferences    # Fetch merged notification settings
+PUT    /notifications/preferences    # Update notification toggles and reminder time
+POST   /notifications/broadcast      # Admin-only: send system/offer pushes
+```
+
+- Device/token endpoints require a valid auth session (called automatically after login/logout).
+- Broadcast endpoint is restricted to the admin email allow‑list exposed via `PUSH_BROADCAST_ALLOWED_EMAILS`.
+- The backend now sends push notifications for offline direct messages, group chats, inactivity (after 24h with daily spacing), and approved broadcasts.
+
 ## 📱 For Users
 
 ### Enable Notifications
@@ -159,8 +173,8 @@ await notificationService.clearBadgeCount();
 
 **Inactivity** 👋
 
-- After 3, 7, or 14 days
-- Gentle reminders
+- Fires when you skip a full day of practice (24h)
+- Repeats every day you remain inactive (with at least 24h between nudges)
 - Can be disabled
 
 **Feedback Ready** ✅
@@ -168,6 +182,26 @@ await notificationService.clearBadgeCount();
 - After AI evaluation
 - Lets you know results available
 - Toggle on/off
+
+**Direct Messages** 💬
+
+- Alerts when friends send you a private chat while you’re offline
+- Automatically suppressed if you’re actively connected
+
+**Group Chats** 👥
+
+- Notifies offline members about new group chat activity
+- Respects per-user toggle in settings
+
+**System Announcements** 📣
+
+- Product updates, downtime notices, feature launches
+- Configurable from Settings → Notifications
+
+**Offers & Rewards** 🎁
+
+- Limited-time discounts, referral bonuses, and point multipliers
+- Opt-in separately from system announcements
 
 ### Time Presets
 
@@ -195,7 +229,11 @@ type NotificationCategory =
   | "streak"
   | "inactivity"
   | "feedback_ready"
-  | "milestone";
+  | "milestone"
+  | "direct_message"
+  | "group_message"
+  | "system"
+  | "offer";
 ```
 
 ### Android Channels
@@ -259,6 +297,38 @@ Category: inactivity
 Title: ✅ Your feedback is ready!
 Body: Check out your detailed feedback for "[Topic Title]"
 Category: feedback_ready
+```
+
+### Direct Message
+
+```
+Title: 💬 [Sender] sent you a message
+Body: [Recent message preview]
+Category: direct_message
+```
+
+### Group Message
+
+```
+Title: 👥 [Group Name]: new message from [Sender]
+Body: [Recent message preview]
+Category: group_message
+```
+
+### System Announcement
+
+```
+Title: 📣 [Announcement Title]
+Body: [What changed + next steps]
+Category: system
+```
+
+### Offer / Promotion
+
+```
+Title: 🎁 [Offer title]
+Body: [Short description of the reward or promo]
+Category: offer
 ```
 
 ### Milestone

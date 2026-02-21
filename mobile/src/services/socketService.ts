@@ -1,8 +1,32 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import io, { Socket } from "socket.io-client";
+import { API_URL } from "../api/client";
+import { loadAuth } from "../auth/storage";
+import { API_BASE_URL, SOCKET_URL as CONFIG_SOCKET_URL } from "../config";
+import { logger } from "../utils/logger";
+import monitoringService from "./monitoringService";
 
-const SOCKET_URL = process.env.SOCKET_URL || "http://localhost:8080";
+const defaultSocketUrl = "http://localhost:8080";
+
+const resolveSocketUrl = (): string => {
+  if (CONFIG_SOCKET_URL) {
+    return CONFIG_SOCKET_URL;
+  }
+
+  const candidate = API_BASE_URL || API_URL;
+
+  try {
+    const url = new URL(candidate);
+    return url.origin;
+  } catch {
+    return defaultSocketUrl;
+  }
+};
+
+const SOCKET_URL = resolveSocketUrl();
+
+logger.info("🔌", "Socket URL:", SOCKET_URL);
+
 const RECONNECTION_ATTEMPTS = 5;
 const RECONNECTION_DELAY = 2000;
 
@@ -13,10 +37,12 @@ export interface Message {
   recipientId?: string;
   groupId?: string;
   content: string;
-  messageType: "text" | "image" | "audio" | "file";
+  messageType: "text" | "image" | "audio" | "video" | "gif" | "file";
   isEdited: boolean;
   readBy: string[];
   createdAt: Date;
+  updatedAt?: Date;
+  deliveredTo?: string[];
   senderName?: string;
   senderAvatar?: string;
 }
@@ -65,8 +91,15 @@ class SocketService {
     try {
       this.isConnecting = true;
 
-      // Get auth token
-      this.token = await AsyncStorage.getItem("authToken");
+      // Get auth token from SecureStore
+      const auth = await loadAuth();
+      this.token = auth?.accessToken || null;
+      console.log("🔑 Socket token retrieved:", {
+        hasToken: !!this.token,
+        tokenLength: this.token?.length || 0,
+        tokenPreview: this.token?.substring(0, 20) + "...",
+      });
+
       if (!this.token) {
         console.log("⏳ No auth token found - will connect after login");
         this.isConnecting = false;
@@ -102,6 +135,9 @@ class SocketService {
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.onConnectionChangeCallback?.(true);
+          monitoringService.trackEvent("socket_connected", {
+            socketId: this.socket?.id,
+          });
           resolve(true);
         });
 
@@ -109,6 +145,10 @@ class SocketService {
           console.error("❌ Socket connection error:", error);
           this.isConnecting = false;
           this.reconnectAttempts++;
+          monitoringService.captureException(error, {
+            phase: "connect_error",
+            attempts: this.reconnectAttempts,
+          });
           resolve(false);
         });
       });
@@ -120,15 +160,72 @@ class SocketService {
   }
 
   /**
-   * Disconnect socket
+   * Disconnect socket and clean up all event listeners
    */
   disconnect(): void {
     if (this.socket) {
+      console.log("🔌 Disconnecting socket and cleaning up listeners...");
+
+      // Remove all socket event listeners to prevent memory leaks
+      this.removeAllSocketListeners();
+
+      // Disconnect the socket
       this.socket.disconnect();
       this.socket = null;
+
+      // Clear all custom listeners
+      this.listeners.clear();
+
+      // Clear callbacks
+      this.onMessageCallback = null;
+      this.onTypingCallback = null;
+      this.onOnlineStatusCallback = null;
+
+      // Notify connection change
       this.onConnectionChangeCallback?.(false);
-      console.log("Socket disconnected");
+      this.onConnectionChangeCallback = null;
+
+      console.log("✅ Socket disconnected and cleaned up");
+      monitoringService.trackEvent("socket_disconnected");
     }
+  }
+
+  /**
+   * Remove all socket event listeners
+   */
+  private removeAllSocketListeners(): void {
+    if (!this.socket) return;
+
+    console.log("🧹 Removing all socket event listeners...");
+
+    // Connection events
+    this.socket.off("disconnect");
+    this.socket.off("reconnect");
+    this.socket.off("reconnect_error");
+    this.socket.off("connect_error");
+
+    // Message events
+    this.socket.off("message:receive");
+    this.socket.off("message:sent");
+    this.socket.off("group:message:receive");
+    this.socket.off("message:delivered");
+    this.socket.off("message:read");
+
+    // Typing indicators
+    this.socket.off("typing:start");
+    this.socket.off("typing:stop");
+
+    // Online status
+    this.socket.off("user:online");
+    this.socket.off("user:offline");
+
+    // Social events
+    this.socket.off("friend:request:receive");
+    this.socket.off("friend:request:accepted");
+    this.socket.off("group:invite:receive");
+    this.socket.off("achievement:unlocked");
+
+    console.log("✅ All socket event listeners removed");
   }
 
   /**
@@ -140,14 +237,21 @@ class SocketService {
 
   /**
    * Setup socket event listeners
+   * Note: This method removes old listeners before adding new ones to prevent duplicates
    */
   private setupEventListeners(): void {
     if (!this.socket) return;
+
+    console.log("🔧 Setting up socket event listeners...");
+
+    // Remove any existing listeners first to prevent duplicates
+    this.removeAllSocketListeners();
 
     // Connection events
     this.socket.on("disconnect", (reason) => {
       console.log("Socket disconnected:", reason);
       this.onConnectionChangeCallback?.(false);
+      monitoringService.trackEvent("socket_disconnect", { reason });
 
       // Auto-reconnect if not manual disconnect
       if (reason === "io server disconnect") {
@@ -158,10 +262,14 @@ class SocketService {
     this.socket.on("reconnect", (attemptNumber) => {
       console.log("Socket reconnected after", attemptNumber, "attempts");
       this.onConnectionChangeCallback?.(true);
+      monitoringService.trackEvent("socket_reconnect", {
+        attempts: attemptNumber,
+      });
     });
 
     this.socket.on("reconnect_error", (error) => {
       console.error("Socket reconnection error:", error);
+      monitoringService.captureException(error, { phase: "reconnect_error" });
     });
 
     // Message events
@@ -170,6 +278,23 @@ class SocketService {
       const decryptedMessage = this.decryptMessage(data);
       this.onMessageCallback?.(decryptedMessage);
       this.emit("message:receive", decryptedMessage);
+    });
+
+    this.socket.on("message:sent", (data) => {
+      console.log("📤 Message sent confirmation:", data);
+      const decryptedMessage = this.decryptMessage(data);
+      console.log("📤 Decrypted message:", decryptedMessage);
+      console.log("📤 Has onMessageCallback?", !!this.onMessageCallback);
+      // Treat sent messages same as received for local display
+      this.onMessageCallback?.(decryptedMessage);
+      this.emit("message:sent", decryptedMessage);
+    });
+
+    this.socket.on("group:message:receive", (data) => {
+      console.log("Group message received:", data);
+      const decryptedMessage = this.decryptMessage(data);
+      this.onMessageCallback?.(decryptedMessage);
+      this.emit("group:message:receive", decryptedMessage);
     });
 
     this.socket.on("message:delivered", (data) => {
@@ -232,7 +357,7 @@ class SocketService {
   async sendDirectMessage(
     recipientId: string,
     content: string,
-    messageType: "text" | "image" | "audio" | "file" = "text"
+    messageType: "text" | "image" | "audio" | "video" | "gif" | "file" = "text"
   ): Promise<void> {
     if (!this.socket?.connected) {
       throw new Error("Socket not connected");
@@ -253,18 +378,44 @@ class SocketService {
   async sendGroupMessage(
     groupId: string,
     content: string,
-    messageType: "text" | "image" | "audio" | "file" = "text"
+    messageType: "text" | "image" | "audio" | "video" | "gif" | "file" = "text"
   ): Promise<void> {
     if (!this.socket?.connected) {
       throw new Error("Socket not connected");
     }
 
-    this.socket.emit("message:group:send", {
+    this.socket.emit("group:message:send", {
       groupId,
       content,
       messageType,
       timestamp: new Date(),
     });
+  }
+
+  /**
+   * Join a group chat room
+   */
+  joinGroup(groupId: string): void {
+    if (!this.socket?.connected) {
+      console.warn("Socket not connected, cannot join group");
+      return;
+    }
+
+    console.log(`🔗 Joining group: ${groupId}`);
+    this.socket.emit("group:join", groupId);
+  }
+
+  /**
+   * Leave a group chat room
+   */
+  leaveGroup(groupId: string): void {
+    if (!this.socket?.connected) {
+      console.warn("Socket not connected, cannot leave group");
+      return;
+    }
+
+    console.log(`🚪 Leaving group: ${groupId}`);
+    this.socket.emit("group:leave", groupId);
   }
 
   /**
@@ -311,7 +462,11 @@ class SocketService {
     // Backend handles decryption, but we could add client-side decryption here if needed
     return {
       ...message,
-      createdAt: new Date(message.createdAt),
+      // Use timestamp if createdAt is not present, and ensure it's a valid Date
+      createdAt: new Date(message.createdAt || message.timestamp),
+      // Add default values for optional fields
+      readBy: message.readBy || [],
+      reactions: message.reactions || [],
     };
   }
 
@@ -352,11 +507,23 @@ class SocketService {
     this.onMessageCallback = callback;
   }
 
+  offMessage(callback?: (message: Message) => void): void {
+    if (!callback || this.onMessageCallback === callback) {
+      this.onMessageCallback = null;
+    }
+  }
+
   /**
    * Set typing callback
    */
   onTyping(callback: (typing: TypingIndicator) => void): void {
     this.onTypingCallback = callback;
+  }
+
+  offTyping(callback?: (typing: TypingIndicator) => void): void {
+    if (!callback || this.onTypingCallback === callback) {
+      this.onTypingCallback = null;
+    }
   }
 
   /**
@@ -366,6 +533,12 @@ class SocketService {
     this.onOnlineStatusCallback = callback;
   }
 
+  offOnlineStatus(callback?: (status: OnlineStatus) => void): void {
+    if (!callback || this.onOnlineStatusCallback === callback) {
+      this.onOnlineStatusCallback = null;
+    }
+  }
+
   /**
    * Set connection change callback
    */
@@ -373,11 +546,71 @@ class SocketService {
     this.onConnectionChangeCallback = callback;
   }
 
+  offConnectionChange(callback?: (connected: boolean) => void): void {
+    if (!callback || this.onConnectionChangeCallback === callback) {
+      this.onConnectionChangeCallback = null;
+    }
+  }
+
   /**
    * Get socket ID
    */
   getSocketId(): string | undefined {
     return this.socket?.id;
+  }
+
+  /**
+   * Get diagnostic information for debugging memory leaks
+   */
+  getDiagnostics(): {
+    isConnected: boolean;
+    isConnecting: boolean;
+    reconnectAttempts: number;
+    hasSocket: boolean;
+    socketId?: string;
+    activeListeners: number;
+    listenerTypes: string[];
+    hasCallbacks: {
+      message: boolean;
+      typing: boolean;
+      onlineStatus: boolean;
+      connectionChange: boolean;
+    };
+  } {
+    const listenerTypes = Array.from(this.listeners.keys());
+    const totalListeners = Array.from(this.listeners.values()).reduce(
+      (sum, set) => sum + set.size,
+      0
+    );
+
+    return {
+      isConnected: this.isConnected(),
+      isConnecting: this.isConnecting,
+      reconnectAttempts: this.reconnectAttempts,
+      hasSocket: !!this.socket,
+      socketId: this.socket?.id,
+      activeListeners: totalListeners,
+      listenerTypes,
+      hasCallbacks: {
+        message: !!this.onMessageCallback,
+        typing: !!this.onTypingCallback,
+        onlineStatus: !!this.onOnlineStatusCallback,
+        connectionChange: !!this.onConnectionChangeCallback,
+      },
+    };
+  }
+
+  /**
+   * Force cleanup - for testing and debugging only
+   */
+  forceCleanup(): void {
+    console.warn(
+      "⚠️ Force cleanup called - this should only be used for testing!"
+    );
+    this.disconnect();
+    this.token = null;
+    this.isConnecting = false;
+    this.reconnectAttempts = 0;
   }
 }
 

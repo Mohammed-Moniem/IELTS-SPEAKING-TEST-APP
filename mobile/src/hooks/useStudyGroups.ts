@@ -51,6 +51,7 @@ export const useStudyGroups = () => {
         allowMemberInvites?: boolean;
         requireApproval?: boolean;
       };
+      memberIds?: string[];
     }) => {
       try {
         setLoading(true);
@@ -244,6 +245,23 @@ export const useStudyGroups = () => {
     []
   );
 
+  const addMember = useCallback(
+    async (groupId: string, memberId: string) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const updated = await groupService.addMember(groupId, memberId);
+        return updated;
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to add member");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const promoteToAdmin = useCallback(
     async (groupId: string, memberId: string) => {
       try {
@@ -328,6 +346,7 @@ export const useStudyGroups = () => {
     leaveGroup,
     getMembers,
     removeMember,
+    addMember,
     promoteToAdmin,
     removeAdmin,
     searchGroups,

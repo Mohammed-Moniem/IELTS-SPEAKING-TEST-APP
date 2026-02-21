@@ -1,9 +1,9 @@
 import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
+import { userRepository } from '@lib/db/repositories';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
-import { UserModel } from '@models/UserModel';
 import { Service } from 'typedi';
 
 interface UpdateUserPayload {
@@ -18,7 +18,7 @@ export class UserService {
 
   public async getProfile(userId: string, headers: IRequestHeaders) {
     const logMessage = constructLogMessage(__filename, 'getProfile', headers);
-    const user = await UserModel.findById(userId);
+    const user = await userRepository.findById(userId);
 
     if (!user) {
       throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'User not found');
@@ -30,7 +30,7 @@ export class UserService {
 
   public async updateProfile(userId: string, payload: UpdateUserPayload, headers: IRequestHeaders) {
     const logMessage = constructLogMessage(__filename, 'updateProfile', headers);
-    const user = await UserModel.findById(userId);
+    const user = await userRepository.findById(userId);
 
     if (!user) {
       throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'User not found');

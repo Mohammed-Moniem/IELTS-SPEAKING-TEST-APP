@@ -1,4 +1,4 @@
-import { Document, Schema, Types, model } from 'mongoose';
+import { Document, Schema, Types, model } from '@lib/db/mongooseCompat';
 
 export interface IEncryptedMessage {
   encryptedContent: string; // AES encrypted message content
@@ -12,19 +12,41 @@ export interface IChatMessage extends Document {
   senderId: Types.ObjectId;
   recipientId?: Types.ObjectId; // For 1-on-1 chats
   groupId?: Types.ObjectId; // For group chats
-  encryptedContent: string; // AES-256 encrypted message
+  encryptedContent: string; // AES-256 encrypted message (text content or file description)
   iv: string; // Initialization vector
-  messageType: 'text' | 'image' | 'audio' | 'file' | 'system';
+  messageType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'gif' | 'system';
   isEdited: boolean;
   isDeleted: boolean;
   readBy: Types.ObjectId[]; // Users who have read the message
   deliveredTo: Types.ObjectId[]; // Users who have received the message
+  reactions?: Map<string, Types.ObjectId[]>; // emoji -> array of userIds who reacted
   metadata?: {
+    // File metadata
     fileName?: string;
     fileSize?: number;
     fileUrl?: string;
-    duration?: number; // For audio messages
+    thumbnailUrl?: string;
+
+    // Audio/Video specific
+    duration?: number; // Duration in seconds
+    waveformData?: number[]; // For audio visualization (array of amplitudes)
+
+    // Image/Video specific
+    width?: number;
+    height?: number;
+
+    // Reply/Forward
     replyToMessageId?: Types.ObjectId;
+    replyToContent?: string; // Preview of replied message
+    forwardedFromUserId?: Types.ObjectId;
+
+    // Link preview
+    linkPreview?: {
+      url: string;
+      title?: string;
+      description?: string;
+      imageUrl?: string;
+    };
   };
   createdAt: Date;
   updatedAt: Date;
@@ -63,7 +85,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     },
     messageType: {
       type: String,
-      enum: ['text', 'image', 'audio', 'file', 'system'],
+      enum: ['text', 'image', 'audio', 'video', 'file', 'gif', 'system'],
       default: 'text',
       required: true
     },
@@ -88,12 +110,38 @@ const ChatMessageSchema = new Schema<IChatMessage>(
         ref: 'User'
       }
     ],
+    reactions: {
+      type: Map,
+      of: [Schema.Types.ObjectId],
+      default: {}
+    },
     metadata: {
+      // File metadata
       fileName: String,
       fileSize: Number,
       fileUrl: String,
-      duration: Number,
-      replyToMessageId: Schema.Types.ObjectId
+      thumbnailUrl: String,
+
+      // Audio/Video specific
+      duration: Number, // Duration in seconds
+      waveformData: [Number], // For audio visualization
+
+      // Image/Video specific
+      width: Number,
+      height: Number,
+
+      // Reply/Forward
+      replyToMessageId: Schema.Types.ObjectId,
+      replyToContent: String,
+      forwardedFromUserId: Schema.Types.ObjectId,
+
+      // Link preview
+      linkPreview: {
+        url: String,
+        title: String,
+        description: String,
+        imageUrl: String
+      }
     }
   },
   {

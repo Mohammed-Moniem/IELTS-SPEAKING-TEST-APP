@@ -3,7 +3,7 @@ import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { StandardResponse } from '@responses/StandardResponse';
 import { AdvancedSearchService } from '@services/AdvancedSearchService';
 import { Response } from 'express';
-import { Model } from 'mongoose';
+import { Model } from '@lib/db/mongooseCompat';
 import { Container } from 'typedi';
 
 /**

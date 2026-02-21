@@ -5,21 +5,6 @@ import { Logger } from '@lib/logger';
 import OpenAI from 'openai';
 import { Service } from 'typedi';
 
-interface FeedbackBandScores {
-  overallBand?: number;
-  pronunciation?: number;
-  fluency?: number;
-  lexicalResource?: number;
-  grammaticalRange?: number;
-}
-
-interface DetailedAnalysis {
-  fluencyNotes?: string;
-  lexicalNotes?: string;
-  grammaticalNotes?: string;
-  pronunciationNotes?: string;
-}
-
 export interface FluencyAnalysis {
   speechRate: number; // words per minute
   pauseCount: number;

@@ -1,4 +1,4 @@
-import { HydratedDocument, Schema, model } from 'mongoose';
+import { HydratedDocument, Schema, model } from '@lib/db/mongooseCompat';
 
 export interface ITopic {
   slug: string;

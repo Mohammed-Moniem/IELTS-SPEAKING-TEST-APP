@@ -2,6 +2,7 @@ import { AxiosResponse } from "axios";
 
 import {
   AuthResponse,
+  NotificationSettings,
   PracticeSession,
   PracticeSessionStart,
   Preferences,
@@ -25,6 +26,7 @@ export const authApi = {
     firstName: string;
     lastName: string;
     phone?: string;
+    referralCode?: string;
   }) => unwrap<AuthResponse>(apiClient.post("/auth/register", payload)),
   login: (payload: { email: string; password: string }) =>
     unwrap<AuthResponse>(apiClient.post("/auth/login", payload)),
@@ -32,6 +34,8 @@ export const authApi = {
     unwrap<AuthResponse>(apiClient.post("/auth/refresh", { refreshToken })),
   logout: (refreshToken: string) =>
     unwrap<void>(apiClient.post("/auth/logout", { refreshToken })),
+  guestSession: () =>
+    unwrap<AuthResponse>(apiClient.post("/auth/guest-session")),
 };
 
 export const userApi = {
@@ -40,6 +44,7 @@ export const userApi = {
     firstName?: string;
     lastName?: string;
     phone?: string;
+    appTheme?: string;
   }) => unwrap<User>(apiClient.patch("/users/me", payload)),
 };
 
@@ -105,9 +110,6 @@ export const practiceApi = {
 
     return unwrap<PracticeSession & { transcription?: any }>(
       apiClient.post(`/practice/sessions/${sessionId}/audio`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const progress = (progressEvent.loaded / progressEvent.total) * 100;
@@ -159,6 +161,7 @@ export const subscriptionApi = {
     unwrap<SubscriptionInfo>(apiClient.get("/subscription/current")),
   checkout: (payload: {
     planType: "premium" | "pro";
+    couponCode?: string;
     successUrl?: string;
     cancelUrl?: string;
   }) =>
@@ -168,4 +171,21 @@ export const subscriptionApi = {
       publishableKey?: string | null;
     }>(apiClient.post("/subscription/checkout", payload)),
   config: () => unwrap<StripeConfig>(apiClient.get("/subscription/config")),
+};
+
+export const notificationsApi = {
+  getPreferences: () =>
+    unwrap<NotificationSettings>(apiClient.get("/notifications/preferences")),
+  updatePreferences: (payload: NotificationSettings) =>
+    unwrap<NotificationSettings>(
+      apiClient.put("/notifications/preferences", payload)
+    ),
+  registerDevice: (token: string) =>
+    unwrap<void>(apiClient.post("/notifications/device", { token })),
+  unregisterDevice: (token: string) =>
+    unwrap<void>(
+      apiClient.delete("/notifications/device", {
+        data: { token },
+      })
+    ),
 };

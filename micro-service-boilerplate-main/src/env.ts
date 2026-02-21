@@ -52,7 +52,13 @@ export const env = {
     output: getOsEnv('LOG_OUTPUT') || 'stdout'
   },
   db: {
-    mongoURL: getOsEnv('MONGO_URL') || `mongodb://127.0.0.1:27017/ielts-speaking`
+    mongoURL: getOsEnv('MONGO_URL') || `mongodb://127.0.0.1:27017/ielts-speaking`,
+    supabaseUrl: getOsEnv('SUPABASE_URL') || '',
+    supabaseServiceRoleKey: getOsEnv('SUPABASE_SERVICE_ROLE_KEY') || '',
+    supabaseDbUrl: getOsEnv('SUPABASE_DB_URL') || '',
+    writeMode: (getOsEnv('DB_WRITE_MODE') as 'mongo' | 'dual' | 'supabase') || 'supabase',
+    readMode: (getOsEnv('DB_READ_MODE') as 'mongo' | 'supabase') || 'supabase',
+    parityLogging: toBool(getOsEnv('DB_PARITY_LOGGING') || 'false')
   },
   jwt: {
     accessSecret: getOsEnv('JWT_ACCESS_SECRET') || 'dev-access-secret',
@@ -98,8 +104,18 @@ export const env = {
   openai: {
     apiKey: getOsEnv('OPENAI_API_KEY'),
     model: getOsEnv('OPENAI_MODEL') || 'gpt-3.5-turbo',
+    ttsModel: getOsEnv('OPENAI_TTS_MODEL') || 'gpt-4o-mini-tts',
+    ttsVoice: getOsEnv('OPENAI_TTS_VOICE') || 'alloy',
     maxTokens: toNumber(getOsEnv('OPENAI_MAX_TOKENS')) || 1000,
     temperature: parseFloat(getOsEnv('OPENAI_TEMPERATURE') || '0.7')
+  },
+  push: {
+    enabled: toBool(getOsEnv('PUSH_NOTIFICATIONS_ENABLED') || 'true'),
+    expoAccessToken: getOsEnv('EXPO_ACCESS_TOKEN'),
+    broadcastAllowedEmails: (getOsEnv('PUSH_BROADCAST_ALLOWED_EMAILS') || '')
+      .split(',')
+      .map(email => email.trim())
+      .filter(Boolean)
   },
   elevenlabs: {
     apiKey: getOsEnv('ELEVENLABS_API_KEY'),
@@ -111,19 +127,31 @@ export const env = {
     optimizeStreamingLatency: toNumber(getOsEnv('ELEVENLABS_STREAMING_LATENCY')) || 0
   },
   storage: {
-    provider: getOsEnv('STORAGE_PROVIDER') || 'mongodb', // 'mongodb' or 's3'
+    provider: getOsEnv('STORAGE_PROVIDER') || 'supabase', // 'supabase', 'mongodb', or 's3'
     mongodb: {
-      audioCollectionName: getOsEnv('STORAGE_MONGODB_COLLECTION') || 'audio_recordings'
+      audioCollectionName: getOsEnv('STORAGE_MONGODB_COLLECTION') || 'audio_recordings',
+      chatFilesCollectionName: getOsEnv('STORAGE_MONGODB_CHAT_FILES') || 'chat_files'
+    },
+    supabase: {
+      chatBucket: getOsEnv('SUPABASE_STORAGE_CHAT_BUCKET') || 'chat-files',
+      audioBucket: getOsEnv('SUPABASE_STORAGE_AUDIO_BUCKET') || 'audio-recordings',
+      signedUrlExpiry: toNumber(getOsEnv('SUPABASE_STORAGE_SIGNED_URL_EXPIRY')) || 3600 // 1 hour
     },
     s3: {
       accessKeyId: getOsEnv('AWS_ACCESS_KEY_ID'),
       secretAccessKey: getOsEnv('AWS_SECRET_ACCESS_KEY'),
       region: getOsEnv('AWS_REGION') || 'us-east-1',
       bucket: getOsEnv('AWS_S3_BUCKET') || 'ielts-speaking-recordings',
+      chatFilesBucket: getOsEnv('AWS_S3_CHAT_FILES_BUCKET') || 'ielts-chat-files',
       signedUrlExpiry: toNumber(getOsEnv('AWS_S3_SIGNED_URL_EXPIRY')) || 3600 // 1 hour
     },
     maxFileSizeMB: toNumber(getOsEnv('STORAGE_MAX_FILE_SIZE_MB')) || 50,
-    allowedMimeTypes: (getOsEnv('STORAGE_ALLOWED_MIME_TYPES') || 'audio/mpeg,audio/wav,audio/webm,audio/mp4').split(',')
+    allowedMimeTypes: (
+      getOsEnv('STORAGE_ALLOWED_MIME_TYPES') ||
+      'audio/mpeg,audio/wav,audio/webm,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/3gpp,image/jpeg,image/png,image/gif,video/mp4,video/quicktime'
+    ).split(','),
+    // Auto-delete chat files after 1 month (30 days)
+    chatFileTTLDays: toNumber(getOsEnv('CHAT_FILE_TTL_DAYS')) || 30
   },
   rabbitmq: {
     enabled: toBool(getOsEnv('RABBITMQ_ENABLED')) || false,
@@ -147,5 +175,11 @@ export const env = {
       errorDescription:
         getOsEnv('DEFAULT_ERROR_DESC') || 'Error is not mapped in the service, please check log for further info'
     }
+  },
+  referral: {
+    baseUrl: getOsEnv('REFERRAL_BASE_URL') || 'https://app.ielts-practice.com',
+    deepLinkScheme: getOsEnv('APP_DEEP_LINK_SCHEME') || 'ieltsspeaking',
+    iosStoreUrl: getOsEnv('APP_IOS_STORE_URL') || 'https://apps.apple.com/',
+    androidStoreUrl: getOsEnv('APP_ANDROID_STORE_URL') || 'https://play.google.com/'
   }
 };
