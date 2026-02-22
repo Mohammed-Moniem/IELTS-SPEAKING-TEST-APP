@@ -15,7 +15,6 @@ import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { AudioCacheInitializer } from "./src/components/AudioCacheInitializer";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { OfflineBanner } from "./src/components/OfflineBanner";
-import { ToastContainer } from "./src/components/ToastContainer";
 import { PointsProvider, ThemeProvider, useTheme } from "./src/context";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import firebaseAnalyticsService from "./src/services/firebaseAnalyticsService";
@@ -76,7 +75,6 @@ const AppContent = () => {
         <PointsProvider>
           <AppNavigator />
           <OfflineBanner />
-          <ToastContainer />
           <StatusBar style={theme === "dark" ? "light" : "dark"} />
         </PointsProvider>
       </AudioCacheInitializer>
@@ -87,7 +85,6 @@ const AppContent = () => {
     <AudioCacheInitializer>
       <AppNavigator />
       <OfflineBanner />
-      <ToastContainer />
       <StatusBar style={theme === "dark" ? "light" : "dark"} />
     </AudioCacheInitializer>
   );

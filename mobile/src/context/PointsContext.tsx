@@ -56,6 +56,11 @@ interface PointsContextType {
 
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
+const isUnauthorizedError = (err: unknown): boolean => {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  return status === 401;
+};
+
 export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -72,7 +77,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
   const fetchSummary = useCallback(async () => {
     console.log("📊 fetchSummary called, accessToken:", !!accessToken);
 
-    if (!accessToken) {
+    if (!accessToken || user?.isGuest) {
       setSummary(null);
       setLoading(false);
       setIsRefreshing(false);
@@ -87,6 +92,12 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
       setSummary(data);
       return data;
     } catch (err) {
+      if (isUnauthorizedError(err)) {
+        logger.warn("⚠️ Points summary unauthorized during startup; skipping.");
+        setSummary(null);
+        setError(null);
+        return null;
+      }
       const message =
         err instanceof Error ? err.message : "Failed to fetch points";
       logger.error("❌ Error fetching points summary:", err);
@@ -96,7 +107,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [accessToken]);
+  }, [accessToken, user?.isGuest]);
 
   /**
    * Fetch recent transactions
@@ -110,7 +121,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
         !!accessToken
       );
 
-      if (!accessToken) {
+      if (!accessToken || user?.isGuest) {
         setTransactions([]);
         return [];
       }
@@ -126,18 +137,25 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
         setTransactions(data);
         return data;
       } catch (err) {
+        if (isUnauthorizedError(err)) {
+          logger.warn(
+            "⚠️ Points transactions unauthorized during startup; skipping."
+          );
+          setTransactions([]);
+          return [];
+        }
         logger.error("❌ Error fetching transactions:", err);
         throw err;
       }
     },
-    [accessToken]
+    [accessToken, user?.isGuest]
   );
 
   /**
    * Refresh both summary and transactions
    */
   const refresh = useCallback(async () => {
-    if (!accessToken) {
+    if (!accessToken || user?.isGuest) {
       setIsRefreshing(false);
       return;
     }
@@ -147,7 +165,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (err) {
       logger.error("❌ Error refreshing points data:", err);
     }
-  }, [accessToken, fetchSummary, fetchTransactions]);
+  }, [accessToken, user?.isGuest, fetchSummary, fetchTransactions]);
 
   /**
    * Redeem points for discount
@@ -238,10 +256,26 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
+    if (user?.isGuest) {
+      console.log("🔍 PointsContext: Guest session, skipping points fetch");
+      setLoading(false);
+      setTransactions([]);
+      setSummary(null);
+      return;
+    }
+
     // Initial fetch
     console.log("📊 PointsContext: Fetching initial data...");
-    fetchSummary();
-    fetchTransactions();
+    fetchSummary().catch((err) => {
+      if (!isUnauthorizedError(err)) {
+        logger.error("❌ Initial points summary fetch failed:", err);
+      }
+    });
+    fetchTransactions().catch((err) => {
+      if (!isUnauthorizedError(err)) {
+        logger.error("❌ Initial points transactions fetch failed:", err);
+      }
+    });
 
     // Listen for points granted events
     socketService.on("points:granted", handlePointsGranted);
@@ -252,7 +286,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
       socketService.off("points:granted", handlePointsGranted);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken]); // Only depend on accessToken to prevent re-fetching
+  }, [accessToken, user?.isGuest]); // Only auth state should trigger re-fetching
 
   /**
    * Get tier name for display

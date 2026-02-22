@@ -1,13 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useState } from "react";
+import React from "react";
 import {
   Alert,
   Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -16,31 +13,12 @@ import {
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
+import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context/ThemeContext";
-import type { AppTabParamList } from "../../navigation/AppNavigator";
 import { spacing } from "../../theme/tokens";
 
 export const SettingsScreen: React.FC = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AppTabParamList>>();
-  const { theme, themeMode, colors, setThemeMode } = useTheme();
-  const [autoSystem, setAutoSystem] = useState(themeMode === "system");
-
-  const handleThemeToggle = async (value: boolean) => {
-    if (autoSystem) {
-      Alert.alert(
-        "Auto Theme Active",
-        "Please disable 'Follow System Theme' first to manually select a theme."
-      );
-      return;
-    }
-    await setThemeMode(value ? "dark" : "light");
-  };
-
-  const handleAutoSystemToggle = async (value: boolean) => {
-    setAutoSystem(value);
-    await setThemeMode(value ? "system" : theme);
-  };
+  const { colors } = useTheme();
 
   const settingsOptions = [
     {
@@ -95,57 +73,20 @@ export const SettingsScreen: React.FC = () => {
           Customize how Spokio looks
         </SectionHeading>
         <Card style={{ backgroundColor: colors.surface }}>
-          {/* Auto System Theme */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text
                 style={[styles.settingTitle, { color: colors.textPrimary }]}
               >
-                Follow System Theme
+                Theme
               </Text>
               <Text
                 style={[styles.settingDescription, { color: colors.textMuted }]}
               >
-                Automatically match your device settings
+                Cycle between System, Light, and Dark mode
               </Text>
             </View>
-            <Switch
-              value={autoSystem}
-              onValueChange={handleAutoSystemToggle}
-              trackColor={{ false: colors.borderMuted, true: colors.primary }}
-              thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
-            />
-          </View>
-
-          {/* Manual Dark Mode Toggle */}
-          <View
-            style={[
-              styles.settingRow,
-              styles.settingRowWithBorder,
-              { borderTopColor: colors.divider },
-            ]}
-          >
-            <View style={styles.settingInfo}>
-              <Text
-                style={[styles.settingTitle, { color: colors.textPrimary }]}
-              >
-                Dark Mode
-              </Text>
-              <Text
-                style={[styles.settingDescription, { color: colors.textMuted }]}
-              >
-                {autoSystem
-                  ? "Controlled by system settings"
-                  : "Toggle dark theme manually"}
-              </Text>
-            </View>
-            <Switch
-              value={theme === "dark"}
-              onValueChange={handleThemeToggle}
-              disabled={autoSystem}
-              trackColor={{ false: colors.borderMuted, true: colors.primary }}
-              thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
-            />
+            <ThemeModeSwitch />
           </View>
         </Card>
 
@@ -307,11 +248,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-  },
-  settingRowWithBorder: {
-    borderTopWidth: 1,
-    marginTop: spacing.sm,
-    paddingTop: spacing.md + spacing.sm,
   },
   settingInfo: {
     flex: 1,

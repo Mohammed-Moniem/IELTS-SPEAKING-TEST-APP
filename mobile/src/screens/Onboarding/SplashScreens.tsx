@@ -25,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -258,6 +259,8 @@ export function SplashScreen1({
         translucent
       />
       <View style={styles.screen}>
+      <ThemeModeSwitch style={styles.themeSwitch} />
+
       {/* Skip Button */}
       <APressable onPress={onSkip} style={styles.skipButton}>
         <Text style={styles.skipText}>Skip</Text>
@@ -464,6 +467,8 @@ export function SplashScreen2({ onNext, onSkip }: SplashScreen2Props) {
         translucent
       />
       <View style={styles.screen}>
+      <ThemeModeSwitch style={styles.themeSwitch} />
+
       {/* Skip Button */}
       <APressable onPress={onSkip} style={styles.skipButton}>
         <Text style={styles.skipText}>Skip</Text>
@@ -729,6 +734,8 @@ export function SplashScreen3({ onNext, onSkip }: SplashScreen3Props) {
         translucent
       />
       <View style={[styles.screen, { overflow: "hidden" }]}>
+        <ThemeModeSwitch style={styles.themeSwitch} />
+
         {/* Skip Button */}
         <APressable onPress={onSkip} style={styles.skipButton}>
           <Text style={styles.skipText}>Skip</Text>
@@ -1006,6 +1013,12 @@ const createStyles = (palette: SplashPalette) =>
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
+  },
+  themeSwitch: {
+    position: "absolute",
+    top: 50,
+    left: 24,
+    zIndex: 100,
   },
   skipText: {
     color: palette.white,

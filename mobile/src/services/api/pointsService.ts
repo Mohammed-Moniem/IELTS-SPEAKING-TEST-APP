@@ -69,6 +69,12 @@ export interface RedeemDiscountResponse {
 class PointsService {
   private basePath = "/points";
 
+  private isUnauthorizedError(error: unknown): boolean {
+    const status = (error as { response?: { status?: number } })?.response
+      ?.status;
+    return status === 401;
+  }
+
   private normalizeTierLabel(
     tier: DiscountTier | string | null | undefined
   ): DiscountTier | string | null {
@@ -185,6 +191,10 @@ class PointsService {
       logger.info("✅ Points summary fetched:", normalized);
       return normalized;
     } catch (error) {
+      if (this.isUnauthorizedError(error)) {
+        logger.warn("⚠️ Points summary unauthorized");
+        throw error;
+      }
       logger.error("❌ Failed to fetch points summary:", error);
       throw error;
     }
@@ -205,6 +215,10 @@ class PointsService {
       logger.info(`✅ Fetched ${response.data.data.length} transactions`);
       return response.data.data;
     } catch (error) {
+      if (this.isUnauthorizedError(error)) {
+        logger.warn("⚠️ Points transactions unauthorized");
+        throw error;
+      }
       logger.error("❌ Failed to fetch transactions:", error);
       throw error;
     }

@@ -133,7 +133,7 @@ export const PracticeScreen: React.FC = () => {
             <Text style={styles.topicMeta}>
               Part {topic.part} • {topic.difficulty}
             </Text>
-            {topic.isPremium ? <Tag label="Premium" tone="warning" /> : null}
+            {topic.isPremium ? <Tag label="Premium" tone="premium" /> : null}
           </View>
         </View>
         <Text style={styles.topicDescription}>{topic.description}</Text>

@@ -106,12 +106,19 @@ class Logger {
    */
   apiError(error: any) {
     if (isDevelopment) {
-      console.error("❌ API Error:", {
+      const payload = {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
         url: error.config?.url,
-      });
+      };
+
+      if (payload.status === 401 || payload.status === 403) {
+        console.warn("⚠️ API Auth Error:", payload);
+        return;
+      }
+
+      console.error("❌ API Error:", payload);
     }
   }
 

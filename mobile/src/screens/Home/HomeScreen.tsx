@@ -19,6 +19,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { StatCard } from "../../components/StatCard";
 import { Tag } from "../../components/Tag";
+import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context";
 import { useThemedStyles } from "../../hooks";
 import { AppTabParamList } from "../../navigation/AppNavigator";
@@ -61,9 +62,12 @@ export const HomeScreen: React.FC = () => {
         contentContainerStyle={styles.content}
       >
         <View style={styles.hero}>
-          <Text style={styles.greeting}>
-            Hi {user?.firstName || "there"} 👋
-          </Text>
+          <View style={styles.heroTopRow}>
+            <Text style={styles.greeting}>
+              Hi {user?.firstName || "there"} 👋
+            </Text>
+            <ThemeModeSwitch />
+          </View>
           <Text style={styles.subtitle}>
             Ready for your next speaking session?
           </Text>
@@ -170,10 +174,17 @@ const createStyles = (colors: ColorTokens) =>
   hero: {
     marginBottom: spacing.xl,
   },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
   greeting: {
     fontSize: 26,
     fontWeight: "700",
     color: colors.textPrimary,
+    flex: 1,
   },
   subtitle: {
     marginTop: spacing.sm,

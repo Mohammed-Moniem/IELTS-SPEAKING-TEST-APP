@@ -23,12 +23,14 @@ const THEME_STORAGE_KEY = "app_theme";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ActiveTheme = "light" | "dark";
+const THEME_MODE_ORDER: ThemeMode[] = ["system", "light", "dark"];
 
 interface ThemeContextType {
   theme: ActiveTheme;
   themeMode: ThemeMode;
   colors: ColorTokens;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  cycleThemeMode: () => Promise<void>;
   toggleTheme: () => Promise<void>;
 }
 
@@ -106,6 +108,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     await setThemeMode(newTheme);
   }, [theme, setThemeMode]);
 
+  const cycleThemeMode = useCallback(async () => {
+    const currentIndex = THEME_MODE_ORDER.indexOf(themeMode);
+    const nextIndex = (currentIndex + 1) % THEME_MODE_ORDER.length;
+    await setThemeMode(THEME_MODE_ORDER[nextIndex]);
+  }, [themeMode, setThemeMode]);
+
   const currentColors = useMemo(
     () => (theme === "dark" ? darkColors : lightColors),
     [theme]
@@ -117,9 +125,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       themeMode,
       colors: currentColors,
       setThemeMode,
+      cycleThemeMode,
       toggleTheme,
     }),
-    [theme, themeMode, currentColors, setThemeMode, toggleTheme]
+    [theme, themeMode, currentColors, setThemeMode, cycleThemeMode, toggleTheme]
   );
 
   return (

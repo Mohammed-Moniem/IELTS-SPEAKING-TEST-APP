@@ -8,22 +8,46 @@ import { radii, spacing } from "../theme/tokens";
 
 interface TagProps {
   label: string;
-  tone?: "default" | "success" | "warning" | "info";
+  tone?: "default" | "success" | "warning" | "info" | "premium";
 }
 
-const getToneStyles = (colors: ColorTokens) => ({
+type ToneStyle = {
+  background: string;
+  text: string;
+  border?: string;
+};
+
+type TagTone = NonNullable<TagProps["tone"]>;
+
+const getToneStyles = (
+  colors: ColorTokens,
+  isDark: boolean
+): Record<TagTone, ToneStyle> => ({
   default: { background: colors.borderMuted, text: colors.textPrimary },
   success: { background: colors.successSoft, text: colors.successOn },
   warning: { background: colors.warningSoft, text: colors.warningOn },
   info: { background: colors.infoSoft, text: colors.info },
+  premium: {
+    background: isDark ? "#FACC15" : "#FDE68A",
+    text: isDark ? "#1F1400" : "#4A3200",
+    border: isDark ? "#FDE047" : "#EAB308",
+  },
 });
 
 export const Tag: React.FC<TagProps> = ({ label, tone = "default" }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const palette = getToneStyles(colors)[tone];
+  const palette = getToneStyles(colors, theme === "dark")[tone];
   return (
-    <View style={[styles.tag, { backgroundColor: palette.background }]}>
+    <View
+      style={[
+        styles.tag,
+        {
+          backgroundColor: palette.background,
+          borderColor: palette.border ?? `${colors.border}55`,
+        },
+      ]}
+    >
       <Text style={[styles.label, { color: palette.text }]}>{label}</Text>
     </View>
   );
@@ -41,6 +65,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     label: {
       fontSize: 12,
-      fontWeight: "600",
+      fontWeight: "700",
     },
   });

@@ -166,12 +166,13 @@ class MonitoringService {
   }
 
   trackScreen(name: string, properties?: EventPayload): void {
-    this.addBreadcrumb("screen_view", { screen: name, ...properties });
+    const safeProperties = properties ?? {};
+    this.addBreadcrumb("screen_view", { screen: name, ...safeProperties });
 
     if (this.sentryEnabled) {
       const Sentry = loadSentryModule();
       if (Sentry) {
-        Sentry.Native.setContext("last_screen", { name, ...properties });
+        Sentry.Native.setContext("last_screen", { name, ...safeProperties });
       }
     }
 

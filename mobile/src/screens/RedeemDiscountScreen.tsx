@@ -22,7 +22,6 @@ import { usePoints, useThemedStyles } from "../hooks";
 import { DiscountTier, pointsService } from "../services/api";
 import firebaseAnalyticsService from "../services/firebaseAnalyticsService";
 import monitoringService from "../services/monitoringService";
-import { toastService } from "../services/toastService";
 import type { ColorTokens } from "../theme/tokens";
 import { spacing } from "../theme/tokens";
 import { logger } from "../utils/logger";
@@ -155,7 +154,10 @@ export const RedeemDiscountScreen: React.FC<{ navigation: any }> = ({
 
   const handleRedeem = async () => {
     if (!selectedTier) {
-      toastService.warning("Please select a discount tier");
+      Alert.alert(
+        "Select Discount Tier",
+        "Please select a discount tier before redeeming."
+      );
       return;
     }
 
@@ -181,15 +183,18 @@ export const RedeemDiscountScreen: React.FC<{ navigation: any }> = ({
                 logger.success("Discount redeemed successfully", result);
                 setCouponCode(result.couponCode);
                 setCouponModalVisible(true);
-                toastService.discountRedeemed(
-                  tierInfo.name,
-                  tierInfo.discountPercentage
+                Alert.alert(
+                  "Discount Redeemed",
+                  `${tierInfo.name} unlocked: ${tierInfo.discountPercentage}% off`
                 );
                 setSelectedTier(null);
               }
             } catch (error: any) {
               logger.error("Failed to redeem discount", error);
-              toastService.error(error.message || "Failed to redeem discount");
+              Alert.alert(
+                "Redemption Failed",
+                error.message || "Failed to redeem discount"
+              );
             } finally {
               setIsRedeeming(false);
             }
@@ -201,7 +206,7 @@ export const RedeemDiscountScreen: React.FC<{ navigation: any }> = ({
 
   const handleCopyCoupon = async () => {
     await Clipboard.setStringAsync(couponCode);
-    toastService.success("Coupon code copied!");
+    Alert.alert("Copied", "Coupon code copied!");
   };
 
   if (loading) {
