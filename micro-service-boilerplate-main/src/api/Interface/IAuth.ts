@@ -2,6 +2,8 @@ export interface ICurrentUser {
   id: string;
   email: string;
   plan?: string;
+  roles?: string[];
+  subscriptionPlan?: string;
 }
 
 declare global {

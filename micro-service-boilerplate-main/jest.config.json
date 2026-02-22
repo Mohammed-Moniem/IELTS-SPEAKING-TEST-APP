@@ -12,6 +12,7 @@
     "^@controllers/(.*)$": "<rootDir>/src/api/controllers/$1",
     "^@middlewares/(.*)$": "<rootDir>/src/api/middlewares/$1",
     "^@models/(.*)$": "<rootDir>/src/api/models/$1",
+    "^@dto/(.*)$": "<rootDir>/src/api/dto/$1",
     "^@interfaces/(.*)$": "<rootDir>/src/api/Interface/$1",
     "^@errors/(.*)$": "<rootDir>/src/api/errors/$1",
     "^@responses/(.*)$": "<rootDir>/src/api/responses/$1",

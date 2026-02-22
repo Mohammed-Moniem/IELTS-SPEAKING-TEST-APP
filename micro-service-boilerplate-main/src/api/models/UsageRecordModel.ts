@@ -4,11 +4,23 @@ export interface IUsageRecord {
   user: Types.ObjectId;
   practiceCount: number;
   testCount: number;
+  writingCount: number;
+  readingCount: number;
+  listeningCount: number;
+  aiRequestCount: number;
+  aiTokenCount: number;
+  aiEstimatedCostUsd: number;
   lastReset: Date;
   monthlyResets: {
     resetAt: Date;
     practiceCount: number;
     testCount: number;
+    writingCount: number;
+    readingCount: number;
+    listeningCount: number;
+    aiRequestCount: number;
+    aiTokenCount: number;
+    aiEstimatedCostUsd: number;
   }[];
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +45,30 @@ const UsageRecordSchema = new Schema<IUsageRecord>(
       type: Number,
       default: 0
     },
+    writingCount: {
+      type: Number,
+      default: 0
+    },
+    readingCount: {
+      type: Number,
+      default: 0
+    },
+    listeningCount: {
+      type: Number,
+      default: 0
+    },
+    aiRequestCount: {
+      type: Number,
+      default: 0
+    },
+    aiTokenCount: {
+      type: Number,
+      default: 0
+    },
+    aiEstimatedCostUsd: {
+      type: Number,
+      default: 0
+    },
     lastReset: {
       type: Date,
       default: () => new Date()
@@ -41,7 +77,13 @@ const UsageRecordSchema = new Schema<IUsageRecord>(
       {
         resetAt: { type: Date, required: true },
         practiceCount: { type: Number, required: true },
-        testCount: { type: Number, required: true }
+        testCount: { type: Number, required: true },
+        writingCount: { type: Number, required: true, default: 0 },
+        readingCount: { type: Number, required: true, default: 0 },
+        listeningCount: { type: Number, required: true, default: 0 },
+        aiRequestCount: { type: Number, required: true, default: 0 },
+        aiTokenCount: { type: Number, required: true, default: 0 },
+        aiEstimatedCostUsd: { type: Number, required: true, default: 0 }
       }
     ]
   },

@@ -9,7 +9,10 @@ import { Service } from 'typedi';
 
 const FREE_LIMITS = {
   practice: 3,
-  test: 1
+  test: 1,
+  writing: 2,
+  reading: 2,
+  listening: 2
 };
 
 @Service()
@@ -30,10 +33,22 @@ export class UsageService {
       record.monthlyResets.push({
         resetAt: record.lastReset,
         practiceCount: record.practiceCount,
-        testCount: record.testCount
+        testCount: record.testCount,
+        writingCount: record.writingCount || 0,
+        readingCount: record.readingCount || 0,
+        listeningCount: record.listeningCount || 0,
+        aiRequestCount: record.aiRequestCount || 0,
+        aiTokenCount: record.aiTokenCount || 0,
+        aiEstimatedCostUsd: record.aiEstimatedCostUsd || 0
       });
       record.practiceCount = 0;
       record.testCount = 0;
+      record.writingCount = 0;
+      record.readingCount = 0;
+      record.listeningCount = 0;
+      record.aiRequestCount = 0;
+      record.aiTokenCount = 0;
+      record.aiEstimatedCostUsd = 0;
       record.lastReset = now;
       await record.save();
     }
@@ -79,6 +94,50 @@ export class UsageService {
     await UsageRecordModel.updateOne({ user: userId }, { $inc: { testCount: 1 } }, { upsert: true });
   }
 
+  public async assertModuleAllowance(
+    userId: string,
+    plan: SubscriptionPlan,
+    module: 'writing' | 'reading' | 'listening',
+    headers: IRequestHeaders
+  ) {
+    if (plan !== 'free') return;
+
+    const usage = await this.getOrCreateUsageRecord(userId);
+    const key = `${module}Count` as const;
+    const limit = FREE_LIMITS[module];
+    const used = usage[key] || 0;
+
+    if (used >= limit) {
+      const logMessage = constructLogMessage(__filename, 'assertModuleAllowance', headers);
+      this.log.warn(`${logMessage} :: ${module} limit reached for user ${userId}`);
+      throw new CSError(
+        HTTP_STATUS_CODES.FORBIDDEN,
+        CODES.UsageLimitReached,
+        `Monthly ${module} limit reached for your current plan`
+      );
+    }
+  }
+
+  public async incrementModuleUsage(userId: string, module: 'writing' | 'reading' | 'listening') {
+    const key = `${module}Count`;
+    await UsageRecordModel.updateOne({ user: userId }, { $inc: { [key]: 1 } }, { upsert: true });
+  }
+
+  public async incrementAIUsage(userId: string | undefined, tokens: number, estimatedCostUsd: number) {
+    if (!userId) return;
+    await UsageRecordModel.updateOne(
+      { user: userId },
+      {
+        $inc: {
+          aiRequestCount: 1,
+          aiTokenCount: Math.max(0, Math.round(tokens || 0)),
+          aiEstimatedCostUsd: Number((estimatedCostUsd || 0).toFixed(6))
+        }
+      },
+      { upsert: true }
+    );
+  }
+
   public async getUsageSummary(userId: string, plan: SubscriptionPlan, _headers: IRequestHeaders) {
     const usage = await this.getOrCreateUsageRecord(userId);
 
@@ -88,8 +147,17 @@ export class UsageService {
       plan,
       practiceCount: usage.practiceCount,
       testCount: usage.testCount,
+      writingCount: usage.writingCount || 0,
+      readingCount: usage.readingCount || 0,
+      listeningCount: usage.listeningCount || 0,
+      aiRequestCount: usage.aiRequestCount || 0,
+      aiTokenCount: usage.aiTokenCount || 0,
+      aiEstimatedCostUsd: usage.aiEstimatedCostUsd || 0,
       practiceLimit: limits.practice,
       testLimit: limits.test,
+      writingLimit: plan === 'free' ? FREE_LIMITS.writing : Infinity,
+      readingLimit: plan === 'free' ? FREE_LIMITS.reading : Infinity,
+      listeningLimit: plan === 'free' ? FREE_LIMITS.listening : Infinity,
       lastReset: usage.lastReset
     };
   }

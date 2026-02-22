@@ -37,7 +37,9 @@ export class AuthMiddleware implements ExpressMiddlewareInterface {
       req.currentUser = {
         id: payload.sub,
         email: payload.email,
-        plan: payload.plan
+        plan: payload.plan,
+        subscriptionPlan: payload.plan,
+        roles: payload.roles || []
       };
 
       if (!req.header('Unique-Reference-Code')) {

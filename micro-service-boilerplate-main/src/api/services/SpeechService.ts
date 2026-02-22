@@ -751,7 +751,11 @@ MANDATORY RULES:
     const normalizedSuggestions = ensureArray(evaluation.suggestions, []).map(suggestion => ({
       category: suggestion.category || 'general',
       suggestion: suggestion.suggestion,
-      priority: suggestion.priority === 'high' || suggestion.priority === 'low' ? suggestion.priority : 'medium'
+      priority: (
+        suggestion.priority === 'high' || suggestion.priority === 'low' || suggestion.priority === 'medium'
+          ? suggestion.priority
+          : 'medium'
+      ) as 'high' | 'medium' | 'low'
     }));
 
     const defaultCriteria = () => ({

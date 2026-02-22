@@ -6,6 +6,7 @@ export interface TokenPayload {
   email: string;
   scope?: string[];
   plan?: string;
+  roles?: string[];
   iat?: number;
   exp?: number;
 }

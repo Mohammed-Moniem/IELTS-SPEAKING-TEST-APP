@@ -145,7 +145,8 @@ export class AuthService {
     const payload = {
       sub: user._id.toString(),
       email: user.email,
-      plan: user.subscriptionPlan
+      plan: user.subscriptionPlan,
+      roles: user.adminRoles || []
     };
 
     return {
