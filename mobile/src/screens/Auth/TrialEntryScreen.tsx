@@ -14,7 +14,11 @@ import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../context";
 import { useThemedStyles } from "../../hooks";
 import type { AuthStackParamList } from "../../navigation/AppNavigator";
-import { markFreeTrialUsed, hasUsedFreeTrial } from "../../storage/freeTrialStorage";
+import {
+  hasUsedFreeTrial,
+  markFreeTrialStarted,
+  resetFreeTrialState,
+} from "../../storage/freeTrialStorage";
 import type { ColorTokens } from "../../theme/tokens";
 import { spacing } from "../../theme/tokens";
 
@@ -53,10 +57,11 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
     }
     setLoading(true);
     try {
+      await markFreeTrialStarted();
       await startGuestSession();
-      await markFreeTrialUsed();
       setTrialUsed(true);
     } catch (error: any) {
+      await resetFreeTrialState();
       const message =
         error?.response?.data?.message ||
         error?.message ||
@@ -110,9 +115,12 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
             color={trialUsed ? colors.textMuted : colors.primary}
           />
         </View>
-        <Text style={[styles.cardTitle, styles.tryCardText]}>Try it now</Text>
+        <Text style={[styles.cardTitle, styles.tryCardText]}>
+          Start free test now
+        </Text>
         <Text style={[styles.cardDescription, styles.tryCardText]}>
-          Jump straight into an AI-powered full IELTS speaking simulation.
+          One full IELTS speaking simulation, complete feedback, and results are
+          included in your free trial.
         </Text>
         <View style={styles.cardActionRow}>
           {loading ? (
@@ -135,7 +143,9 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
             Your free trial has been used. Create an account to continue.
           </Text>
         ) : (
-          <Text style={styles.trialHint}>One complimentary session only</Text>
+          <Text style={styles.trialHint}>
+            Trial limit: one complimentary full test only.
+          </Text>
         )}
       </TouchableOpacity>
 
@@ -165,6 +175,11 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Text style={styles.secondaryButtonText}>Sign in</Text>
           </TouchableOpacity>
+        </View>
+        <View style={styles.trustRow}>
+          <Text style={styles.trustText}>No card required</Text>
+          <Text style={styles.trustDivider}>•</Text>
+          <Text style={styles.trustText}>Your data stays private</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -282,5 +297,21 @@ const createStyles = (colors: ColorTokens) =>
     secondaryButtonText: {
       color: colors.textPrimary,
       fontWeight: "600",
+    },
+    trustRow: {
+      marginTop: spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.xs,
+    },
+    trustText: {
+      fontSize: 12,
+      color: colors.textMuted,
+      fontWeight: "600",
+    },
+    trustDivider: {
+      color: colors.textMuted,
+      fontSize: 12,
     },
   });

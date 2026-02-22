@@ -3,26 +3,14 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Linking from "expo-linking";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  ActivityIndicator,
-  StyleSheet as RNStyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 import { useAuth } from "../auth/AuthContext";
 import { CustomTabBar } from "../components/CustomTabBar";
 import { PointsPill } from "../components/PointsPill";
 import { ProfileMenu } from "../components/ProfileMenu";
 import { useTheme } from "../context";
-import { useThemedStyles } from "../hooks";
 import { AnalyticsScreen } from "../screens/Analytics/AnalyticsScreen";
 import { LoginScreen } from "../screens/Auth/LoginScreen";
 import { RegisterScreen } from "../screens/Auth/RegisterScreen";
@@ -42,7 +30,6 @@ import { SubscriptionScreen } from "../screens/Subscription/SubscriptionScreen";
 import { UsageScreen } from "../screens/Usage/UsageScreen";
 import { VoiceTestScreen } from "../screens/VoiceTest/VoiceTestScreen";
 import monitoringService from "../services/monitoringService";
-import type { ColorTokens } from "../theme/tokens";
 import { PracticeNavigator } from "./PracticeNavigator";
 import { SimulationNavigator } from "./SimulationNavigator";
 import { SocialNavigator } from "./SocialNavigator";
@@ -55,17 +42,6 @@ export type AuthStackParamList = {
   Register: { referralCode?: string } | undefined;
 };
 
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-type GuestStackParamList = {
-  GuestVoiceTest:
-    | {
-        autoStartMode?: "practice" | "simulation" | "fulltest" | "fulltest-v2";
-      }
-    | undefined;
-};
-const GuestStack = createNativeStackNavigator<GuestStackParamList>();
-
-const ONBOARDING_KEY = "hasSeenOnboarding";
 export type AppTabParamList = {
   Home: undefined;
   VoiceTest:
@@ -81,7 +57,10 @@ export type AppTabParamList = {
   Practice: undefined;
   Results: undefined;
   Social: undefined;
-  // Hidden screens (accessible via ProfileMenu or navigation)
+};
+
+export type AppRootStackParamList = {
+  MainTabs: undefined;
   Profile: undefined;
   Analytics: undefined;
   Settings: undefined;
@@ -90,9 +69,23 @@ export type AppTabParamList = {
   Simulations: undefined;
   PointsDetail: undefined;
   RedeemDiscount: undefined;
+  OnboardingReplay: undefined;
 };
 
+type GuestStackParamList = {
+  GuestVoiceTest:
+    | {
+        autoStartMode?: "practice" | "simulation" | "fulltest" | "fulltest-v2";
+      }
+    | undefined;
+};
+
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator<AppTabParamList>();
+const GuestStack = createNativeStackNavigator<GuestStackParamList>();
+const RootStack = createNativeStackNavigator<AppRootStackParamList>();
+
+const ONBOARDING_KEY = "hasSeenOnboarding";
 
 const SplashScreen = () => {
   const { colors } = useTheme();
@@ -110,25 +103,8 @@ const SplashScreen = () => {
   );
 };
 
-const TabIcon = ({
-  label,
-  color,
-  focused,
-  styles,
-}: {
-  label: string;
-  color: string;
-  focused: boolean;
-  styles: ReturnType<typeof createStyles>;
-}) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
-    <Text style={{ fontSize: focused ? 22 : 20, color }}>{label}</Text>
-  </View>
-);
-
 const AppTabs = () => {
   const { colors } = useTheme();
-  const styles = useThemedStyles(createStyles);
 
   return (
     <Tab.Navigator
@@ -142,6 +118,7 @@ const AppTabs = () => {
           elevation: 0,
           shadowOpacity: 0,
         },
+        headerShadowVisible: false,
         headerTitleStyle: {
           fontSize: 20,
           fontWeight: "700",
@@ -149,7 +126,6 @@ const AppTabs = () => {
         },
       }}
     >
-      {/* Visible tabs */}
       <Tab.Screen
         name="Practice"
         component={PracticeNavigator}
@@ -158,17 +134,19 @@ const AppTabs = () => {
       <Tab.Screen
         name="VoiceTest"
         component={VoiceTestScreen}
-        options={{ headerTitle: "Voice AI" }}
+        options={{ headerTitle: "Voice Test" }}
       />
       <Tab.Screen
         name="Home"
         component={HomeScreen}
         options={({ navigation }) => ({
           headerRight: () => (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-            >
-              <PointsPill onPress={() => navigation.navigate("PointsDetail")} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <PointsPill
+                onPress={() =>
+                  (navigation.getParent() as any)?.navigate("PointsDetail")
+                }
+              />
               <ProfileMenu />
             </View>
           ),
@@ -180,119 +158,141 @@ const AppTabs = () => {
         component={SocialNavigator}
         options={{ headerShown: false }}
       />
-
-      {/* Hidden tabs - accessible via ProfileMenu */}
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={({ navigation }) => ({
-          tabBarButton: () => null, // Hide from tab bar
-          headerRight: () => (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-            >
-              <PointsPill onPress={() => navigation.navigate("PointsDetail")} />
-              <ProfileMenu />
-            </View>
-          ),
-        })}
-      />
-      <Tab.Screen
-        name="Analytics"
-        component={AnalyticsScreen}
-        options={{
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="Subscription"
-        component={SubscriptionScreen}
-        options={{
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="Usage"
-        component={UsageScreen}
-        options={{
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="Simulations"
-        component={SimulationNavigator}
-        options={{
-          headerShown: false,
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="PointsDetail"
-        component={PointsDetailScreen}
-        options={{
-          headerShown: false,
-          tabBarButton: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="RedeemDiscount"
-        component={RedeemDiscountScreen}
-        options={{
-          headerShown: false,
-          tabBarButton: () => null,
-        }}
-      />
     </Tab.Navigator>
   );
 };
 
-// Onboarding flow component
-const OnboardingFlow = ({ navigation }: any) => {
+type OnboardingFlowProps = {
+  onComplete: () => void;
+  onSkip?: () => void;
+  onSignIn?: () => void;
+  onRegister?: () => void;
+};
+
+const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
+  onComplete,
+  onSkip,
+  onSignIn,
+  onRegister,
+}) => {
   const [currentScreen, setCurrentScreen] = useState(1);
 
-  const handleNext = async () => {
+  const handleNext = () => {
     if (currentScreen < 3) {
-      setCurrentScreen(currentScreen + 1);
-    } else {
-      // Mark onboarding as complete and navigate to login
-      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-      navigation.replace("TrialEntry");
+      setCurrentScreen((prev) => prev + 1);
+      return;
     }
+
+    onComplete();
   };
 
-  const handleSkip = async () => {
-    // Mark onboarding as complete and navigate directly to login
-    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-    navigation.replace("TrialEntry");
+  const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+      return;
+    }
+
+    onComplete();
   };
 
   if (currentScreen === 1) {
-    return <SplashScreen1 onNext={handleNext} onSkip={handleSkip} />;
-  } else if (currentScreen === 2) {
-    return <SplashScreen2 onNext={handleNext} onSkip={handleSkip} />;
-  } else {
-    return <SplashScreen3 onNext={handleNext} onSkip={handleSkip} />;
+    return (
+      <SplashScreen1
+        onNext={handleNext}
+        onSkip={handleSkip}
+        onSignIn={onSignIn}
+        onRegister={onRegister}
+      />
+    );
   }
+
+  if (currentScreen === 2) {
+    return (
+      <SplashScreen2
+        onNext={handleNext}
+        onSkip={handleSkip}
+        onSignIn={onSignIn}
+        onRegister={onRegister}
+      />
+    );
+  }
+
+  return (
+    <SplashScreen3
+      onNext={handleNext}
+      onSkip={handleSkip}
+      onSignIn={onSignIn}
+      onRegister={onRegister}
+    />
+  );
+};
+
+const OnboardingReplayScreen = ({ navigation }: { navigation: any }) => {
+  return (
+    <OnboardingFlow
+      onComplete={() => navigation.goBack()}
+      onSkip={() => navigation.goBack()}
+    />
+  );
 };
 
 const AuthNavigator = () => {
-  // Always show onboarding - no AsyncStorage check
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
 
-  // Note: Removed useEffect that checks AsyncStorage
-  // This ensures onboarding ALWAYS shows on app start
+  useEffect(() => {
+    let mounted = true;
+
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then((value) => {
+        if (!mounted) {
+          return;
+        }
+        setHasSeenOnboarding(value === "true");
+      })
+      .catch(() => {
+        if (mounted) {
+          setHasSeenOnboarding(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (hasSeenOnboarding === null) {
+    return <SplashScreen />;
+  }
 
   return (
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       {!hasSeenOnboarding && (
-        <AuthStack.Screen name="Onboarding" component={OnboardingFlow} />
+        <AuthStack.Screen name="Onboarding">
+          {({ navigation }) => (
+            <OnboardingFlow
+              onComplete={async () => {
+                await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+                setHasSeenOnboarding(true);
+                navigation.replace("TrialEntry");
+              }}
+              onSkip={async () => {
+                await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+                setHasSeenOnboarding(true);
+                navigation.replace("TrialEntry");
+              }}
+              onSignIn={async () => {
+                await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+                setHasSeenOnboarding(true);
+                navigation.replace("Login");
+              }}
+              onRegister={async () => {
+                await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+                setHasSeenOnboarding(true);
+                navigation.replace("Register");
+              }}
+            />
+          )}
+        </AuthStack.Screen>
       )}
       <AuthStack.Screen name="TrialEntry" component={TrialEntryScreen} />
       <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -320,12 +320,68 @@ const GuestExperience = () => {
   );
 };
 
+const AuthenticatedNavigator = () => {
+  const { colors } = useTheme();
+
+  return (
+    <RootStack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.surface,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerShadowVisible: false,
+        headerTintColor: colors.textPrimary,
+        headerTitleStyle: {
+          fontSize: 20,
+          fontWeight: "700",
+          color: colors.textPrimary,
+        },
+        headerRight: () => <ProfileMenu />,
+      }}
+    >
+      <RootStack.Screen
+        name="MainTabs"
+        component={AppTabs}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen name="Profile" component={ProfileScreen} />
+      <RootStack.Screen name="Analytics" component={AnalyticsScreen} />
+      <RootStack.Screen name="Settings" component={SettingsScreen} />
+      <RootStack.Screen name="Subscription" component={SubscriptionScreen} />
+      <RootStack.Screen name="Usage" component={UsageScreen} />
+      <RootStack.Screen
+        name="Simulations"
+        component={SimulationNavigator}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="PointsDetail"
+        component={PointsDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="RedeemDiscount"
+        component={RedeemDiscountScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="OnboardingReplay"
+        component={OnboardingReplayScreen}
+        options={{ headerShown: false }}
+      />
+    </RootStack.Navigator>
+  );
+};
+
 export const AppNavigator = () => {
   const { user, initializing } = useAuth();
   const routeNameRef = useRef<string | undefined>(undefined);
   const pendingReferralRef = useRef<string | null>(null);
   const [navReady, setNavReady] = useState(false);
   const { colors, theme } = useTheme();
+
   const navigationTheme = useMemo(
     () => ({
       ...DefaultTheme,
@@ -356,10 +412,7 @@ export const AppNavigator = () => {
 
         if (!code && typeof path === "string") {
           const segments = path.split("/").filter(Boolean);
-          if (
-            segments.length >= 2 &&
-            segments[0].toLowerCase() === "referral"
-          ) {
+          if (segments.length >= 2 && segments[0].toLowerCase() === "referral") {
             code = segments[1];
           }
           if (
@@ -389,13 +442,11 @@ export const AppNavigator = () => {
         });
       }
     },
-    [navReady, navigationRef, user]
+    [navReady, user]
   );
 
   useEffect(() => {
-    Linking.getInitialURL()
-      .then(processReferralUrl)
-      .catch(() => undefined);
+    Linking.getInitialURL().then(processReferralUrl).catch(() => undefined);
     const subscription = Linking.addEventListener("url", ({ url }) => {
       processReferralUrl(url);
     });
@@ -406,12 +457,7 @@ export const AppNavigator = () => {
   }, [processReferralUrl]);
 
   useEffect(() => {
-    if (
-      navReady &&
-      !user &&
-      pendingReferralRef.current &&
-      navigationRef.isReady()
-    ) {
+    if (navReady && !user && pendingReferralRef.current && navigationRef.isReady()) {
       const currentRoute = navigationRef.getCurrentRoute()?.name;
       if (currentRoute !== "Register") {
         navigationRef.navigate("Register", {
@@ -423,7 +469,7 @@ export const AppNavigator = () => {
     if (user) {
       pendingReferralRef.current = null;
     }
-  }, [navReady, navigationRef, user]);
+  }, [navReady, user]);
 
   if (initializing) {
     return <SplashScreen />;
@@ -454,39 +500,7 @@ export const AppNavigator = () => {
         routeNameRef.current = currentRoute;
       }}
     >
-      {user ? (user.isGuest ? <GuestExperience /> : <AppTabs />) : <AuthNavigator />}
+      {user ? user.isGuest ? <GuestExperience /> : <AuthenticatedNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
 };
-
-const createStyles = (colors: ColorTokens) =>
-  RNStyleSheet.create({
-    iconContainer: {
-      height: 40,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 12,
-    },
-    iconContainerFocused: {
-      backgroundColor: `${colors.primary}15`, // 15% opacity
-    },
-    homeIconContainer: {
-      width: 60,
-      height: 60,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 30,
-      marginTop: -20, // Lift it above the tab bar
-      backgroundColor: colors.backgroundMuted,
-      borderWidth: 3,
-      borderColor: colors.surface,
-    },
-    homeIconContainerFocused: {
-      backgroundColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
-      elevation: 10,
-    },
-  });

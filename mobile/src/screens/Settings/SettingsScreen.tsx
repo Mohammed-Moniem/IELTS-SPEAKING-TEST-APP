@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import {
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,53 +15,38 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context/ThemeContext";
+import { AppRootStackParamList } from "../../navigation/AppNavigator";
 import { spacing } from "../../theme/tokens";
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
+  const navigation = useNavigation<any>();
 
   const settingsOptions = [
     {
       icon: "notifications" as const,
       title: "Notifications",
       description: "Manage notification preferences",
-      route: null, // TODO: Add NotificationSettings route to AppTabParamList
-      onPress: () => {
-        Alert.alert(
-          "Notifications",
-          "This feature will navigate to notification settings. Route needs to be added to AppNavigator."
-        );
-      },
+      status: "coming_soon" as const,
     },
     {
       icon: "language" as const,
       title: "Language",
       description: "Change app language",
-      route: null,
-      onPress: () => {
-        Alert.alert("Language", "Multi-language support coming soon!");
-      },
+      status: "coming_soon" as const,
     },
     {
       icon: "volume-high" as const,
       title: "Audio Settings",
       description: "Adjust voice and sound settings",
-      route: null,
-      onPress: () => {
-        Alert.alert("Audio", "Audio settings coming soon!");
-      },
+      status: "coming_soon" as const,
     },
     {
       icon: "shield-checkmark" as const,
       title: "Privacy",
       description: "Control your data and privacy",
-      route: null,
-      onPress: () => {
-        Alert.alert(
-          "Privacy",
-          "Privacy settings available in Profile section."
-        );
-      },
+      status: "available" as const,
+      onPress: () => navigation.navigate("Profile" satisfies keyof AppRootStackParamList),
     },
   ];
 
@@ -88,6 +73,22 @@ export const SettingsScreen: React.FC = () => {
             </View>
             <ThemeModeSwitch />
           </View>
+          <View style={[styles.settingRow, styles.settingRowTopBorder, { borderTopColor: colors.divider }]}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>
+                Replay Onboarding
+              </Text>
+              <Text style={[styles.settingDescription, { color: colors.textMuted }]}>
+                View the intro slides again any time
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.replayButton, { backgroundColor: colors.primary }]}
+              onPress={() => navigation.navigate("OnboardingReplay")}
+            >
+              <Text style={styles.replayButtonText}>Replay</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
 
         {/* App Settings Section */}
@@ -103,6 +104,7 @@ export const SettingsScreen: React.FC = () => {
                 index > 0 && styles.optionCardWithBorder,
                 { borderTopColor: colors.divider },
               ]}
+              disabled={option.status !== "available"}
               onPress={option.onPress}
             >
               <View
@@ -128,11 +130,19 @@ export const SettingsScreen: React.FC = () => {
                   {option.description}
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.textMuted}
-              />
+              {option.status === "available" ? (
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={colors.textMuted}
+                />
+              ) : (
+                <View style={[styles.badge, { backgroundColor: colors.surfaceSubtle }]}>
+                  <Text style={[styles.badgeText, { color: colors.textMutedStrong }]}>
+                    Coming soon
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </Card>
@@ -169,7 +179,7 @@ export const SettingsScreen: React.FC = () => {
         <Card style={{ backgroundColor: colors.surface }}>
           <TouchableOpacity
             style={styles.optionCard}
-            onPress={() => Alert.alert("Help", "Help center coming soon!")}
+            disabled
           >
             <View
               style={[
@@ -190,7 +200,7 @@ export const SettingsScreen: React.FC = () => {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name="time-outline"
               size={20}
               color={colors.textMuted}
             />
@@ -202,9 +212,7 @@ export const SettingsScreen: React.FC = () => {
               styles.optionCardWithBorder,
               { borderTopColor: colors.divider },
             ]}
-            onPress={() =>
-              Alert.alert("Contact", "Contact support coming soon!")
-            }
+            disabled
           >
             <View
               style={[
@@ -225,7 +233,7 @@ export const SettingsScreen: React.FC = () => {
               </Text>
             </View>
             <Ionicons
-              name="chevron-forward"
+              name="time-outline"
               size={20}
               color={colors.textMuted}
             />
@@ -249,6 +257,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
   },
+  settingRowTopBorder: {
+    borderTopWidth: 1,
+  },
   settingInfo: {
     flex: 1,
     marginRight: spacing.md,
@@ -260,6 +271,16 @@ const styles = StyleSheet.create({
   },
   settingDescription: {
     fontSize: 14,
+  },
+  replayButton: {
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  replayButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 13,
   },
   optionCard: {
     flexDirection: "row",
@@ -306,5 +327,14 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 15,
+  },
+  badge: {
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

@@ -71,17 +71,53 @@ const AView = Animated.createAnimatedComponent(View);
 const AImage = Animated.createAnimatedComponent(Image);
 const APressable = Animated.createAnimatedComponent(Pressable);
 
+type AuthShortcutProps = {
+  styles: ReturnType<typeof createStyles>;
+  onSignIn?: () => void;
+  onRegister?: () => void;
+};
+
+const AuthShortcutRow: React.FC<AuthShortcutProps> = ({
+  styles,
+  onSignIn,
+  onRegister,
+}) => {
+  if (!onSignIn && !onRegister) {
+    return null;
+  }
+
+  return (
+    <View style={styles.authShortcutRow}>
+      {onSignIn ? (
+        <Pressable onPress={onSignIn}>
+          <Text style={styles.authShortcutText}>Sign in</Text>
+        </Pressable>
+      ) : null}
+      {onSignIn && onRegister ? <Text style={styles.authShortcutDot}>•</Text> : null}
+      {onRegister ? (
+        <Pressable onPress={onRegister}>
+          <Text style={styles.authShortcutText}>Create account</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+};
+
 // ---------- SplashScreen 1 ----------
 export interface SplashScreen1Props {
   onNext: () => void;
   onSkip: () => void;
   logoSource?: ImageSourcePropType;
+  onSignIn?: () => void;
+  onRegister?: () => void;
 }
 
 export function SplashScreen1({
   onNext,
   onSkip,
   logoSource,
+  onSignIn,
+  onRegister,
 }: SplashScreen1Props) {
   const palette = useSplashPalette();
   const styles = useMemo(() => createStyles(palette), [palette]);
@@ -299,7 +335,8 @@ export function SplashScreen1({
 
       <AView style={[styles.mb12, pStyle]}>
         <Text style={[styles.p, { color: palette.purple700 }]}>
-          Your AI-powered companion for mastering IELTS Speaking
+          Raise your IELTS band faster with realistic speaking practice and
+          clear feedback in minutes.
         </Text>
       </AView>
 
@@ -307,6 +344,11 @@ export function SplashScreen1({
       <APressable onPress={onNext} style={[styles.btn, btnStyle]}>
         <Text style={styles.btnText}>Get Started</Text>
       </APressable>
+      <AuthShortcutRow
+        styles={styles}
+        onSignIn={onSignIn}
+        onRegister={onRegister}
+      />
       </View>
     </SafeAreaView>
   );
@@ -316,9 +358,16 @@ export function SplashScreen1({
 export interface SplashScreen2Props {
   onNext: () => void;
   onSkip: () => void;
+  onSignIn?: () => void;
+  onRegister?: () => void;
 }
 
-export function SplashScreen2({ onNext, onSkip }: SplashScreen2Props) {
+export function SplashScreen2({
+  onNext,
+  onSkip,
+  onSignIn,
+  onRegister,
+}: SplashScreen2Props) {
   const palette = useSplashPalette();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { theme } = useTheme();
@@ -500,8 +549,8 @@ export function SplashScreen2({ onNext, onSkip }: SplashScreen2Props) {
             { color: palette.purple700, textAlign: "center", opacity: 0.8 },
           ]}
         >
-          Get instant feedback on your speaking skills with advanced AI
-          technology
+          See band-level feedback after every session and understand what to
+          improve next.
         </Text>
       </AView>
 
@@ -534,6 +583,11 @@ export function SplashScreen2({ onNext, onSkip }: SplashScreen2Props) {
       >
         <Text style={styles.btnText}>Continue</Text>
       </APressable>
+      <AuthShortcutRow
+        styles={styles}
+        onSignIn={onSignIn}
+        onRegister={onRegister}
+      />
       </View>
     </SafeAreaView>
   );
@@ -543,9 +597,16 @@ export function SplashScreen2({ onNext, onSkip }: SplashScreen2Props) {
 export interface SplashScreen3Props {
   onNext: () => void;
   onSkip: () => void;
+  onSignIn?: () => void;
+  onRegister?: () => void;
 }
 
-export function SplashScreen3({ onNext, onSkip }: SplashScreen3Props) {
+export function SplashScreen3({
+  onNext,
+  onSkip,
+  onSignIn,
+  onRegister,
+}: SplashScreen3Props) {
   const palette = useSplashPalette();
   const styles = useMemo(() => createStyles(palette), [palette]);
   const { theme } = useTheme();
@@ -779,8 +840,8 @@ export function SplashScreen3({ onNext, onSkip }: SplashScreen3Props) {
                 { color: palette.purple700, textAlign: "center", opacity: 0.8 },
               ]}
             >
-              Build confidence and reach your target IELTS band score with
-              personalized practice
+              Most learners see clearer speaking structure and stronger answers
+              after a few guided sessions.
             </Text>
           </View>
 
@@ -812,6 +873,11 @@ export function SplashScreen3({ onNext, onSkip }: SplashScreen3Props) {
           <APressable onPress={onNext} style={[styles.btnLg, ctaStyle]}>
             <Text style={styles.btnText}>Start Learning</Text>
           </APressable>
+          <AuthShortcutRow
+            styles={styles}
+            onSignIn={onSignIn}
+            onRegister={onRegister}
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -1036,5 +1102,22 @@ const createStyles = (palette: SplashPalette) =>
     width: "100%",
     height: "100%",
     borderRadius: 32,
+  },
+  authShortcutRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  authShortcutText: {
+    color: palette.purple700,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  authShortcutDot: {
+    color: palette.purple500,
+    fontSize: 14,
+    fontWeight: "700",
   },
   });

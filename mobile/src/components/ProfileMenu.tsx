@@ -23,6 +23,7 @@ interface MenuItem {
   label: string;
   screen: string;
   color?: string;
+  available?: boolean;
 }
 
 const menuItems: MenuItem[] = [
@@ -49,12 +50,14 @@ const menuItems: MenuItem[] = [
     iconFamily: "Ionicons",
     label: "Subscription",
     screen: "Subscription",
+    available: false,
   },
   {
     icon: "bar-chart",
     iconFamily: "Ionicons",
     label: "Usage",
     screen: "Usage",
+    available: false,
   },
   {
     icon: "log-out",
@@ -80,6 +83,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleMenuPress = async (item: MenuItem) => {
     setVisible(false);
+
+    if (item.available === false) {
+      return;
+    }
 
     if (item.screen === "Logout") {
       await logout();
@@ -132,6 +139,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     styles.menuItem,
                     index === menuItems.length - 1 && styles.menuItemLast,
                   ]}
+                  disabled={item.available === false}
                   onPress={() => handleMenuPress(item)}
                   activeOpacity={0.7}
                 >
@@ -163,7 +171,11 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   >
                     {item.label}
                   </Text>
-                  <Ionicons name="chevron-forward" size={20} color="#999999" />
+                  {item.available === false ? (
+                    <Text style={styles.soonText}>Soon</Text>
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color="#999999" />
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -258,5 +270,12 @@ const createStyles = (colors: ColorTokens) =>
     fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
+  },
+  soonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
   });

@@ -44,7 +44,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   const getLabel = (routeName: string) => {
     switch (routeName) {
       case "VoiceTest":
-        return "AI";
+        return "Voice Test";
       case "Practice":
         return "Practice";
       case "Home":
@@ -78,18 +78,6 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   return (
     <View style={styles.tabBar}>
       {state.routes.map((route, index) => {
-        // Skip hidden routes
-        if (
-          route.name === "Profile" ||
-          route.name === "Analytics" ||
-          route.name === "Settings" ||
-          route.name === "Subscription" ||
-          route.name === "Usage" ||
-          route.name === "Simulations"
-        ) {
-          return null;
-        }
-
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 

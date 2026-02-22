@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, Suspense, useState } from 'react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ApiError } from '@/lib/api/client';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -63,5 +63,20 @@ export default function LoginPage() {
         No account yet? <Link href="/register">Create one now</Link>
       </p>
     </section>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="auth-card panel stack">
+          <div className="loader" />
+          <p className="small">Loading sign-in...</p>
+        </section>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

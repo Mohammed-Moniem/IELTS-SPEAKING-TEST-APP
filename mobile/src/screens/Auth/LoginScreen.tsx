@@ -118,6 +118,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                   (!isValid && (touched.email || touched.password))
                 }
               />
+              <View style={styles.trustRow}>
+                <Text style={styles.trustText}>Secure login</Text>
+                <Text style={styles.trustDot}>•</Text>
+                <Text style={styles.trustText}>Your data stays private</Text>
+              </View>
             </View>
           )}
         </Formik>
@@ -159,5 +164,21 @@ const createStyles = (colors: ColorTokens) =>
   switchText: {
     color: colors.primary,
     fontWeight: "600",
+  },
+  trustRow: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  trustText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: "600",
+  },
+  trustDot: {
+    fontSize: 12,
+    color: colors.textMuted,
   },
   });
