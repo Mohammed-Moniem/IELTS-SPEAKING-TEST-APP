@@ -15,6 +15,9 @@ interface IHealthTestOptions {
   mongoState?: number;
   rabbitEnabled?: boolean;
   rabbitConnected?: boolean;
+  supabaseDbHealthy?: boolean;
+  supabaseStorageHealthy?: boolean;
+  storageProvider?: 'supabase' | 'mongodb' | 's3';
   healthConfig?: IHealthEnvOverrides;
 }
 
@@ -26,6 +29,9 @@ describe('HealthService', () => {
       mongoState = 1,
       rabbitEnabled = false,
       rabbitConnected = false,
+      supabaseDbHealthy = true,
+      supabaseStorageHealthy = true,
+      storageProvider = 'supabase',
       healthConfig = {}
     } = options;
 
@@ -64,6 +70,9 @@ describe('HealthService', () => {
         health: healthDefaults,
         rabbitmq: {
           enabled: rabbitEnabled
+        },
+        storage: {
+          provider: storageProvider
         }
       }
     }));
@@ -79,6 +88,27 @@ describe('HealthService', () => {
     };
 
     jest.doMock('@loaders/RabbitMQLoader', () => rabbitMock);
+
+    jest.doMock('@lib/db/pgClient', () => ({
+      checkPgConnection: jest.fn(() =>
+        supabaseDbHealthy ? Promise.resolve(true) : Promise.reject(new Error('Supabase DB unavailable'))
+      )
+    }));
+
+    jest.doMock('@lib/db/supabaseClient', () => ({
+      checkSupabaseStorageConnection: jest.fn(() =>
+        supabaseStorageHealthy ? Promise.resolve(true) : Promise.reject(new Error('Supabase storage unavailable'))
+      )
+    }));
+
+    jest.doMock('@lib/logger', () => ({
+      Logger: class {
+        public info = jest.fn();
+        public debug = jest.fn();
+        public warn = jest.fn();
+        public error = jest.fn();
+      }
+    }));
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const module = require('../../../../../src/api/services/HealthService');

@@ -1,0 +1,76 @@
+{
+  "scenarios": [
+    {
+      "name": "writing-task-generate",
+      "method": "POST",
+      "url": "{{BASE_URL}}/writing/tasks/generate",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general",
+        "taskType": "task2"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    },
+    {
+      "name": "reading-start",
+      "method": "POST",
+      "url": "{{BASE_URL}}/reading/tests/start",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    },
+    {
+      "name": "listening-start",
+      "method": "POST",
+      "url": "{{BASE_URL}}/listening/tests/start",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    }
+  ]
+}

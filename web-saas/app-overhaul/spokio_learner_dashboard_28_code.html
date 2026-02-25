@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Writing Evaluation Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", 
+              "primary-hover": "#6D28D9",
+              "background-page": "#FFFFFF", 
+              "sidebar-bg": "#F9FAFB",
+              "card-bg": "#FFFFFF",
+              "text-main": "#111827",
+              "text-secondary": "#4B5563",
+              "text-muted": "#6B7280",
+              "border-color": "#E5E7EB",
+              "success": "#10B981",
+              "warning": "#F59E0B",
+              "error": "#EF4444",
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", 
+              'xl': "1rem", 
+              '2xl': "1.5rem", 
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        .highlight-error {
+            background-color: #FEF2F2;
+            color: #991B1B;
+            text-decoration: underline;
+            text-decoration-color: #EF4444;
+            text-decoration-thickness: 2px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        .highlight-suggestion {
+            background-color: #FFFBEB;
+            color: #92400E;
+            text-decoration: underline;
+            text-decoration-color: #F59E0B;
+            text-decoration-thickness: 2px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        .highlight-good {
+            background-color: #ECFDF5;
+            color: #065F46;
+            text-decoration: underline;
+            text-decoration-color: #10B981;
+            text-decoration-thickness: 2px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-background-page text-text-main font-sans antialiased min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-sidebar-bg border-r border-border-color flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-border-color">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-text-main">Spokio</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">dashboard</span>
+            Dashboard
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Practice Areas
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">mic</span>
+            Speaking
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-white shadow-sm border border-gray-100 text-primary group" href="#">
+<span class="material-symbols-outlined text-xl">edit_note</span>
+            Writing
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">menu_book</span>
+            Reading
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">headphones</span>
+            Listening
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Assessment
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">assignment</span>
+            Full Exams
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-secondary hover:bg-white hover:shadow-sm hover:text-primary transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-text-muted group-hover:text-primary transition-colors">bar_chart</span>
+            Progress &amp; Stats
+        </a>
+</nav>
+<div class="p-4 border-t border-border-color">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border border-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-text-main">Student One</p>
+<p class="text-xs text-text-muted">Free Plan</p>
+</div>
+<span class="material-symbols-outlined ml-auto text-text-muted">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen bg-background-page">
+<header class="lg:hidden h-16 bg-white border-b border-border-color flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg text-text-main">Spokio</span>
+</div>
+<button class="p-2 text-text-muted hover:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
+<div class="flex flex-col gap-4 mb-8">
+<div class="flex items-center gap-2 text-sm text-text-muted">
+<a class="hover:text-primary transition-colors" href="#">Dashboard</a>
+<span class="material-symbols-outlined text-sm text-gray-400">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Writing Practice</a>
+<span class="material-symbols-outlined text-sm text-gray-400">chevron_right</span>
+<span class="text-text-main font-medium">Evaluation #204</span>
+</div>
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="text-2xl md:text-3xl font-bold text-text-main mb-2">Writing Evaluation: Task 2</h1>
+<p class="text-text-secondary max-w-2xl text-lg">
+                        Topic: "Some people believe that the best way to solve environmental problems is to increase the cost of fuel. To what extent do you agree or disagree?"
+                    </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 border border-border-color rounded-xl text-sm font-medium hover:bg-gray-50 text-text-secondary transition-colors bg-white">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                        Export PDF
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">refresh</span>
+                        Retry Task
+                    </button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+<div class="xl:col-span-8 space-y-6">
+<div class="bg-card-bg rounded-2xl border border-border-color shadow-sm overflow-hidden flex flex-col h-full">
+<div class="border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between bg-white gap-4">
+<h3 class="font-bold text-text-main flex items-center gap-2 text-lg">
+<span class="material-symbols-outlined text-primary">edit_document</span>
+                            Your Essay with AI Feedback
+                        </h3>
+<div class="flex flex-wrap items-center gap-4 text-xs font-medium">
+<span class="flex items-center gap-1.5 px-2 py-1 bg-red-50 text-error rounded-md border border-red-100">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span> Correction
+                            </span>
+<span class="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-warning rounded-md border border-amber-100">
+<span class="w-1.5 h-1.5 rounded-full bg-warning"></span> Suggestion
+                            </span>
+<span class="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-success rounded-md border border-emerald-100">
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span> Good Vocabulary
+                            </span>
+</div>
+</div>
+<div class="p-6 md:p-10 font-serif text-lg leading-relaxed text-gray-800 bg-white">
+<p class="mb-6">
+                            Environmental issues have become a major concern in today's world. While some argue that <span class="highlight-suggestion group relative">increasing fuel prices<span class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-white text-gray-700 text-xs rounded-lg shadow-xl z-10 font-sans border border-gray-200"><strong>Suggestion:</strong> Consider "raising the cost of fuel" to vary your vocabulary.</span></span> is the most effective solution, I believe that this measure alone is insufficient and could have negative economic impacts. A multi-faceted approach is required to tackle this global crisis effectively.
+                        </p>
+<p class="mb-6">
+                            Firstly, higher fuel costs would undoubtedly encourage people to use cars less. This would reduce carbon emissions significantly. However, it would also <span class="highlight-error group relative">effect<span class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-white text-gray-700 text-xs rounded-lg shadow-xl z-10 font-sans border border-gray-200"><strong class="text-error">Correction:</strong> "affect". 'Effect' is usually a noun, while 'affect' is a verb.</span></span> the economy by increasing transportation costs for goods. This could lead to inflation, making daily necessities more expensive for the average citizen.
+                        </p>
+<p class="mb-6">
+                            Moreover, relying solely on price hikes ignores the root cause: the lack of sustainable alternatives. Governments should invest in <span class="highlight-good group relative">renewable energy infrastructure<span class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-white text-gray-700 text-xs rounded-lg shadow-xl z-10 font-sans border border-gray-200"><strong class="text-success">Good Job!</strong> Excellent topic-specific vocabulary.</span></span> and improve public transportation systems. For instance, if electric buses and trains were more accessible and affordable, people would naturally switch without being penalized financially.
+                        </p>
+<p class="mb-6">
+                            In conclusion, while making fuel more expensive might deter some usage, it is a punitive measure that disproportionately affects lower-income individuals. A more <span class="highlight-suggestion group relative">comprehensive strategy<span class="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-white text-gray-700 text-xs rounded-lg shadow-xl z-10 font-sans border border-gray-200"><strong>Suggestion:</strong> "holistic approach" creates a nice parallel with your earlier points.</span></span> involving green technology and better infrastructure is the only viable long-term solution.
+                        </p>
+<div class="mt-8 pt-6 border-t border-gray-100 font-sans text-sm text-text-muted flex justify-between items-center">
+<span class="font-medium">Word Count: 218 words</span>
+<span class="text-warning font-semibold flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+<span class="material-symbols-outlined text-base">warning</span> Under length (Target: 250+)
+                            </span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<h3 class="font-bold text-xl text-text-main">Areas for Improvement</h3>
+<div class="bg-card-bg p-5 rounded-xl border border-border-color hover:border-primary/30 transition-colors shadow-sm">
+<div class="flex gap-4">
+<div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 border border-red-100">
+<span class="material-symbols-outlined">short_text</span>
+</div>
+<div>
+<h4 class="font-bold text-text-main mb-1 text-lg">Expand Your Arguments</h4>
+<p class="text-sm text-text-secondary mb-3 leading-relaxed">Your essay is 218 words, which is below the 250-word minimum for Task 2. This will negatively impact your Task Response score. Try to add another body paragraph or expand on your examples.</p>
+<button class="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 uppercase tracking-wide">
+                                    See Example Expansion <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<div class="bg-card-bg p-5 rounded-xl border border-border-color hover:border-primary/30 transition-colors shadow-sm">
+<div class="flex gap-4">
+<div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 border border-blue-100">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<div>
+<h4 class="font-bold text-text-main mb-1 text-lg">Varied Sentence Structures</h4>
+<p class="text-sm text-text-secondary mb-3 leading-relaxed">You use a lot of "Subject + Verb" starts. Try starting sentences with subordinating conjunctions like "Although," "Despite," or "Given that" to boost your Grammatical Range score.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="xl:col-span-4 space-y-6">
+<div class="bg-white p-8 rounded-2xl text-center relative overflow-hidden border border-border-color shadow-sm">
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<p class="text-text-muted text-sm font-bold uppercase tracking-widest mb-4">Overall Band Score</p>
+<div class="flex items-center justify-center mb-4">
+<div class="w-32 h-32 rounded-full border-8 border-primary flex items-center justify-center bg-white shadow-xl shadow-primary/10">
+<span class="text-5xl font-extrabold text-primary">6.5</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-50 rounded-full text-sm text-text-secondary border border-gray-100 font-medium">
+<span class="material-symbols-outlined text-sm text-primary">trending_up</span>
+                            Top 35% of students
+                        </div>
+</div>
+</div>
+<div class="bg-card-bg rounded-2xl border border-border-color shadow-sm p-6">
+<h3 class="font-bold text-lg text-text-main mb-6">Score Breakdown</h3>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between items-center mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">fact_check</span>
+<span class="text-sm font-bold text-gray-700">Task Response</span>
+</div>
+<span class="text-sm font-bold text-primary bg-primary/5 px-2 py-0.5 rounded text-primary">6.0</span>
+</div>
+<div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 60%"></div>
+</div>
+<p class="text-xs text-text-muted mt-2">Relevant ideas but under word count.</p>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-blue-500 text-xl">link</span>
+<span class="text-sm font-bold text-gray-700">Coherence &amp; Cohesion</span>
+</div>
+<span class="text-sm font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">7.0</span>
+</div>
+<div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+<div class="bg-blue-500 h-full rounded-full" style="width: 70%"></div>
+</div>
+<p class="text-xs text-text-muted mt-2">Good use of linking words and logical flow.</p>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-500 text-xl">book</span>
+<span class="text-sm font-bold text-gray-700">Lexical Resource</span>
+</div>
+<span class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">6.5</span>
+</div>
+<div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+<div class="bg-emerald-500 h-full rounded-full" style="width: 65%"></div>
+</div>
+<p class="text-xs text-text-muted mt-2">Adequate range, some repetition of "fuel".</p>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-orange-500 text-xl">gavel</span>
+<span class="text-sm font-bold text-gray-700">Grammatical Range</span>
+</div>
+<span class="text-sm font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">6.5</span>
+</div>
+<div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+<div class="bg-orange-500 h-full rounded-full" style="width: 65%"></div>
+</div>
+<p class="text-xs text-text-muted mt-2">Generally accurate, minor error with 'effect/affect'.</p>
+</div>
+</div>
+</div>
+<div class="bg-card-bg rounded-2xl border border-border-color shadow-sm p-6">
+<h3 class="font-bold text-lg text-text-main mb-4">Recommended Actions</h3>
+<button class="w-full mb-3 flex items-center justify-between p-3 rounded-xl bg-white border border-border-color hover:bg-gray-50 hover:border-primary/30 transition-all group shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl">edit</span>
+</div>
+<div class="text-left">
+<p class="text-sm font-bold text-text-main">Rewrite Essay</p>
+<p class="text-xs text-text-secondary">Apply the feedback immediately</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-300 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-border-color hover:bg-gray-50 hover:border-primary/30 transition-all group shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
+<span class="material-symbols-outlined text-xl">school</span>
+</div>
+<div class="text-left">
+<p class="text-sm font-bold text-text-main">Lesson: Expanding Ideas</p>
+<p class="text-xs text-text-secondary">5 min micro-lesson</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-300 group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

@@ -12,6 +12,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { processConversationTurn } from "../api/speechApi";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { logger } from "../utils/logger";
 import { VoiceOrb } from "./VoiceOrb";
 
 type ConversationMode = "practice" | "simulation";
@@ -26,6 +30,8 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
   mode,
   onEnd,
 }) => {
+  const { colors, theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [state, setState] = useState<ConversationState>("idle");
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -90,7 +96,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       setRecording(newRecording);
       setState("recording");
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording", error);
       Alert.alert(
         "Recording Error",
         "Failed to start recording. Please try again."
@@ -143,7 +149,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         // Return to idle state after audio finishes
         setState("idle");
       } catch (error: any) {
-        console.error("❌ Conversation error:", error);
+        logger.warn("Conversation error", error);
         Alert.alert(
           "Connection Error",
           error.message ||
@@ -152,7 +158,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         setState("idle");
       }
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording", error);
       setState("idle");
     }
   };
@@ -178,7 +184,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         }
       });
     } catch (error) {
-      console.error("❌ Audio playback error:", error);
+      logger.warn("Audio playback error", error);
       throw error;
     }
   };
@@ -208,12 +214,15 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar
+        barStyle={theme === "light" ? "dark-content" : "light-content"}
+        backgroundColor={colors.background}
+      />
 
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onEnd} style={styles.iconButton}>
-          <Ionicons name="close" size={24} color="#ffffff" />
+          <Ionicons name="close" size={24} color={colors.textInverse} />
         </TouchableOpacity>
 
         <View style={styles.topBarCenter}>
@@ -229,7 +238,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
           <Ionicons
             name="information-circle-outline"
             size={24}
-            color="#ffffff"
+            color={colors.textInverse}
           />
         </TouchableOpacity>
       </View>
@@ -261,7 +270,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
           <Ionicons
             name={isMuted ? "mic-off" : "mic"}
             size={28}
-            color="#ffffff"
+            color={colors.textInverse}
           />
         </TouchableOpacity>
 
@@ -271,29 +280,30 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
             onPress={startRecording}
             disabled={state === "ai-speaking"}
           >
-            <Ionicons name="mic" size={32} color="#ffffff" />
+            <Ionicons name="mic" size={32} color={colors.textInverse} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[styles.recordButton, styles.recordButtonActive]}
             onPress={stopRecording}
           >
-            <Ionicons name="stop" size={32} color="#ffffff" />
+            <Ionicons name="stop" size={32} color={colors.textInverse} />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.controlButton} onPress={onEnd}>
-          <Ionicons name="close-circle" size={28} color="#ff4444" />
+          <Ionicons name="close-circle" size={28} color={colors.danger} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: colors.background,
   },
   topBar: {
     flexDirection: "row",
@@ -310,11 +320,11 @@ const styles = StyleSheet.create({
   topBarTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.textInverse,
   },
   timer: {
     fontSize: 14,
-    color: "#d4a745",
+    color: colors.warning,
     marginTop: 4,
     fontWeight: "500",
   },
@@ -333,7 +343,7 @@ const styles = StyleSheet.create({
   stateText: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.textInverse,
     marginTop: 40,
     textAlign: "center",
   },
@@ -341,13 +351,13 @@ const styles = StyleSheet.create({
     marginTop: 30,
     paddingHorizontal: 24,
     paddingVertical: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 16,
     maxWidth: "90%",
   },
   transcriptText: {
     fontSize: 16,
-    color: "#ffffff",
+    color: colors.textPrimary,
     lineHeight: 24,
     textAlign: "center",
   },
@@ -363,27 +373,27 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: colors.surfaceSubtle,
     justifyContent: "center",
     alignItems: "center",
   },
   controlButtonActive: {
-    backgroundColor: "#d4a745",
+    backgroundColor: colors.warning,
   },
   recordButton: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#d4a745",
+    backgroundColor: colors.warning,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#d4a745",
+    shadowColor: colors.warning,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 8,
   },
   recordButtonActive: {
-    backgroundColor: "#ff4444",
+    backgroundColor: colors.danger,
   },
 });

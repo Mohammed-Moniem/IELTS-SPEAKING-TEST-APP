@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio - Partner Payout Operations Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6366f1", 
+                        "primary-content": "#ffffff",
+                        "primary-dark": "#4f46e5",
+                        "primary-light": "#818cf8",
+                        "background-light": "#f8fafc",
+                        "surface-white": "#ffffff",
+                        "border-light": "#e2e8f0",
+                        "text-main": "#0f172a",
+                        "text-secondary": "#64748b",
+                        "text-muted": "#94a3b8",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light font-display text-text-main overflow-x-hidden min-h-screen flex flex-col antialiased selection:bg-primary/20 selection:text-primary">
+<div class="relative flex flex-col w-full h-full min-h-screen">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-border-light bg-surface-white px-10 py-3 sticky top-0 z-20 shadow-sm">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-text-main">
+<div class="size-8 flex items-center justify-center text-primary bg-primary/10 rounded-lg">
+<span class="material-symbols-outlined text-2xl">hub</span>
+</div>
+<h2 class="text-text-main text-lg font-bold leading-tight tracking-[-0.015em]">Spokio Admin</h2>
+</div>
+<label class="flex flex-col min-w-40 !h-10 max-w-64 hidden md:flex group">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full border border-border-light bg-slate-50 overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all shadow-sm">
+<div class="text-slate-400 flex items-center justify-center pl-3">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden border-none bg-transparent focus:outline-0 focus:ring-0 h-full placeholder:text-slate-400 px-3 text-sm font-normal leading-normal text-text-main" placeholder="Search partners, payouts..." value=""/>
+</div>
+</label>
+</div>
+<div class="flex flex-1 justify-end gap-8">
+<nav class="hidden lg:flex items-center gap-8">
+<a class="text-text-secondary hover:text-primary transition-colors text-sm font-medium leading-normal" href="#">Dashboard</a>
+<a class="text-text-secondary hover:text-primary transition-colors text-sm font-medium leading-normal" href="#">Partners</a>
+<a class="text-primary font-semibold text-sm leading-normal bg-primary/5 px-3 py-1 rounded-full" href="#">Payouts</a>
+<a class="text-text-secondary hover:text-primary transition-colors text-sm font-medium leading-normal" href="#">Settings</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-slate-100 text-text-secondary relative transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 ring-2 ring-slate-100 shadow-sm cursor-pointer hover:ring-primary/30 transition-all" data-alt="Admin user profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDPLigfdpXeAmp3I29PDXbyR_vkrwbJNbx0NFbAIlCEfaepalQHbCRT7YAsK5aTrX7D4_Gu6X6hquSy_Y-q-9xBlW5KwjpB4QNSKC8CkhQwlhVIu4Jix2ICYu_dldgj5Ob4xKakoUnY2FguADbeTq5EaVDQRwzUJcLquIt3JzEtTTzj2TaV_O0p6NBrGUqeQgqa-QbtcZ3am93unCl1zqKlbPLJHuwmj4nWyqELiwtYZsl18xOKbhQujHIcQYwub-zgPLV1_1vgitkg");'></div>
+</div>
+</div>
+</header>
+<main class="flex-1 w-full max-w-[1440px] mx-auto p-6 lg:p-10 flex flex-col gap-8">
+<div class="flex flex-col gap-4">
+<div class="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+<a class="hover:text-primary transition-colors" href="#">Admin</a>
+<span class="material-symbols-outlined text-[16px] text-slate-300">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Partners</a>
+<span class="material-symbols-outlined text-[16px] text-slate-300">chevron_right</span>
+<span class="font-medium text-text-main">Payout Operations</span>
+</div>
+<div class="flex flex-wrap justify-between items-end gap-4">
+<div class="flex flex-col gap-2 max-w-2xl">
+<h1 class="text-3xl lg:text-4xl font-black leading-tight tracking-tight text-text-main">Partner Payout Operations</h1>
+<p class="text-text-secondary text-base font-normal">Manage commission approvals and process bulk payout batches for the current billing cycle.</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 h-10 px-4 rounded-lg border border-border-light bg-white hover:bg-slate-50 text-text-secondary hover:text-text-main text-sm font-bold transition-all shadow-sm">
+<span class="material-symbols-outlined text-[20px]">download</span>
+<span class="truncate">Export Report</span>
+</button>
+<button class="flex items-center gap-2 h-10 px-6 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+<span class="truncate">Process Batch</span>
+</button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex flex-col gap-1 p-6 rounded-xl border border-border-light bg-white shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl"></div>
+<div class="flex justify-between items-start z-10">
+<p class="text-text-secondary text-xs font-semibold uppercase tracking-wider">Pending Payouts</p>
+<span class="bg-emerald-50 text-emerald-600 text-xs px-2.5 py-1 rounded-full font-bold border border-emerald-100">+12.5%</span>
+</div>
+<p class="text-text-main text-3xl font-bold tracking-tight mt-3">$124,592.00</p>
+<div class="w-full bg-slate-100 h-2 rounded-full mt-5 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 75%"></div>
+</div>
+<p class="text-xs text-text-muted mt-2 font-medium">75% of monthly budget utilized</p>
+</div>
+<div class="flex flex-col gap-1 p-6 rounded-xl border border-border-light bg-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="flex justify-between items-start">
+<p class="text-text-secondary text-xs font-semibold uppercase tracking-wider">Next Batch Date</p>
+<div class="bg-indigo-50 p-1.5 rounded-md">
+<span class="material-symbols-outlined text-indigo-500 text-[20px]">calendar_today</span>
+</div>
+</div>
+<p class="text-text-main text-3xl font-bold tracking-tight mt-2">Oct 31, 2023</p>
+<p class="text-sm text-primary font-semibold mt-1 flex items-center gap-1">
+<span class="size-2 rounded-full bg-primary animate-pulse"></span>
+                    4 days remaining
+                </p>
+<div class="mt-auto pt-4 border-t border-slate-50 w-full">
+<p class="text-xs text-text-muted font-medium">Automated cutoff at 11:59 PM EST</p>
+</div>
+</div>
+<div class="flex flex-col gap-1 p-6 rounded-xl border border-border-light bg-white shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start">
+<p class="text-text-secondary text-xs font-semibold uppercase tracking-wider">Total Paid (LTM)</p>
+<span class="bg-emerald-50 text-emerald-600 text-xs px-2.5 py-1 rounded-full font-bold border border-emerald-100">+5.2%</span>
+</div>
+<p class="text-text-main text-3xl font-bold tracking-tight mt-3">$1.2M</p>
+<div class="flex items-center gap-3 mt-4">
+<div class="flex -space-x-3">
+<div class="size-8 rounded-full border-2 border-white bg-slate-200 ring-1 ring-slate-100" data-alt="Avatar" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAGQg9pfyZiH2rP8-QRw-K6ecbeVHW032xCLA8IZZrMhVyYbbOPqY5MKfzllEjRFajhpUsJ-jwY9H3Q9AmqkVU6rlA8mW8VI82mlAvI5a2IMx6DidKtriOMBOxdOoYU6lVuTrrcgFEawebECVsfPwi8MOQLIklZfqGXKbXGcHxWrVTgYtc0_ry2RL0y-NuCzQiV4RedjaHANMdXMcfvdYuh_IB3ozwXhppQGUDkrdJrWkURBk8xU9GGgPBlKdwiM4wHF8PdDpfE5ejq'); background-size: cover;"></div>
+<div class="size-8 rounded-full border-2 border-white bg-slate-300 ring-1 ring-slate-100" data-alt="Avatar" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuACaeqp9-CrCCYqsqBnP5U2hRi2TmVvPaO5bK0Ai-835icAyF7t3N_oZi4tW8RN1TH7nOTgx45PkJgfiLZvOkpkDg5VlMOO-v7SRQZzCUE0I8Ujo5PBc_LbzKGcuEqpW31imG8RJDXfcyJLguPpQ_IAK6u2xcq1wiwQrH7p_BByNVZ4GzdvI-gz9Ml2F1UKvSgfho9lZuBD4zldt8b0NkXYtQCQQhHZ73A3WcSp0w9IMPybecRU-XhdzhTmoe9Po-M_0XwugQrzK0NX'); background-size: cover;"></div>
+<div class="size-8 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-100" data-alt="Avatar" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAYHo1OjUFM3hdP9DW7TnB4Xu3DbToLuyRri9pI3EkeBfQyqqbsHDPQ8pANdP7ZpmggNLovoBoT0SA9HCZ5Ot6tGpedtLUSKOUFY45NHq-baTZY_KLeBoHEoHbPM65V5jPcPhqi68LGN-mfjnFC7aof6obGHRBDWw0ZJrcA85r4aJqjZ5NiVXsVKVdDTJY8x2b0j-FPUxEEYE99IFfRe6y4qvf0P-9Feo-ACeuByI5HvKyd7L46gLy9wf09c-9J2aOXM2uiMvJknt0Y'); background-size: cover;"></div>
+</div>
+<span class="text-xs text-text-secondary font-medium">Top performers active</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col border border-border-light rounded-xl bg-white shadow-sm overflow-hidden">
+<div class="flex flex-wrap items-center justify-between p-4 border-b border-border-light gap-4 bg-white">
+<div class="flex items-center gap-3">
+<h3 class="text-lg font-bold text-text-main">Pending Commissions</h3>
+<span class="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-bold border border-slate-200">42</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px] group-hover:text-primary transition-colors">filter_list</span>
+<select class="pl-9 pr-8 py-2 h-9 text-sm bg-white border border-border-light rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-text-secondary font-medium appearance-none cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+<option>Status: All</option>
+<option>Status: Pending</option>
+<option>Status: Processing</option>
+<option>Status: Paid</option>
+</select>
+</div>
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[18px] group-hover:text-primary transition-colors">sort</span>
+<select class="pl-9 pr-8 py-2 h-9 text-sm bg-white border border-border-light rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-text-secondary font-medium appearance-none cursor-pointer hover:bg-slate-50 transition-colors shadow-sm">
+<option>Sort by: Amount</option>
+<option>Sort by: Date</option>
+<option>Sort by: Partner</option>
+</select>
+</div>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm text-text-secondary">
+<thead class="bg-slate-50 text-xs uppercase font-semibold text-text-muted border-b border-border-light sticky top-0 z-10">
+<tr>
+<th class="px-6 py-4 w-10">
+<input class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</th>
+<th class="px-6 py-4">Partner Name</th>
+<th class="px-6 py-4 text-right">Attributed Revenue</th>
+<th class="px-6 py-4 text-center">Commission Rate</th>
+<th class="px-6 py-4 text-right">Calculated Payout</th>
+<th class="px-6 py-4">Payment Method</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-light bg-white">
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<input class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-100 flex-shrink-0 ring-1 ring-slate-100" data-alt="TechFlow logo" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCJjPUy-MGud1vdQ6I_5HN4DTSD0uqLAFH90TeMC73zI91-CKky9ts2YaHGLWk0dQGuYkbLgtNFaHwFR7PWlzYlvYikqMlpZI-DWw6EPxDdDZQNs_VB4NQOyudPBwOLZRHryU8dgnd8O2BvMyaFPRzqZgRTx_5N9GgGhX6BkJNUAPT-m2RipeKZ3GsxRMDF8GrpIkOLp7hEk7LK_3ZrtO1KRy1saT0JI6taqQq1YgHLictZDx6zk7dgwI037C0fl2uzbSvECFuRXdHZ'); background-size: cover;"></div>
+<div>
+<p class="font-semibold text-text-main">TechFlow Inc.</p>
+<p class="text-xs text-text-muted font-medium">ID: #P-8832</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">$12,500.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        20%
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-text-main">$2,500.00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">account_balance</span>
+<span class="text-slate-700 font-medium">Bank Transfer</span>
+<span class="text-xs text-slate-400 ml-1">•••• 4242</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+<span class="size-1.5 rounded-full bg-amber-500"></span>
+                                        Pending
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors p-1 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<input class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-100 flex-shrink-0 ring-1 ring-slate-100" data-alt="AlphaStream logo" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAVDRNBqVyU37d_lRzIEV5ZMfOEF9aH2omnre8L_0Z_dNdVpiQ8pW0T5yJeONv0N3yeb6ZFw-eNbL8evJUA9XBJdi7sykMzjUNSeWifKtb4b4PVL9qUnICrv6J4tIgYToKz9mtk5pJqkajmKdWhHGmt1DHnGtAvfrxHNDXaahCAVGqRenQLWNuVb6YCs2d6afQ6di0ttIKYm0XIMlRoawoxGp97cAzECw9KTEOlrnxedWNOeOC0jL0YU38mUkzoRVc0AqyCvbcNpPPU'); background-size: cover;"></div>
+<div>
+<p class="font-semibold text-text-main">AlphaStream</p>
+<p class="text-xs text-text-muted font-medium">ID: #P-9102</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">$8,240.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        15%
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-text-main">$1,236.00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">credit_card</span>
+<span class="text-slate-700 font-medium">Stripe Connect</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+<span class="size-1.5 rounded-full bg-amber-500"></span>
+                                        Pending
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors p-1 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="bg-primary/5 hover:bg-primary/10 transition-colors group">
+<td class="px-6 py-4">
+<input checked="" class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-pink-50 flex items-center justify-center text-pink-600 text-xs font-bold ring-1 ring-pink-100">MK</div>
+<div>
+<p class="font-semibold text-text-main">Marcus Kane</p>
+<p class="text-xs text-text-muted font-medium">ID: #P-7721</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">$450.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-white text-slate-600 border border-slate-200 shadow-sm">
+                                        10%
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-text-main">$45.00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">payments</span>
+<span class="text-slate-700 font-medium">PayPal</span>
+<span class="text-xs text-slate-400 ml-1">m.kane@...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+<span class="size-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                                        Processing
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors p-1 hover:bg-white rounded-full">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<input class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-slate-100 flex-shrink-0 ring-1 ring-slate-100" data-alt="Nexus Digital logo" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD6HLBLK-xJRymE1Y8kdBZyIB93ZJVg59PJwluQiAML4RNrHVLCnL-STb_ewLADr3rQIe4BjJOcD8_DZmg_JFJxrz0OC5JFzG6V_wSDVCGyln8NY5sQj6FWIo7c0-zJbz39Ecn0JJRELzvTexFIrr4qq7RN2I0lwfkwFDYqwGdlFDyyweyNCjhjYfZb6hzNghpsJpCMg27kn6zFA4eCBtp-WnRxI7WDDvih3P57c5ofF_7OwQmG_7kAKoMgxh6_K286FkEuBw4WZHBN'); background-size: cover;"></div>
+<div>
+<p class="font-semibold text-text-main">Nexus Digital</p>
+<p class="text-xs text-text-muted font-medium">ID: #P-8899</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">$32,100.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        25%
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-text-main">$8,025.00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">account_balance</span>
+<span class="text-slate-700 font-medium">Bank Transfer</span>
+<span class="text-xs text-slate-400 ml-1">•••• 9981</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="material-symbols-outlined text-[14px] font-bold">check</span>
+                                        Paid
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors p-1 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 transition-colors group">
+<td class="px-6 py-4">
+<input class="rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 bg-white size-4 cursor-pointer" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-9 rounded-full bg-orange-50 flex items-center justify-center text-orange-600 text-xs font-bold ring-1 ring-orange-100">GS</div>
+<div>
+<p class="font-semibold text-text-main">Global Scale</p>
+<p class="text-xs text-text-muted font-medium">ID: #P-1102</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-600">$5,600.00</td>
+<td class="px-6 py-4 text-center">
+<span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                        15%
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right font-bold text-text-main">$840.00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">credit_card</span>
+<span class="text-slate-700 font-medium">Stripe Connect</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+<span class="size-1.5 rounded-full bg-amber-500"></span>
+                                        Pending
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors p-1 hover:bg-slate-100 rounded-full">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="flex items-center justify-between px-6 py-4 border-t border-border-light bg-slate-50 rounded-b-xl">
+<p class="text-sm text-text-secondary">
+                        Showing <span class="font-bold text-text-main">1</span> to <span class="font-bold text-text-main">5</span> of <span class="font-bold text-text-main">42</span> results
+                    </p>
+<div class="flex gap-2">
+<button class="px-4 py-2 text-sm border border-border-light rounded-lg bg-white text-slate-400 cursor-not-allowed font-medium shadow-sm">Previous</button>
+<button class="px-4 py-2 text-sm border border-border-light rounded-lg bg-white text-text-main hover:bg-slate-50 hover:text-primary hover:border-primary/30 transition-all font-medium shadow-sm">Next</button>
+</div>
+</div>
+</div>
+<div class="flex items-start gap-4 p-4 rounded-lg bg-blue-50 border border-blue-100 shadow-sm">
+<span class="material-symbols-outlined text-blue-600 mt-0.5">info</span>
+<div class="flex-1">
+<h4 class="text-sm font-bold text-blue-900">Batch Processing Note</h4>
+<p class="text-sm text-blue-700 mt-1 leading-relaxed">
+                        Payouts processed after 5:00 PM EST will be deposited the next business day. Ensure all bank details are verified before processing the batch.
+                    </p>
+</div>
+<button class="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline">Dismiss</button>
+</div>
+</main>
+</div>
+
+</body></html>

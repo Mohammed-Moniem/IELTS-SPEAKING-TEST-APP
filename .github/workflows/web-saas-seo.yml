@@ -1,0 +1,45 @@
+name: web-saas-seo
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'web-saas/**'
+      - '.github/workflows/web-saas-seo.yml'
+
+jobs:
+  seo-gates:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-saas
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web-saas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: SEO quality gates (Playwright + Lighthouse)
+        run: npm run test:seo:ci
+
+      - name: Upload Lighthouse artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-saas-lighthouse
+          path: web-saas/.lighthouseci
+          if-no-files-found: ignore

@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 export class GenerateWritingTaskRequest {
   @IsOptional()
@@ -35,4 +35,16 @@ export class WritingHistoryQuery {
   @IsInt()
   @Min(0)
   offset?: number;
+
+  @IsOptional()
+  @IsIn(['academic', 'general'])
+  track?: 'academic' | 'general';
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

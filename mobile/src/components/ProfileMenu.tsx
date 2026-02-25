@@ -22,8 +22,7 @@ interface MenuItem {
   iconFamily: "Ionicons" | "MaterialCommunityIcons";
   label: string;
   screen: string;
-  color?: string;
-  available?: boolean;
+  destructive?: boolean;
 }
 
 const menuItems: MenuItem[] = [
@@ -50,21 +49,19 @@ const menuItems: MenuItem[] = [
     iconFamily: "Ionicons",
     label: "Subscription",
     screen: "Subscription",
-    available: false,
   },
   {
     icon: "bar-chart",
     iconFamily: "Ionicons",
     label: "Usage",
     screen: "Usage",
-    available: false,
   },
   {
     icon: "log-out",
     iconFamily: "Ionicons",
     label: "Logout",
     screen: "Logout",
-    color: "#EF4444", // Red color for logout
+    destructive: true,
   },
 ];
 
@@ -84,10 +81,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const handleMenuPress = async (item: MenuItem) => {
     setVisible(false);
 
-    if (item.available === false) {
-      return;
-    }
-
     if (item.screen === "Logout") {
       await logout();
       return;
@@ -106,6 +99,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
         onPress={() => setVisible(true)}
         style={[styles.profileButton, containerStyle]}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Open profile menu"
+        accessibilityHint="Shows profile, settings, and account actions"
       >
         <View style={styles.profileIconContainer}>
           <Ionicons name="person-circle" size={32} color={colors.primary} />
@@ -139,43 +135,40 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     styles.menuItem,
                     index === menuItems.length - 1 && styles.menuItemLast,
                   ]}
-                  disabled={item.available === false}
                   onPress={() => handleMenuPress(item)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
                 >
                   <View
                     style={[
                       styles.menuItemIcon,
-                      item.color && { backgroundColor: "#FEE2E2" },
+                      item.destructive && { backgroundColor: colors.dangerSoft },
                     ]}
                   >
                     {item.iconFamily === "Ionicons" ? (
                       <Ionicons
                         name={item.icon as any}
                         size={22}
-                        color={item.color || colors.primary}
+                        color={item.destructive ? colors.danger : colors.primary}
                       />
                     ) : (
                       <MaterialCommunityIcons
                         name={item.icon as any}
                         size={22}
-                        color={item.color || colors.primary}
+                        color={item.destructive ? colors.danger : colors.primary}
                       />
                     )}
                   </View>
                   <Text
                     style={[
                       styles.menuItemText,
-                      item.color && { color: item.color },
+                      item.destructive && { color: colors.danger },
                     ]}
                   >
                     {item.label}
                   </Text>
-                  {item.available === false ? (
-                    <Text style={styles.soonText}>Soon</Text>
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color="#999999" />
-                  )}
+                  <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -188,94 +181,87 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-  profileButton: {
-    marginRight: 16,
-    paddingLeft: 8,
-  },
-  profileIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: `${colors.primary}10`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  menuContainer: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  menuHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  menuTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.backgroundMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuItems: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  menuItemLast: {
-    borderBottomWidth: 0,
-    marginTop: 8,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  menuItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: `${colors.primary}10`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  menuItemText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  soonText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
+    profileButton: {
+      marginRight: 16,
+      paddingLeft: 8,
+    },
+    profileIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: `${colors.primary}10`,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlayBackdrop,
+      justifyContent: "flex-end",
+    },
+    menuContainer: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 40,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    menuHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.backgroundMuted,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    menuItems: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuItemLast: {
+      borderBottomWidth: 0,
+      marginTop: 8,
+      paddingTop: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    menuItemIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: `${colors.primary}10`,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    menuItemText: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
   });

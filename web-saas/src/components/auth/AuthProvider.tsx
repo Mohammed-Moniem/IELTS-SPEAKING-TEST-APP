@@ -1,10 +1,18 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
-import { apiRequest } from '@/lib/api/client';
-import { clearStoredSession, loadStoredSession, saveStoredSession, StoredSession } from '@/lib/auth/session';
-import { AuthResult, AuthUser } from '@/lib/types';
+import { apiRequest, registerApiAuthHandlers } from '@/lib/api/client';
+import firebaseAnalyticsService from '@/lib/analytics/firebaseAnalyticsService';
+import {
+  clearStoredSession,
+  getStoredRefreshToken,
+  loadStoredSession,
+  saveStoredSession,
+  StoredSession
+} from '@/lib/auth/session';
+import { AppConfig, AuthResult, AuthUser } from '@/lib/types';
 
 type RegisterPayload = {
   email: string;
@@ -12,18 +20,25 @@ type RegisterPayload = {
   lastName: string;
   password: string;
   phone?: string;
+  referralCode?: string;
+  partnerCode?: string;
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
+  appConfig: AppConfig | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  sessionError: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<string | null>;
+  refreshAppConfig: () => Promise<void>;
   hydrateFromStorage: () => void;
+  clearSessionError: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -35,10 +50,84 @@ const toStoredSession = (result: AuthResult): StoredSession => ({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  const clearSessionState = useCallback((message?: string) => {
+    clearStoredSession();
+    setUser(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+    setAppConfig(null);
+    if (message) {
+      setSessionError(message);
+    }
+  }, []);
+
+  const persist = useCallback((result: AuthResult) => {
+    const session = toStoredSession(result);
+    saveStoredSession(session);
+    setUser(result.user);
+    setAccessToken(result.accessToken);
+    setRefreshToken(result.refreshToken);
+    setSessionError(null);
+  }, []);
+
+  const loadConfig = useCallback(async (tokenOverride?: string) => {
+    const data = await apiRequest<AppConfig>('/app/config', {
+      token: tokenOverride || undefined
+    });
+    setAppConfig(data);
+
+    // Keep user plan and roles aligned with server bootstrap payload.
+    setUser(prev =>
+      prev
+        ? {
+            ...prev,
+            subscriptionPlan: data.subscriptionPlan,
+            adminRoles: (data.roles || []) as AuthUser['adminRoles']
+          }
+        : prev
+    );
+  }, []);
+
+  const refreshSession = useCallback(async (): Promise<string | null> => {
+    const token = refreshToken || getStoredRefreshToken();
+    if (!token) {
+      clearSessionState('Your session has expired. Please sign in again.');
+      return null;
+    }
+
+    try {
+      const refreshed = await apiRequest<AuthResult>('/auth/refresh', {
+        method: 'POST',
+        authOptional: true,
+        retryOnUnauthorized: false,
+        body: JSON.stringify({ refreshToken: token })
+      });
+
+      persist(refreshed);
+      await loadConfig(refreshed.accessToken);
+      return refreshed.accessToken;
+    } catch {
+      clearSessionState('Your session is no longer valid. Please sign in again.');
+      return null;
+    }
+  }, [clearSessionState, loadConfig, persist, refreshToken]);
+
+  const refreshAppConfig = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      await loadConfig(accessToken);
+    } catch {
+      // Do not block UI on config refresh errors.
+    }
+  }, [accessToken, loadConfig]);
 
   const hydrateFromStorage = useCallback(() => {
     const session = loadStoredSession();
@@ -46,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setAccessToken(null);
       setRefreshToken(null);
+      setAppConfig(null);
       return;
     }
 
@@ -59,24 +149,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, [hydrateFromStorage]);
 
-  const persist = useCallback((result: AuthResult) => {
-    const session = toStoredSession(result);
-    saveStoredSession(session);
-    setUser(result.user);
-    setAccessToken(result.accessToken);
-    setRefreshToken(result.refreshToken);
+  useEffect(() => {
+    void firebaseAnalyticsService.initialize();
   }, []);
+
+  useEffect(() => {
+    registerApiAuthHandlers({
+      getAccessToken: () => accessToken,
+      refreshAccessToken: refreshSession,
+      onSessionExpired: () => clearSessionState('Your session has expired. Please sign in again.')
+    });
+  }, [accessToken, clearSessionState, refreshSession]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
+    void (async () => {
+      try {
+        await loadConfig(accessToken);
+      } catch {
+        await refreshSession();
+      }
+    })();
+  }, [accessToken, loadConfig, refreshSession]);
+
+  useEffect(() => {
+    void firebaseAnalyticsService.setUserId(user?._id || null);
+    if (!user) return;
+
+    const roleValue = user.adminRoles?.length ? user.adminRoles.join(',') : undefined;
+    void firebaseAnalyticsService.setUserProperties({
+      plan: user.subscriptionPlan,
+      roles: roleValue
+    });
+  }, [user?._id, user?.subscriptionPlan, user?.adminRoles]);
+
+  useEffect(() => {
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const route = search ? `${pathname}${search}` : pathname;
+    const routeArea = route.startsWith('/admin')
+      ? 'admin'
+      : route.startsWith('/app')
+        ? 'learner'
+        : 'marketing';
+
+    void firebaseAnalyticsService.trackScreen(route, {
+      route_area: routeArea
+    });
+  }, [pathname]);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const result = await apiRequest<AuthResult>('/auth/login', {
         method: 'POST',
         authOptional: true,
+        retryOnUnauthorized: false,
         body: JSON.stringify({ email, password })
       });
+
       persist(result);
+      await loadConfig(result.accessToken);
     },
-    [persist]
+    [loadConfig, persist]
   );
 
   const register = useCallback(
@@ -84,45 +218,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await apiRequest<AuthResult>('/auth/register', {
         method: 'POST',
         authOptional: true,
+        retryOnUnauthorized: false,
         body: JSON.stringify(payload)
       });
+
       persist(result);
+      await loadConfig(result.accessToken);
     },
-    [persist]
+    [loadConfig, persist]
   );
 
   const logout = useCallback(async () => {
     try {
-      if (refreshToken) {
+      const token = refreshToken || getStoredRefreshToken();
+      if (token) {
         await apiRequest('/auth/logout', {
           method: 'POST',
           token: accessToken || undefined,
-          body: JSON.stringify({ refreshToken })
+          retryOnUnauthorized: false,
+          authOptional: true,
+          body: JSON.stringify({ refreshToken: token })
         });
       }
     } catch {
-      // Logout should still clear local session on failure.
+      // Clear local session even if remote logout fails.
     }
 
-    clearStoredSession();
-    setUser(null);
-    setAccessToken(null);
-    setRefreshToken(null);
-  }, [accessToken, refreshToken]);
+    clearSessionState();
+  }, [accessToken, clearSessionState, refreshToken]);
+
+  const clearSessionError = useCallback(() => setSessionError(null), []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       accessToken,
       refreshToken,
+      appConfig,
       isLoading,
       isAuthenticated: !!(user && accessToken),
+      sessionError,
       login,
       register,
       logout,
-      hydrateFromStorage
+      refreshSession,
+      refreshAppConfig,
+      hydrateFromStorage,
+      clearSessionError
     }),
-    [user, accessToken, refreshToken, isLoading, login, register, logout, hydrateFromStorage]
+    [
+      user,
+      accessToken,
+      refreshToken,
+      appConfig,
+      isLoading,
+      sessionError,
+      login,
+      register,
+      logout,
+      refreshSession,
+      refreshAppConfig,
+      hydrateFromStorage,
+      clearSessionError
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

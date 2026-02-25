@@ -17,6 +17,8 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   BandDistribution,
   compareCriteriaPerformance,
@@ -25,11 +27,15 @@ import {
   getProgressStats,
   ProgressStats,
 } from "../../api/analyticsApi";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export const ProgressDashboardScreen: React.FC = () => {
   const { user, initializing: authInitializing } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [stats, setStats] = useState<ProgressStats | null>(null);
   const [distribution, setDistribution] = useState<BandDistribution[]>([]);
   const [comparison, setComparison] = useState<CriteriaComparison[]>([]);
@@ -76,7 +82,7 @@ export const ProgressDashboardScreen: React.FC = () => {
       setDistribution(distData);
       setComparison(compData);
     } catch (error) {
-      console.error("Failed to load analytics:", error);
+      logger.warn("⚠️ Failed to load analytics:", error);
     } finally {
       setLoading(false);
     }
@@ -92,10 +98,10 @@ export const ProgressDashboardScreen: React.FC = () => {
   };
 
   const getBandColor = (band: number): string => {
-    if (band >= 8) return "#10b981";
-    if (band >= 7) return "#3b82f6";
-    if (band >= 6) return "#f59e0b";
-    return "#ef4444";
+    if (band >= 8) return colors.success;
+    if (band >= 7) return colors.primary;
+    if (band >= 6) return colors.warning;
+    return colors.danger;
   };
 
   const getTrendIcon = (trend: "improving" | "declining" | "stable") => {
@@ -105,9 +111,9 @@ export const ProgressDashboardScreen: React.FC = () => {
   };
 
   const getTrendColor = (trend: "up" | "down" | "stable"): string => {
-    if (trend === "up") return "#10b981";
-    if (trend === "down") return "#ef4444";
-    return "#9ca3af";
+    if (trend === "up") return colors.success;
+    if (trend === "down") return colors.danger;
+    return colors.textMuted;
   };
 
   const renderOverallScoreCard = () => {
@@ -115,7 +121,7 @@ export const ProgressDashboardScreen: React.FC = () => {
 
     return (
       <LinearGradient
-        colors={["#1a365d", "#2d5a8f"]}
+        colors={[colors.primaryStrong, colors.primary]}
         style={styles.overallCard}
       >
         <View style={styles.overallHeader}>
@@ -124,7 +130,7 @@ export const ProgressDashboardScreen: React.FC = () => {
             <Ionicons
               name={getTrendIcon(stats.bandTrend)}
               size={16}
-              color="#ffffff"
+              color={colors.primaryOn}
             />
             <Text style={styles.trendText}>
               {stats.bandTrend === "improving"
@@ -212,7 +218,7 @@ export const ProgressDashboardScreen: React.FC = () => {
                   <Ionicons
                     name={criterion.icon as any}
                     size={20}
-                    color="#3b82f6"
+                    color={colors.primary}
                   />
                   <Text style={styles.criteriaName}>{criterion.name}</Text>
                 </View>
@@ -279,7 +285,7 @@ export const ProgressDashboardScreen: React.FC = () => {
           {/* Strengths */}
           <View style={styles.strengthsCard}>
             <View style={styles.swHeader}>
-              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
               <Text style={styles.swTitle}>Strengths</Text>
             </View>
             {stats.strengths.map((strength, index) => (
@@ -293,7 +299,7 @@ export const ProgressDashboardScreen: React.FC = () => {
           {/* Weaknesses */}
           <View style={styles.weaknessesCard}>
             <View style={styles.swHeader}>
-              <Ionicons name="warning" size={20} color="#f59e0b" />
+              <Ionicons name="warning" size={20} color={colors.warning} />
               <Text style={styles.swTitle}>Focus Areas</Text>
             </View>
             {stats.weaknesses.map((weakness, index) => (
@@ -387,11 +393,11 @@ export const ProgressDashboardScreen: React.FC = () => {
   if (authInitializing) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={[colors.primaryStrong, colors.primary]} style={styles.header}>
           <Text style={styles.headerTitle}>Progress Dashboard</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading analytics...</Text>
         </View>
       </View>
@@ -401,11 +407,11 @@ export const ProgressDashboardScreen: React.FC = () => {
   if (!userId) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={[colors.primaryStrong, colors.primary]} style={styles.header}>
           <Text style={styles.headerTitle}>Progress Dashboard</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Ionicons name="lock-closed-outline" size={64} color={colors.textMutedStrong} />
           <Text style={styles.emptyTitle}>Sign in required</Text>
           <Text style={styles.emptySubtitle}>
             Log in or create an account to unlock your personalized analytics
@@ -418,11 +424,11 @@ export const ProgressDashboardScreen: React.FC = () => {
   if (loading && !stats) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={[colors.primaryStrong, colors.primary]} style={styles.header}>
           <Text style={styles.headerTitle}>Progress Dashboard</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading analytics...</Text>
         </View>
       </View>
@@ -432,11 +438,11 @@ export const ProgressDashboardScreen: React.FC = () => {
   if (!stats) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={[colors.primaryStrong, colors.primary]} style={styles.header}>
           <Text style={styles.headerTitle}>Progress Dashboard</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <Ionicons name="analytics-outline" size={64} color="#4b5563" />
+          <Ionicons name="analytics-outline" size={64} color={colors.textMutedStrong} />
           <Text style={styles.emptyTitle}>No Data Yet</Text>
           <Text style={styles.emptySubtitle}>
             Complete some tests to see your progress
@@ -449,7 +455,7 @@ export const ProgressDashboardScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+      <LinearGradient colors={[colors.primaryStrong, colors.primary]} style={styles.header}>
         <Text style={styles.headerTitle}>Progress Dashboard</Text>
 
         {/* Period selector */}
@@ -485,7 +491,7 @@ export const ProgressDashboardScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#3b82f6"
+            tintColor={colors.primary}
           />
         }
       >
@@ -494,16 +500,17 @@ export const ProgressDashboardScreen: React.FC = () => {
         {renderStrengthsWeaknesses()}
         {renderBandDistribution()}
         {renderMonthlyProgress()}
-        <View style={{ height: 40 }} />
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: colors.background,
   },
   header: {
     paddingTop: 60,
@@ -513,7 +520,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
     marginBottom: 15,
   },
   periodSelector: {
@@ -524,18 +531,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: colors.border,
   },
   periodButtonActive: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.primaryOn,
   },
   periodButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   periodButtonTextActive: {
-    color: "#1a365d",
+    color: colors.primaryStrong,
   },
   scrollView: {
     flex: 1,
@@ -556,13 +563,13 @@ const styles = StyleSheet.create({
   },
   overallLabel: {
     fontSize: 14,
-    color: "#d4a745",
+    color: colors.warning,
     fontWeight: "600",
   },
   trendBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -571,7 +578,7 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   overallScoreContainer: {
     flexDirection: "row",
@@ -582,7 +589,7 @@ const styles = StyleSheet.create({
   overallScore: {
     fontSize: 64,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   rangeContainer: {
     flex: 1,
@@ -592,23 +599,23 @@ const styles = StyleSheet.create({
   },
   rangeLabel: {
     fontSize: 12,
-    color: "#d1d5db",
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   rangeValue: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   rangeDivider: {
     height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: colors.border,
     marginVertical: 5,
   },
   testCountRow: {
     flexDirection: "row",
     borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.2)",
+    borderTopColor: colors.border,
     paddingTop: 15,
   },
   testCountItem: {
@@ -618,12 +625,12 @@ const styles = StyleSheet.create({
   testCountValue: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
     marginBottom: 5,
   },
   testCountLabel: {
     fontSize: 12,
-    color: "#d1d5db",
+    color: colors.textSecondary,
   },
   section: {
     marginBottom: 25,
@@ -631,11 +638,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
     marginBottom: 15,
   },
   criteriaCard: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 15,
     marginBottom: 12,
@@ -655,7 +662,7 @@ const styles = StyleSheet.create({
   criteriaName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
     flex: 1,
   },
   criteriaRight: {
@@ -678,7 +685,7 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     height: 6,
-    backgroundColor: "#2d2d2d",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 3,
     overflow: "hidden",
   },
@@ -692,19 +699,19 @@ const styles = StyleSheet.create({
   },
   strengthsCard: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 15,
     borderLeftWidth: 3,
-    borderLeftColor: "#10b981",
+    borderLeftColor: colors.success,
   },
   weaknessesCard: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 15,
     borderLeftWidth: 3,
-    borderLeftColor: "#f59e0b",
+    borderLeftColor: colors.warning,
   },
   swHeader: {
     flexDirection: "row",
@@ -715,7 +722,7 @@ const styles = StyleSheet.create({
   swTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   swItem: {
     flexDirection: "row",
@@ -727,18 +734,18 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#9ca3af",
+    backgroundColor: colors.textMuted,
     marginTop: 6,
   },
   swText: {
     flex: 1,
     fontSize: 13,
-    color: "#d1d5db",
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   distributionContainer: {
     flexDirection: "row",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 15,
     gap: 8,
@@ -750,13 +757,13 @@ const styles = StyleSheet.create({
   distributionBand: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
     marginBottom: 8,
   },
   distributionBarContainer: {
     height: 100,
     width: "100%",
-    backgroundColor: "#2d2d2d",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 4,
     justifyContent: "flex-end",
     overflow: "hidden",
@@ -768,11 +775,11 @@ const styles = StyleSheet.create({
   },
   distributionPercentage: {
     fontSize: 11,
-    color: "#9ca3af",
+    color: colors.textMuted,
     marginTop: 8,
   },
   monthCard: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 15,
     marginBottom: 10,
@@ -786,7 +793,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   monthScore: {
     fontSize: 20,
@@ -798,7 +805,7 @@ const styles = StyleSheet.create({
   },
   monthStat: {
     fontSize: 12,
-    color: "#9ca3af",
+    color: colors.textMuted,
   },
   centerContainer: {
     flex: 1,
@@ -809,18 +816,21 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    color: "#9ca3af",
+    color: colors.textMuted,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
     marginTop: 20,
     marginBottom: 10,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: "#9ca3af",
+    color: colors.textMuted,
     textAlign: "center",
   },
-});
+  bottomSpacing: {
+    height: 40,
+  },
+  });

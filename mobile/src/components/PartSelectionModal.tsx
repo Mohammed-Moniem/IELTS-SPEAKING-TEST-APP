@@ -35,7 +35,7 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
       description:
         "General questions about yourself, your home, family, work, studies, and interests.",
       icon: "person-outline" as const,
-      color: "#3b82f6",
+      color: colors.info,
       features: [
         "Familiar topics",
         "Simple, direct questions",
@@ -49,7 +49,7 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
       description:
         "Speak for 2 minutes about a topic given on a task card, after 1 minute of preparation.",
       icon: "document-text-outline" as const,
-      color: "#f59e0b",
+      color: colors.warning,
       features: [
         "Cue card with prompts",
         "1 minute preparation time",
@@ -63,7 +63,7 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
       description:
         "Discuss more abstract ideas and issues related to the Part 2 topic.",
       icon: "people-outline" as const,
-      color: "#10b981",
+      color: colors.success,
       features: [
         "Abstract and analytical",
         "Complex questions",
@@ -113,7 +113,7 @@ export const PartSelectionModal: React.FC<PartSelectionModalProps> = ({
                     { backgroundColor: item.color },
                   ]}
                 >
-                  <Ionicons name={item.icon} size={32} color="#ffffff" />
+                  <Ionicons name={item.icon} size={32} color={colors.primaryOn} />
                 </View>
                 <View style={styles.partTitleContainer}>
                   <Text style={styles.partTitle}>{item.title}</Text>
@@ -192,7 +192,7 @@ const createStyles = (colors: ColorTokens) =>
     padding: spacing.lg,
     marginBottom: spacing.lg,
     borderLeftWidth: 4,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,

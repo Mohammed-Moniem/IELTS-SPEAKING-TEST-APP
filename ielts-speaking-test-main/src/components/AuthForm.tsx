@@ -108,13 +108,13 @@ export function AuthForm({ onAuthComplete }: AuthFormProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 fade-in">
-      <Card className="w-full max-w-md glass-card border-0 shadow-2xl">
+      <Card className="w-full max-w-md glass-card border-0 shadow-lg">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-            <UserCircle size={40} className="text-primary" />
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+            <UserCircle size={32} className="text-primary" />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold gradient-text mb-2">IELTS Speaking Practice</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-foreground mb-2">IELTS Speaking Practice</CardTitle>
             <CardDescription className="text-muted-foreground">
               {isLogin ? "Welcome back! Sign in to continue your practice." : "Create your account to start practicing."}
             </CardDescription>
@@ -123,9 +123,9 @@ export function AuthForm({ onAuthComplete }: AuthFormProps) {
 
         <CardContent>
           <Tabs value={isLogin ? "login" : "register"} onValueChange={(value) => setIsLogin(value === "login")}>
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-secondary/50 p-1 rounded-xl">
-              <TabsTrigger value="login" className="rounded-lg font-medium">Sign In</TabsTrigger>
-              <TabsTrigger value="register" className="rounded-lg font-medium">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-secondary/50 p-1 rounded-lg">
+              <TabsTrigger value="login" className="rounded-md font-medium">Sign In</TabsTrigger>
+              <TabsTrigger value="register" className="rounded-md font-medium">Sign Up</TabsTrigger>
             </TabsList>
 
             <form onSubmit={handleSubmit} className="space-y-5">

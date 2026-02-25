@@ -8,7 +8,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import audioRecordingService from "../../services/api/audioRecordingService";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 interface AudioMessageProps {
   mediaUrl: string;
@@ -29,6 +33,8 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
   uploadError,
   status,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -89,7 +95,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
         setIsPlaying(true);
       }
     } catch (error) {
-      console.error("Playback error:", error);
+      logger.warn("Audio message playback error", error);
       setIsPlaying(false);
     } finally {
       setIsLoading(false);
@@ -128,7 +134,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
 
       {isUploading && (
         <View pointerEvents="none" style={styles.uploadOverlay}>
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color={colors.primaryOn} />
           <Text style={styles.uploadText}>
             {Math.max(0, Math.round(uploadProgress ?? 0))}%
           </Text>
@@ -143,13 +149,13 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
         {isLoading ? (
           <ActivityIndicator
             size="small"
-            color={isOwnMessage ? "#000000" : "#128C7E"}
+            color={isOwnMessage ? colors.textPrimary : colors.primary}
           />
         ) : (
           <Ionicons
             name={isPlaying ? "pause" : "play"}
             size={24}
-            color={isOwnMessage ? "#000000" : "#128C7E"}
+            color={isOwnMessage ? colors.textPrimary : colors.primary}
           />
         )}
       </TouchableOpacity>
@@ -171,9 +177,9 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
                     height: barHeight,
                     backgroundColor: isActive
                       ? isOwnMessage
-                        ? "#075E54"
-                        : "#128C7E"
-                      : "rgba(0, 0, 0, 0.15)",
+                        ? colors.success
+                        : colors.primary
+                      : colors.borderMuted,
                   },
                 ]}
               />
@@ -190,13 +196,13 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
         <Ionicons
           name="mic"
           size={16}
-          color={isOwnMessage ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)"}
+          color={isOwnMessage ? colors.textMutedStrong : colors.textMuted}
         />
       </View>
 
       {hasError && (
         <View style={styles.errorBanner}>
-          <Ionicons name="warning" size={14} color="#FF3B30" />
+          <Ionicons name="warning" size={14} color={colors.danger} />
           <Text style={styles.errorText}>
             {uploadError || "Upload failed"}
           </Text>
@@ -206,7 +212,8 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -216,17 +223,17 @@ const styles = StyleSheet.create({
     minWidth: 200,
     maxWidth: 280,
     position: "relative",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.18,
     shadowRadius: 1.5,
     elevation: 2,
   },
   ownMessage: {
-    backgroundColor: "#DCF8C6",
+    backgroundColor: colors.successSoft,
   },
   otherMessage: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
   },
   tail: {
     position: "absolute",
@@ -240,7 +247,7 @@ const styles = StyleSheet.create({
     borderWidth: 8,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "#DCF8C6",
+    borderTopColor: colors.successSoft,
     borderBottomColor: "transparent",
     transform: [{ rotate: "45deg" }],
   },
@@ -249,20 +256,20 @@ const styles = StyleSheet.create({
     borderWidth: 8,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderTopColor: "#FFFFFF",
+    borderTopColor: colors.surface,
     borderBottomColor: "transparent",
     transform: [{ rotate: "-45deg" }],
   },
   uploadOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: colors.overlayBackdrop,
     borderRadius: 8,
     zIndex: 2,
     alignItems: "center",
     justifyContent: "center",
   },
   uploadText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 12,
     fontWeight: "600",
     marginTop: 4,
@@ -293,11 +300,11 @@ const styles = StyleSheet.create({
   },
   duration: {
     fontSize: 11,
-    color: "#667781",
+    color: colors.textMuted,
     fontWeight: "500",
   },
   ownDuration: {
-    color: "#075E54",
+    color: colors.success,
   },
   micIcon: {
     marginLeft: 12,
@@ -312,7 +319,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   errorText: {
-    color: "#FF3B30",
+    color: colors.danger,
     fontSize: 11,
   },
 });

@@ -20,6 +20,30 @@ interface CacheMetadata {
   lastUpdated: number;
 }
 
+const normalizeCacheMetadata = (
+  raw: any,
+  expectedVersion: string
+): CacheMetadata | null => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  if (raw.version !== expectedVersion) {
+    return null;
+  }
+
+  const phrases =
+    raw.phrases && typeof raw.phrases === "object" ? raw.phrases : {};
+  const lastUpdated =
+    typeof raw.lastUpdated === "number" ? raw.lastUpdated : Date.now();
+
+  return {
+    version: expectedVersion,
+    phrases,
+    lastUpdated,
+  };
+};
+
 /**
  * Common examiner phrases that repeat across all tests
  * These will be pre-cached to eliminate loading delays
@@ -133,11 +157,11 @@ class AudioCacheService {
       }
 
       const content = await FileSystem.readAsStringAsync(this.metadataFile);
-      const metadata: CacheMetadata = JSON.parse(content);
+      const rawMetadata = JSON.parse(content);
+      const metadata = normalizeCacheMetadata(rawMetadata, this.cacheVersion);
 
-      // Check if cache version matches
-      if (metadata.version !== this.cacheVersion) {
-        console.log("🔄 Cache version mismatch, clearing cache");
+      if (!metadata) {
+        console.log("🔄 Cache metadata is invalid or outdated, clearing cache");
         await this.clearCache();
         return null;
       }
@@ -221,11 +245,11 @@ class AudioCacheService {
       const existingMetadata = await this.loadMetadata();
 
       // Check if cache is valid
+      const existingPhrases = existingMetadata?.phrases ?? {};
       if (
         existingMetadata &&
         !this.isCacheExpired(existingMetadata) &&
-        Object.keys(existingMetadata.phrases).length ===
-          REPETITIVE_PHRASES.length
+        Object.keys(existingPhrases).length === REPETITIVE_PHRASES.length
       ) {
         console.log("✅ Audio cache is up to date");
         return;
@@ -250,14 +274,22 @@ class AudioCacheService {
 
         onProgress?.(i + 1, total, phrase.id);
 
-        const fileUri = await this.cachePhrase(phrase.id, phrase.text);
+        try {
+          const fileUri = await this.cachePhrase(phrase.id, phrase.text);
 
-        newMetadata.phrases[phrase.id] = {
-          id: phrase.id,
-          text: phrase.text,
-          fileUri,
-          expiresAt: Date.now() + this.cacheTTLDays * 24 * 60 * 60 * 1000,
-        };
+          newMetadata.phrases[phrase.id] = {
+            id: phrase.id,
+            text: phrase.text,
+            fileUri,
+            expiresAt: Date.now() + this.cacheTTLDays * 24 * 60 * 60 * 1000,
+          };
+        } catch (error) {
+          // Keep cache warm-up best-effort and avoid startup failure UX.
+          console.warn(
+            `⚠️ Skipping phrase cache for ${phrase.id}; live TTS fallback will be used.`,
+            error
+          );
+        }
 
         // Small delay to avoid overwhelming the backend
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -269,7 +301,6 @@ class AudioCacheService {
       console.log("✅ Audio pre-caching complete");
     } catch (error) {
       console.warn("⚠️ Audio pre-caching failed:", error);
-      throw error;
     }
   }
 
@@ -286,7 +317,8 @@ class AudioCacheService {
         return null;
       }
 
-      const cachedPhrase = metadata.phrases[phraseId];
+      const phraseMap = metadata.phrases ?? {};
+      const cachedPhrase = phraseMap[phraseId];
       if (!cachedPhrase) {
         return null;
       }
@@ -348,19 +380,21 @@ class AudioCacheService {
         return true;
       }
 
+      const phraseMap = metadata.phrases ?? {};
+
       // Check if expired
       if (this.isCacheExpired(metadata)) {
         return true;
       }
 
       // Check if all phrases are cached
-      if (Object.keys(metadata.phrases).length !== REPETITIVE_PHRASES.length) {
+      if (Object.keys(phraseMap).length !== REPETITIVE_PHRASES.length) {
         return true;
       }
 
       // Check if all files exist
-      for (const phraseId in metadata.phrases) {
-        const cachedPhrase = metadata.phrases[phraseId];
+      for (const phraseId in phraseMap) {
+        const cachedPhrase = phraseMap[phraseId];
         const fileInfo = await FileSystem.getInfoAsync(cachedPhrase.fileUri);
         if (!fileInfo.exists) {
           return true;
@@ -400,10 +434,11 @@ class AudioCacheService {
 
       const expiryTime =
         metadata.lastUpdated + this.cacheTTLDays * 24 * 60 * 60 * 1000;
+      const phraseMap = metadata.phrases ?? {};
 
       return {
         isCached: !this.isCacheExpired(metadata),
-        cachedCount: Object.keys(metadata.phrases).length,
+        cachedCount: Object.keys(phraseMap).length,
         totalCount: REPETITIVE_PHRASES.length,
         lastUpdated: new Date(metadata.lastUpdated),
         expiresAt: new Date(expiryTime),

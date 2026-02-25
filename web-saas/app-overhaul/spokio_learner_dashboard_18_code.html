@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Speaking Practice - Active Recording</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", 
+              "primary-hover": "#6D28D9", 
+              "background-light": "#F3F4F6", 
+              "background-dark": "#0F1115", 
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#18181B", 
+              "surface-darker": "#131316", 
+              "text-light": "#1F2937", 
+              "text-dark": "#F9FAFB", 
+              "text-muted-light": "#6B7280", 
+              "text-muted-dark": "#9CA3AF", 
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", 
+              'xl': "1rem", 
+              '2xl': "1.5rem", 
+            },
+            animation: {
+                'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                'wave': 'wave 1.5s ease-in-out infinite',
+            },
+            keyframes: {
+                wave: {
+                    '0%, 100%': { height: '10%' },
+                    '50%': { height: '100%' },
+                }
+            }
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        .waveform-bar {
+            width: 6px;
+            background-color: #7C3AED;
+            border-radius: 9999px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .waveform-bar:nth-child(odd) {
+            animation-duration: 0.8s;
+            background-color: #A78BFA;
+        }
+        .waveform-bar:nth-child(2n) {
+            animation-duration: 1.1s;
+        }
+        .waveform-bar:nth-child(3n) {
+            animation-duration: 1.3s;
+            background-color: #DDD6FE;
+        }
+        .waveform-bar:nth-child(4n) {
+            animation-duration: 0.9s;
+        }
+        .waveform-bar:nth-child(5n) {
+            animation-duration: 1.2s;
+            background-color: #7C3AED;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white overflow-hidden">
+<aside class="fixed inset-y-0 left-0 w-80 bg-surface-light dark:bg-surface-darker border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-gray-100 dark:border-gray-800/50">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Spokio</span>
+</div>
+</div>
+<div class="flex-1 px-6 py-8 overflow-y-auto">
+<h3 class="text-xs font-bold text-text-muted-light dark:text-gray-500 uppercase tracking-wider mb-6">Session Progress</h3>
+<div class="space-y-8 relative">
+<div class="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gray-200 dark:bg-gray-800 -z-10"></div>
+<div class="flex gap-4 opacity-50">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white shadow-sm ring-4 ring-white dark:ring-surface-darker">
+<span class="material-icons-round text-lg">check</span>
+</div>
+</div>
+<div class="pt-2">
+<h4 class="text-sm font-bold text-gray-900 dark:text-white">Microphone Check</h4>
+<p class="text-xs text-text-muted-light dark:text-gray-500 mt-1">Input levels verified</p>
+</div>
+</div>
+<div class="flex gap-4 opacity-50">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white shadow-sm ring-4 ring-white dark:ring-surface-darker">
+<span class="material-icons-round text-lg">check</span>
+</div>
+</div>
+<div class="pt-2">
+<h4 class="text-sm font-bold text-gray-900 dark:text-white">Part 1: Introduction</h4>
+<p class="text-xs text-text-muted-light dark:text-gray-500 mt-1">General questions</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30 ring-4 ring-white dark:ring-surface-darker relative">
+<span class="material-icons-round text-lg">mic</span>
+<span class="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-surface-darker animate-pulse"></span>
+</div>
+</div>
+<div class="pt-2">
+<h4 class="text-sm font-bold text-gray-900 dark:text-white text-primary">Part 2: Long Turn</h4>
+<p class="text-xs text-primary/80 mt-1 font-medium">Recording in progress...</p>
+</div>
+</div>
+<div class="flex gap-4 opacity-40">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-400 dark:text-gray-500 shadow-sm ring-4 ring-white dark:ring-surface-darker">
+<span class="text-sm font-bold">3</span>
+</div>
+</div>
+<div class="pt-2">
+<h4 class="text-sm font-bold text-gray-900 dark:text-white">Part 3: Discussion</h4>
+<p class="text-xs text-text-muted-light dark:text-gray-500 mt-1">Deep dive topics</p>
+</div>
+</div>
+</div>
+<div class="mt-12 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800">
+<div class="flex items-center justify-between mb-3">
+<span class="text-xs font-semibold text-gray-500 uppercase">System Check</span>
+<span class="flex items-center gap-1 text-xs font-bold text-green-500">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+                        Good
+                    </span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+<span class="material-icons-round text-sm">mic</span>
+<span>Microphone Input</span>
+<div class="ml-auto w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+<div class="h-full bg-green-500 w-[80%] animate-pulse"></div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+<span class="material-icons-round text-sm">wifi</span>
+<span>Network Stability</span>
+<div class="ml-auto w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+<div class="h-full bg-green-500 w-[95%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-gray-100 dark:border-gray-800">
+<button class="w-full py-2 px-4 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                Quit Session
+            </button>
+</div>
+</aside>
+<main class="lg:pl-80 flex-1 flex flex-col h-screen relative bg-white dark:bg-[#0F1115]">
+<header class="h-20 flex items-center justify-between px-8 border-b border-gray-100 dark:border-gray-800/50 bg-surface-light/80 dark:bg-surface-darker/80 backdrop-blur-md sticky top-0 z-20">
+<div class="flex items-center gap-4">
+<div class="bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full flex items-center gap-2 border border-red-100 dark:border-red-900/30">
+<div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+<span class="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide">Recording</span>
+</div>
+<div class="text-3xl font-mono font-bold text-gray-900 dark:text-white tabular-nums tracking-wider">
+                    01:42
+                </div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex flex-col items-end">
+<span class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-0.5">Current Task</span>
+<span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Describe a memorable journey</span>
+</div>
+<button class="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+<span class="material-icons-round">settings</span>
+</button>
+</div>
+</header>
+<div class="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden">
+<div class="w-full max-w-2xl text-center mb-16 z-10">
+<h2 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white leading-tight mb-4">
+                    "Describe a memorable journey you have taken."
+                </h2>
+<div class="inline-flex flex-wrap justify-center gap-2 text-sm text-text-muted-light dark:text-gray-400">
+<span class="bg-gray-100 dark:bg-surface-dark px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">where you went</span>
+<span class="bg-gray-100 dark:bg-surface-dark px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">who you went with</span>
+<span class="bg-gray-100 dark:bg-surface-dark px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700">why it was memorable</span>
+</div>
+</div>
+<div class="w-full max-w-3xl h-32 flex items-center justify-center gap-1.5 mb-16 z-10 px-8">
+<div class="waveform-bar h-8"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-6"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-10"></div>
+<div class="waveform-bar h-14"></div>
+<div class="waveform-bar h-8"></div>
+<div class="waveform-bar h-20"></div>
+<div class="waveform-bar h-28"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-6"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-32"></div>
+<div class="waveform-bar h-24"></div> 
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-28"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-20"></div>
+<div class="waveform-bar h-8"></div>
+<div class="waveform-bar h-14"></div>
+<div class="waveform-bar h-10"></div>
+<div class="waveform-bar h-24"></div>
+<div class="waveform-bar h-16"></div>
+<div class="waveform-bar h-6"></div>
+<div class="waveform-bar h-12"></div>
+<div class="waveform-bar h-8"></div>
+</div>
+<div class="flex flex-col items-center gap-6 z-10">
+<button class="group relative flex items-center gap-3 px-8 py-4 bg-primary hover:bg-primary-hover text-white rounded-2xl shadow-xl shadow-primary/25 transition-all hover:scale-105 active:scale-95">
+<div class="absolute inset-0 rounded-2xl ring-4 ring-primary/20 animate-pulse-slow"></div>
+<span class="material-icons-round text-2xl">stop_circle</span>
+<span class="text-lg font-bold tracking-wide">Finish Answer</span>
+</button>
+<p class="text-sm text-text-muted-light dark:text-gray-500">
+                    Click to stop recording and proceed
+                </p>
+</div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 dark:bg-primary/5 rounded-full blur-3xl -z-0 pointer-events-none"></div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50">
+<button class="bg-surface-dark text-white dark:bg-white dark:text-gray-900 p-3 rounded-full shadow-lg hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-round block dark:hidden">dark_mode</span>
+<span class="material-icons-round hidden dark:block">light_mode</span>
+</button>
+</div>
+
+</body></html>

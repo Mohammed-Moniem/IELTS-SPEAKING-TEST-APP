@@ -1,4 +1,5 @@
 import { API_URL, apiClient } from "./client";
+import { logger } from "../utils/logger";
 
 /**
  * Test backend connectivity
@@ -47,26 +48,26 @@ export const testBackendConnection = async () => {
     console.log("\n✅ Backend connection test complete!\n");
     return true;
   } catch (error: any) {
-    console.error("\n❌ Backend connection test FAILED");
-    console.error("Error:", error.message);
+    logger.warn("\n❌ Backend connection test FAILED");
+    logger.warn("Error:", error.message);
 
     if (
       error.message === "Network request failed" ||
       error.message.includes("Network")
     ) {
-      console.error("\n🔴 NETWORK ERROR - Troubleshooting:");
-      console.error(
+      logger.warn("\n🔴 NETWORK ERROR - Troubleshooting:");
+      logger.warn(
         '1. Is backend running? Check terminal for "app is ready on http://0.0.0.0:4000"'
       );
-      console.error(
+      logger.warn(
         "2. Same WiFi? Mobile and computer must be on same network"
       );
-      console.error("3. Firewall? Check macOS firewall settings");
-      console.error("4. IP correct? Current IP in app.json:", API_URL);
-      console.error(
+      logger.warn("3. Firewall? Check macOS firewall settings");
+      logger.warn("4. IP correct? Current IP in app.json:", API_URL);
+      logger.warn(
         '\n💡 To fix: Update mobile/app.json "extra.apiUrl" with your Mac IP'
       );
-      console.error(
+      logger.warn(
         "   Find your IP: System Settings → Network → WiFi → Details"
       );
     }

@@ -67,7 +67,7 @@ export function SettingsMenu({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+    <div className="min-h-screen p-4 fade-in">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -80,8 +80,8 @@ export function SettingsMenu({
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Settings</h1>
-            <p className="text-slate-600">Manage your account and preferences</p>
+            <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+            <p className="text-muted-foreground">Manage your account and preferences</p>
           </div>
         </div>
 

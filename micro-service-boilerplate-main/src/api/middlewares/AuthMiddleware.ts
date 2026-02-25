@@ -13,7 +13,7 @@ import { Service } from 'typedi';
 export class AuthMiddleware implements ExpressMiddlewareInterface {
   private log = new Logger(__filename);
 
-  private readonly PUBLIC_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/health'];
+  private readonly PUBLIC_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/health', '/subscription/webhook'];
 
   public use(req: express.Request, res: express.Response, next: express.NextFunction): void {
     const headers: IRequestHeaders = { urc: (req.header('Unique-Reference-Code') || '').trim() || 'auth-mw' };

@@ -1,16 +1,20 @@
 import { Service } from 'typedi';
 
+import { CSError } from '@errors/CSError';
+import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { AIUsageLogModel } from '@models/AIUsageLogModel';
+import { AdminAuditLogModel } from '@models/AdminAuditLogModel';
 import { ListeningAttemptModel } from '@models/ListeningAttemptModel';
 import { ListeningTestModel } from '@models/ListeningTestModel';
 import { ReadingAttemptModel } from '@models/ReadingAttemptModel';
 import { ReadingTestModel } from '@models/ReadingTestModel';
 import { SubscriptionModel } from '@models/SubscriptionModel';
 import { UserModel } from '@models/UserModel';
+import { UserProfile } from '@models/UserProfileModel';
 import { WritingSubmissionModel } from '@models/WritingSubmissionModel';
 import { WritingTaskModel } from '@models/WritingTaskModel';
 
-import { AdminAccessService } from './AdminAccessService';
+import { AdminAccessService, AdminRole } from './AdminAccessService';
 import { FeatureFlagService } from './FeatureFlagService';
 
 @Service()
@@ -93,19 +97,125 @@ export class AdminService {
     return updated;
   }
 
-  public async listUsers(limit: number, offset: number) {
+  public async listUsers(
+    limit: number,
+    offset: number,
+    filters?: {
+      query?: string;
+      plan?: 'free' | 'premium' | 'pro' | 'team';
+      status?: 'active' | 'idle' | 'unverified';
+      country?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      flagged?: boolean;
+    }
+  ) {
+    const query: Record<string, unknown> = {};
+    if (filters?.plan) {
+      query.subscriptionPlan = filters.plan;
+    }
+
+    if (filters?.query) {
+      const escaped = filters.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      query.$or = [{ email: regex }, { firstName: regex }, { lastName: regex }];
+    }
+
+    if (filters?.status === 'active') {
+      query.lastLoginAt = { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (filters?.status === 'idle') {
+      query.$or = [...(((query.$or as Array<Record<string, unknown>>) || []) as Array<Record<string, unknown>>), {
+        lastLoginAt: { $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+      }, {
+        lastLoginAt: { $exists: false }
+      }];
+    } else if (filters?.status === 'unverified') {
+      query.emailVerified = false;
+    }
+
+    if (filters?.flagged) {
+      query.emailVerified = false;
+    }
+
+    if (filters?.dateFrom || filters?.dateTo) {
+      query.createdAt = {};
+      if (filters.dateFrom) {
+        (query.createdAt as Record<string, unknown>).$gte = new Date(filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        (query.createdAt as Record<string, unknown>).$lte = new Date(filters.dateTo);
+      }
+    }
+
+    if (filters?.country) {
+      const profiles = await UserProfile.find({
+        'studyGoals.targetCountry': new RegExp(filters.country, 'i')
+      }).select('userId');
+      const userIds = profiles.map(profile => profile.userId);
+      if (userIds.length === 0) {
+        return { users: [], total: 0, limit, offset };
+      }
+      query._id = { $in: userIds };
+    }
+
     const [users, total] = await Promise.all([
-      UserModel.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit),
-      UserModel.countDocuments({})
+      UserModel.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit),
+      UserModel.countDocuments(query)
     ]);
 
     return { users, total, limit, offset };
   }
 
-  public async listSubscriptions(limit: number, offset: number) {
+  public async updateUserRoles(userId: string, roles: AdminRole[], actorUserId: string) {
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'User not found');
+    }
+
+    user.adminRoles = [...roles];
+    await user.save();
+
+    await this.adminAccessService.audit({
+      actorUserId,
+      action: 'update-user-roles',
+      targetType: 'user',
+      targetId: userId,
+      details: { roles }
+    });
+
+    return user;
+  }
+
+  public async listSubscriptions(
+    limit: number,
+    offset: number,
+    filters?: {
+      status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
+      plan?: 'free' | 'premium' | 'pro' | 'team';
+      renewalFrom?: string;
+      renewalTo?: string;
+    }
+  ) {
+    const query: Record<string, unknown> = {};
+    if (filters?.status) {
+      query.status = filters.status;
+    }
+    if (filters?.plan) {
+      query.planType = filters.plan;
+    }
+    if (filters?.renewalFrom || filters?.renewalTo) {
+      query.trialEndsAt = {};
+      if (filters.renewalFrom) {
+        (query.trialEndsAt as Record<string, unknown>).$gte = new Date(filters.renewalFrom);
+      }
+      if (filters.renewalTo) {
+        (query.trialEndsAt as Record<string, unknown>).$lte = new Date(filters.renewalTo);
+      }
+    }
+
     const [subscriptions, total] = await Promise.all([
-      SubscriptionModel.find({}).sort({ updatedAt: -1 }).skip(offset).limit(limit),
-      SubscriptionModel.countDocuments({})
+      SubscriptionModel.find(query).sort({ updatedAt: -1 }).skip(offset).limit(limit),
+      SubscriptionModel.countDocuments(query)
     ]);
 
     return { subscriptions, total, limit, offset };
@@ -124,7 +234,7 @@ export class AdminService {
       WritingSubmissionModel.countDocuments({}),
       ReadingAttemptModel.countDocuments({ status: 'completed' }),
       ListeningAttemptModel.countDocuments({ status: 'completed' }),
-      SubscriptionModel.countDocuments({ planType: { $in: ['premium', 'pro'] }, status: 'active' }),
+      SubscriptionModel.countDocuments({ planType: { $in: ['premium', 'pro', 'team'] }, status: 'active' }),
       this.featureFlagService.listFlags()
     ]);
 
@@ -140,10 +250,78 @@ export class AdminService {
     };
   }
 
-  public async getAIUsageSummary(limit: number) {
+  public async listAuditLogs(
+    limit: number,
+    offset: number,
+    filters?: {
+      actorUserId?: string;
+      action?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) {
+    const query: Record<string, unknown> = {};
+    if (filters?.actorUserId) {
+      query.actorUserId = filters.actorUserId;
+    }
+    if (filters?.action) {
+      query.action = filters.action;
+    }
+    if (filters?.dateFrom || filters?.dateTo) {
+      query.createdAt = {};
+      if (filters.dateFrom) {
+        (query.createdAt as Record<string, unknown>).$gte = new Date(filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        (query.createdAt as Record<string, unknown>).$lte = new Date(filters.dateTo);
+      }
+    }
+
+    const [logs, total] = await Promise.all([
+      AdminAuditLogModel.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit),
+      AdminAuditLogModel.countDocuments(query)
+    ]);
+
+    return {
+      logs,
+      total,
+      limit,
+      offset
+    };
+  }
+
+  public async getAIUsageSummary(
+    limit: number,
+    filters?: {
+      module?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      status?: string;
+    }
+  ) {
+    const query: Record<string, unknown> = {};
+    if (filters?.module) {
+      query.module = filters.module;
+    }
+    if (filters?.status) {
+      query.status = filters.status;
+    }
+    if (filters?.dateFrom || filters?.dateTo) {
+      query.createdAt = {};
+      if (filters.dateFrom) {
+        (query.createdAt as Record<string, unknown>).$gte = new Date(filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        (query.createdAt as Record<string, unknown>).$lte = new Date(filters.dateTo);
+      }
+    }
+
     const [recentLogs, aggregate] = await Promise.all([
-      AIUsageLogModel.find({}).sort({ createdAt: -1 }).limit(limit),
+      AIUsageLogModel.find(query).sort({ createdAt: -1 }).limit(limit),
       AIUsageLogModel.aggregate([
+        {
+          $match: query
+        },
         {
           $group: {
             _id: '$module',

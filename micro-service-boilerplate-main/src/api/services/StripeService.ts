@@ -7,13 +7,29 @@ import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { Logger } from '@lib/logger';
 import { SubscriptionPlan } from '@models/UserModel';
 
+export type BillingCycle = 'monthly' | 'annual';
+
 interface CheckoutSessionParams {
   userId: string;
   planType: SubscriptionPlan;
+  billingCycle?: BillingCycle;
   successUrl: string;
   cancelUrl: string;
   customerId?: string;
   customerEmail?: string;
+  idempotencyKey?: string;
+  promotionCodeId?: string;
+  couponCode?: string;
+  partnerAttribution?: {
+    partnerId: string;
+    partnerCodeId: string;
+    partnerCode: string;
+  };
+}
+
+interface BillingPortalSessionParams {
+  customerId: string;
+  returnUrl: string;
 }
 
 @Service()
@@ -33,12 +49,38 @@ export class StripeService {
     return Boolean(this.stripeClient && env.payments?.stripe?.secretKey);
   }
 
+  public getMode(): 'disabled' | 'test' | 'live' | 'unknown' {
+    const secret = env.payments?.stripe?.secretKey;
+    if (!secret) {
+      return 'disabled';
+    }
+
+    if (secret.startsWith('sk_test_') || secret.startsWith('rk_test_')) {
+      return 'test';
+    }
+
+    if (secret.startsWith('sk_live_') || secret.startsWith('rk_live_')) {
+      return 'live';
+    }
+
+    return 'unknown';
+  }
+
   public getPublishableKey(): string | undefined {
     return env.payments?.stripe?.publishableKey;
   }
 
-  public getPriceId(plan: SubscriptionPlan): string | undefined {
-    return env.payments?.stripe?.priceIds?.[plan];
+  public getPriceId(plan: SubscriptionPlan, billingCycle: BillingCycle = 'monthly'): string | undefined {
+    const configuredPrices = env.payments?.stripe?.priceIds?.[plan];
+    if (!configuredPrices) {
+      return undefined;
+    }
+
+    if (typeof configuredPrices === 'string') {
+      return billingCycle === 'monthly' ? configuredPrices : undefined;
+    }
+
+    return configuredPrices[billingCycle];
   }
 
   public mapPriceIdToPlan(priceId?: string | null): SubscriptionPlan | undefined {
@@ -47,7 +89,18 @@ export class StripeService {
     }
 
     const prices = env.payments?.stripe?.priceIds || {};
-    return (Object.keys(prices) as SubscriptionPlan[]).find(plan => prices[plan] === priceId);
+    return (Object.keys(prices) as SubscriptionPlan[]).find(plan => {
+      const planPrices = prices[plan];
+      if (!planPrices) {
+        return false;
+      }
+
+      if (typeof planPrices === 'string') {
+        return planPrices === priceId;
+      }
+
+      return planPrices.monthly === priceId || planPrices.annual === priceId;
+    });
   }
 
   public async createCheckoutSession(params: CheckoutSessionParams): Promise<Stripe.Checkout.Session> {
@@ -59,7 +112,8 @@ export class StripeService {
       );
     }
 
-    const priceId = this.getPriceId(params.planType);
+    const billingCycle = params.billingCycle || 'monthly';
+    const priceId = this.getPriceId(params.planType, billingCycle);
     if (!priceId) {
       throw new CSError(
         HTTP_STATUS_CODES.BAD_REQUEST,
@@ -80,17 +134,39 @@ export class StripeService {
       ],
       metadata: {
         userId: params.userId,
-        planType: params.planType
+        planType: params.planType,
+        billingCycle,
+        ...(params.couponCode ? { couponCode: params.couponCode } : {}),
+        ...(params.partnerAttribution
+          ? {
+              partnerId: params.partnerAttribution.partnerId,
+              partnerCodeId: params.partnerAttribution.partnerCodeId,
+              partnerCode: params.partnerAttribution.partnerCode
+            }
+          : {})
       },
       subscription_data: {
         metadata: {
           userId: params.userId,
-          planType: params.planType
+          planType: params.planType,
+          billingCycle,
+          ...(params.couponCode ? { couponCode: params.couponCode } : {}),
+          ...(params.partnerAttribution
+            ? {
+                partnerId: params.partnerAttribution.partnerId,
+                partnerCodeId: params.partnerAttribution.partnerCodeId,
+                partnerCode: params.partnerAttribution.partnerCode
+              }
+            : {})
         }
       },
       allow_promotion_codes: true,
       client_reference_id: params.userId
     };
+
+    if (params.promotionCodeId) {
+      payload.discounts = [{ promotion_code: params.promotionCodeId }];
+    }
 
     if (params.customerId) {
       payload.customer = params.customerId;
@@ -98,9 +174,59 @@ export class StripeService {
       payload.customer_email = params.customerEmail;
     }
 
-    const session = await this.stripeClient.checkout.sessions.create(payload);
-    this.log.info(`Stripe checkout session created for user ${params.userId} and plan ${params.planType}`);
+    const session = await this.stripeClient.checkout.sessions.create(payload, {
+      idempotencyKey: params.idempotencyKey
+    });
+    this.log.info(
+      `Stripe checkout session created for user ${params.userId}, plan ${params.planType}, cycle ${billingCycle}`
+    );
     return session;
+  }
+
+  public async createBillingPortalSession(params: BillingPortalSessionParams): Promise<Stripe.BillingPortal.Session> {
+    if (!this.stripeClient || !this.isConfigured()) {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.StripeError,
+        'Stripe integration is not configured'
+      );
+    }
+
+    return this.stripeClient.billingPortal.sessions.create({
+      customer: params.customerId,
+      return_url: params.returnUrl
+    });
+  }
+
+  public async findPromotionCodeIdByCode(code: string): Promise<string | undefined> {
+    if (!this.stripeClient || !this.isConfigured()) {
+      return undefined;
+    }
+
+    const normalizedCode = code.trim();
+    if (!normalizedCode) {
+      return undefined;
+    }
+
+    const promotionCodes = await this.stripeClient.promotionCodes.list({
+      code: normalizedCode,
+      active: true,
+      limit: 1
+    });
+
+    return promotionCodes.data[0]?.id;
+  }
+
+  public async getSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+    if (!this.stripeClient || !this.isConfigured()) {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.StripeError,
+        'Stripe integration is not configured'
+      );
+    }
+
+    return this.stripeClient.subscriptions.retrieve(subscriptionId);
   }
 
   public constructEvent(payload: Buffer | undefined, signature: string | string[] | undefined): Stripe.Event {

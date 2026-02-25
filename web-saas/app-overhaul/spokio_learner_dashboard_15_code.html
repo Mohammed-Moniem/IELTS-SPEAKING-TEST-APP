@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Speaking Evaluation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", 
+              "primary-hover": "#6D28D9",
+              "background-light": "#F3F4F6", 
+              "background-dark": "#0F1115", 
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#18181B", 
+              "surface-darker": "#131316", 
+              "text-light": "#1F2937", 
+              "text-dark": "#F9FAFB", 
+              "text-muted-light": "#6B7280", 
+              "text-muted-dark": "#9CA3AF", 
+              "score-fluency": "#10B981", // Green
+              "score-vocab": "#3B82F6",   // Blue
+              "score-grammar": "#F59E0B", // Amber
+              "score-pronunciation": "#EF4444", // Red
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem",
+              'xl': "1rem", 
+              '2xl': "1.5rem",
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151;
+        }
+        .highlight-error {
+            text-decoration-line: underline;
+            text-decoration-style: wavy;
+            text-decoration-color: #EF4444;
+            text-decoration-thickness: 2px;
+            background-color: rgba(239, 68, 68, 0.1);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .highlight-grammar {
+            text-decoration-line: underline;
+            text-decoration-style: wavy;
+            text-decoration-color: #F59E0B;
+            text-decoration-thickness: 2px;
+            background-color: rgba(245, 158, 11, 0.1);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .highlight-vocab {
+            text-decoration-line: underline;
+            text-decoration-style: wavy;
+            text-decoration-color: #3B82F6;
+            text-decoration-thickness: 2px;
+            background-color: rgba(59, 130, 246, 0.1);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-surface-light dark:bg-surface-darker border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-gray-100 dark:border-gray-800/50">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Spokio</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">dashboard</span>
+            Dashboard
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+            Practice Areas
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-300 group" href="#">
+<span class="material-symbols-outlined text-xl">mic</span>
+            Speaking
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">edit</span>
+            Writing
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">menu_book</span>
+            Reading
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">headphones</span>
+            Listening
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+            Assessment
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">assignment</span>
+            Full Exams
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">bar_chart</span>
+            Progress &amp; Stats
+        </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border-2 border-white dark:border-gray-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Student One</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Free Plan</p>
+</div>
+<span class="material-symbols-outlined ml-auto text-gray-400">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen">
+<header class="lg:hidden h-16 bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg dark:text-white">Spokio</span>
+</div>
+<button class="p-2 text-gray-500 hover:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-7xl mx-auto w-full">
+<div class="flex flex-col gap-6 mb-8">
+<div class="flex items-center text-sm text-text-muted-light dark:text-gray-500">
+<a class="hover:text-primary transition-colors" href="#">Dashboard</a>
+<span class="material-symbols-outlined text-sm mx-2">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">Speaking History</a>
+<span class="material-symbols-outlined text-sm mx-2">chevron_right</span>
+<span class="text-gray-900 dark:text-white font-medium">Evaluation #2048</span>
+</div>
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-6">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white">Speaking Test Evaluation</h1>
+<span class="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 rounded-full text-xs font-semibold">Completed</span>
+</div>
+<p class="text-text-muted-light dark:text-gray-400 max-w-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">calendar_today</span> Oct 25, 2023 • 
+                        <span class="material-symbols-outlined text-lg ml-2">timer</span> 14 mins duration
+                    </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2.5 bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+<span class="material-symbols-outlined text-lg">share</span>
+                        Share
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2.5 bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+<span class="material-symbols-outlined text-lg">download</span>
+                        PDF Report
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl transition-colors shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">restart_alt</span>
+                        Retake Test
+                    </button>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6 mb-8 relative overflow-hidden">
+<div class="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
+<div class="flex flex-col lg:flex-row gap-8 items-center">
+<div class="flex-shrink-0 relative group cursor-help">
+<svg class="w-40 h-40 transform -rotate-90">
+<circle class="text-gray-100 dark:text-gray-800" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary transition-all duration-1000 ease-out" cx="80" cy="80" fill="transparent" r="70" stroke="currentColor" stroke-dasharray="440" stroke-dashoffset="110" stroke-width="12"></circle>
+</svg>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+<span class="text-4xl font-bold text-gray-900 dark:text-white">7.5</span>
+<span class="block text-xs text-text-muted-light uppercase tracking-wide mt-1">Overall Band</span>
+</div>
+</div>
+<div class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+<div class="bg-gray-50 dark:bg-surface-darker rounded-xl p-4 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-medium text-text-muted-light dark:text-gray-400">Fluency &amp; Coherence</span>
+<span class="text-lg font-bold text-score-fluency">7.0</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+<div class="bg-score-fluency h-full rounded-full" style="width: 70%"></div>
+</div>
+<p class="text-xs text-text-muted-light mt-3">Good flow, slight hesitation in complex sentences.</p>
+</div>
+<div class="bg-gray-50 dark:bg-surface-darker rounded-xl p-4 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-medium text-text-muted-light dark:text-gray-400">Lexical Resource</span>
+<span class="text-lg font-bold text-score-vocab">8.0</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+<div class="bg-score-vocab h-full rounded-full" style="width: 80%"></div>
+</div>
+<p class="text-xs text-text-muted-light mt-3">Strong vocabulary usage, idiomatic expressions used correctly.</p>
+</div>
+<div class="bg-gray-50 dark:bg-surface-darker rounded-xl p-4 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-medium text-text-muted-light dark:text-gray-400">Grammar Accuracy</span>
+<span class="text-lg font-bold text-score-grammar">6.5</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+<div class="bg-score-grammar h-full rounded-full" style="width: 65%"></div>
+</div>
+<p class="text-xs text-text-muted-light mt-3">Frequent errors in article usage and tense consistency.</p>
+</div>
+<div class="bg-gray-50 dark:bg-surface-darker rounded-xl p-4 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all">
+<div class="flex justify-between items-start mb-2">
+<span class="text-sm font-medium text-text-muted-light dark:text-gray-400">Pronunciation</span>
+<span class="text-lg font-bold text-score-pronunciation">7.5</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+<div class="bg-score-pronunciation h-full rounded-full" style="width: 75%"></div>
+</div>
+<p class="text-xs text-text-muted-light mt-3">Clear intonation, some minor mispronunciations of 'th' sounds.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+<div class="xl:col-span-2 space-y-6">
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6 sticky top-20 z-10">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-bold text-gray-900 dark:text-white">Session Recording</h3>
+<span class="text-xs font-mono text-text-muted-light bg-gray-100 dark:bg-surface-darker px-2 py-1 rounded">03:45 / 14:20</span>
+</div>
+<div class="h-16 flex items-center justify-center gap-1 mb-4 opacity-70">
+<div class="w-1 bg-primary h-4 rounded-full animate-pulse"></div>
+<div class="w-1 bg-primary h-8 rounded-full animate-pulse" style="animation-delay: 0.1s"></div>
+<div class="w-1 bg-primary h-12 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+<div class="w-1 bg-primary h-6 rounded-full animate-pulse" style="animation-delay: 0.3s"></div>
+<div class="w-1 bg-primary h-10 rounded-full animate-pulse" style="animation-delay: 0.1s"></div>
+<div class="w-1 bg-primary h-14 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+<div class="w-1 bg-primary h-8 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+<div class="w-1 bg-primary h-4 rounded-full animate-pulse" style="animation-delay: 0.1s"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-4 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-8 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-3 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-6 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-4 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-2 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-5 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-3 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-4 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-8 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-3 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-6 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-4 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-8 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-3 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-6 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-4 rounded-full"></div>
+<div class="w-1 bg-gray-300 dark:bg-gray-700 h-2 rounded-full"></div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary-hover shadow-lg shadow-primary/30 transition-all">
+<span class="material-symbols-outlined">pause</span>
+</button>
+<div class="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full cursor-pointer group">
+<div class="bg-primary h-full rounded-full relative" style="width: 35%">
+<div class="w-3 h-3 bg-white rounded-full absolute -right-1.5 -top-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="text-text-muted-light hover:text-primary transition-colors" title="Rewind 10s">
+<span class="material-symbols-outlined">replay_10</span>
+</button>
+<button class="text-text-muted-light hover:text-primary transition-colors" title="Forward 10s">
+<span class="material-symbols-outlined">forward_10</span>
+</button>
+<button class="text-text-muted-light hover:text-primary transition-colors" title="Speed">
+<span class="material-symbols-outlined">speed</span>
+</button>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+<div class="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-gray-800 pb-4">
+<h3 class="font-bold text-gray-900 dark:text-white">Transcript Analysis</h3>
+<div class="flex gap-4 text-xs font-medium">
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Pronunciation
+                            </div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Grammar
+                            </div>
+<div class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Vocabulary
+                            </div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm text-gray-500">smart_toy</span>
+</div>
+<div class="space-y-1">
+<p class="text-sm font-semibold text-gray-900 dark:text-white">Interviewer (AI)</p>
+<p class="text-gray-600 dark:text-gray-300">Let's talk about your hometown. Is it a good place for young people to live?</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                ME
+                            </div>
+<div class="space-y-2 w-full">
+<p class="text-sm font-semibold text-gray-900 dark:text-white flex justify-between">
+                                    You
+                                    <span class="text-xs text-text-muted-light font-normal">00:45</span>
+</p>
+<div class="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
+                                    Actually, I believe it is. <span class="highlight-vocab relative group" tabindex="0">
+                                        For starters
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Good connector!</strong><br/>Shows good cohesion. Alternative: "To begin with"
+                                        </div>
+</span>, there are <span class="highlight-grammar relative group" tabindex="0">
+                                        much
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Grammar Slip</strong><br/>Use "many" for countable nouns like opportunities.
+                                        </div>
+</span> opportunities for employment in the tech sector. Also, the nightlife is quite <span class="highlight-error relative group" tabindex="0">
+                                        vibrant
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Pronunciation</strong><br/>/ˈvaɪ.brənt/<br/>Stress on the first syllable. You said /vi-brant/.
+                                        </div>
+</span>. However, the cost of living has <span class="highlight-vocab relative group" tabindex="0">
+                                        gone up
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Phrasal Verb</strong><br/>Good! Consider "skyrocketed" for stronger emphasis.
+                                        </div>
+</span> significantly recently.
+                                </div>
+</div>
+</div>
+<div class="flex gap-4 pt-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-sm text-gray-500">smart_toy</span>
+</div>
+<div class="space-y-1">
+<p class="text-sm font-semibold text-gray-900 dark:text-white">Interviewer (AI)</p>
+<p class="text-gray-600 dark:text-gray-300">I see. Now, how has your hometown changed over the last 10 years?</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                ME
+                            </div>
+<div class="space-y-2 w-full">
+<p class="text-sm font-semibold text-gray-900 dark:text-white flex justify-between">
+                                    You
+                                    <span class="text-xs text-text-muted-light font-normal">01:12</span>
+</p>
+<div class="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
+                                    Oh, it's changed drastically. They have <span class="highlight-grammar relative group" tabindex="0">
+                                        builded
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Grammar Error</strong><br/>Past participle of build is "built".
+                                        </div>
+</span> a new subway system which <span class="highlight-vocab relative group" tabindex="0">
+                                        eased
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-surface-dark dark:bg-white text-white dark:text-gray-900 text-xs p-2 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity pointer-events-none z-20">
+<strong>Vocabulary</strong><br/>"Alleviated" would be a higher-band synonym here.
+                                        </div>
+</span> traffic congestion. The old market square was renovated last year.
+                                </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+<h3 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">auto_fix_high</span>
+                        Key Improvements
+                    </h3>
+<div class="space-y-4">
+<div class="p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
+<p class="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide mb-1">Critical Pronunciation</p>
+<p class="text-sm text-gray-800 dark:text-gray-200 mb-2">You struggled with the 'th' sound in words like "thinking" and "bathe".</p>
+<button class="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">play_circle</span> Practice 'th' sound
+                            </button>
+</div>
+<div class="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
+<p class="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-1">Grammar Focus</p>
+<p class="text-sm text-gray-800 dark:text-gray-200 mb-2">Review "Past Simple vs Present Perfect". You used "have builded" instead of "have built".</p>
+<button class="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">menu_book</span> View Grammar Rule
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+<h3 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-blue-500">style</span>
+                        Vocabulary Upgrade
+                    </h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+<span class="text-sm text-gray-500 dark:text-gray-400 line-through">Good</span>
+<span class="material-symbols-outlined text-sm text-gray-400 mt-0.5">arrow_forward</span>
+<div>
+<span class="text-sm font-bold text-blue-600 dark:text-blue-400">Exceptional / Outstanding</span>
+<p class="text-xs text-text-muted-light mt-0.5">Use for stronger emphasis.</p>
+</div>
+</li>
+<li class="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+<span class="text-sm text-gray-500 dark:text-gray-400 line-through">Changed</span>
+<span class="material-symbols-outlined text-sm text-gray-400 mt-0.5">arrow_forward</span>
+<div>
+<span class="text-sm font-bold text-blue-600 dark:text-blue-400">Transformed / Evolved</span>
+<p class="text-xs text-text-muted-light mt-0.5">Shows process of change.</p>
+</div>
+</li>
+<li class="flex items-start gap-3">
+<span class="text-sm text-gray-500 dark:text-gray-400 line-through">Build</span>
+<span class="material-symbols-outlined text-sm text-gray-400 mt-0.5">arrow_forward</span>
+<div>
+<span class="text-sm font-bold text-blue-600 dark:text-blue-400">Construct / Establish</span>
+<p class="text-xs text-text-muted-light mt-0.5">More formal tone.</p>
+</div>
+</li>
+</ul>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+<h3 class="font-bold text-gray-900 dark:text-white mb-4">Speaking Pace</h3>
+<div class="flex items-end gap-2 mb-2">
+<span class="text-3xl font-bold text-gray-900 dark:text-white">125</span>
+<span class="text-sm text-text-muted-light mb-1.5">words / min</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-800 h-2 rounded-full overflow-hidden mb-2">
+<div class="bg-green-500 h-full rounded-full" style="width: 60%"></div>
+</div>
+<p class="text-xs text-text-muted-light">Your pace is <span class="text-green-600 font-medium">optimal</span>. Not too fast, not too slow. Keep it up!</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50">
+<button class="bg-surface-dark text-white dark:bg-white dark:text-gray-900 p-3 rounded-full shadow-lg hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined block dark:hidden">dark_mode</span>
+<span class="material-symbols-outlined hidden dark:block">light_mode</span>
+</button>
+</div>
+
+</body></html>

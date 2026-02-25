@@ -1,0 +1,43 @@
+{
+  "findings": [
+    {
+      "affected_urls": [
+        "http://127.0.0.1:3060/admin/overview",
+        "http://127.0.0.1:3060/app/dashboard",
+        "http://127.0.0.1:3060/login",
+        "http://127.0.0.1:3060/register"
+      ],
+      "category": "indexability",
+      "effort": "S",
+      "evidence": {
+        "check_type": "not_noindex",
+        "count": 4
+      },
+      "id": "SEO-001",
+      "impact": "Noindex directives can suppress ranking-critical pages.",
+      "owner_hint": "Engineering",
+      "recommended_fix": "Remove unintended `noindex` directives from meta robots or X-Robots-Tag headers.",
+      "severity": "P0",
+      "verify_step": "Inspect page source and response headers; confirm no `noindex` directive remains."
+    }
+  ],
+  "run_metadata": {
+    "base_url": "http://127.0.0.1:3060/",
+    "generated_at_utc": "2026-02-22T15:26:36.973776Z",
+    "repo_root": "/Users/mohammedosman/Downloads/IELTS-SPEAKING-TEST-APP/web-saas",
+    "schema": "seo_findings_v1",
+    "source_inventory_schema": "seo_inventory_v1"
+  },
+  "summary": {
+    "by_category": {
+      "indexability": 1
+    },
+    "by_severity": {
+      "P0": 1,
+      "P1": 0,
+      "P2": 0
+    },
+    "pages_scanned": 18,
+    "total_findings": 1
+  }
+}

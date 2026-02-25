@@ -1,6 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { apiClient, API_KEY } from "../../api/client";
 import type { ChatMessage } from "./chatService";
+import { logger } from "../../utils/logger";
 
 // Dynamically import react-native-compressor (optional dependency)
 let ImageCompressor: any = null;
@@ -131,7 +132,7 @@ class MediaUploadService {
         height: asset.height,
       };
     } catch (error) {
-      console.error("Error picking image from gallery:", error);
+      logger.warn("Error picking image from gallery:", error);
       throw error;
     }
   }
@@ -171,7 +172,7 @@ class MediaUploadService {
         height: asset.height,
       };
     } catch (error) {
-      console.error("Error taking photo:", error);
+      logger.warn("Error taking photo:", error);
       throw error;
     }
   }
@@ -201,7 +202,7 @@ class MediaUploadService {
 
       return compressedUri;
     } catch (error) {
-      console.error("Error compressing image:", error);
+      logger.warn("Error compressing image:", error);
       // Return original URI if compression fails
       return uri;
     }
@@ -273,7 +274,7 @@ class MediaUploadService {
 
       return response.data.data;
     } catch (error) {
-      console.error("Error uploading media:", error);
+      logger.warn("Error uploading media:", error);
       throw error;
     }
   }
@@ -300,7 +301,7 @@ class MediaUploadService {
 
       return uploadResult;
     } catch (error) {
-      console.error("Error sending image message:", error);
+      logger.warn("Error sending image message:", error);
       throw error;
     }
   }
@@ -316,7 +317,7 @@ class MediaUploadService {
       // The Image component can handle network URLs directly
       return mediaUrl;
     } catch (error) {
-      console.error("Error downloading media:", error);
+      logger.warn("Error downloading media:", error);
       throw error;
     }
   }

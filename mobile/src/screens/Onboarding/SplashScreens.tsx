@@ -27,36 +27,38 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context";
+import { darkColors } from "../../theme/darkTokens";
+import { colors as lightThemeColors } from "../../theme/tokens";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 // Spokio Brand Colors
 const LIGHT_COLORS = {
-  white: "#FFFFFF",
-  purple100: "#F3E8FF",
-  purple200: "#E9D5FF",
-  purple300: "#D8B4FE",
-  purple400: "#C084FC",
-  purple500: "#A855F7",
-  purple600: "#9333EA",
-  purple700: "#7E22CE",
-  purple900: "#581C87",
-  brandPrimary: "#7C3AED",
-  black: "#000000",
+  white: lightThemeColors.surface,
+  purple100: lightThemeColors.primarySoft,
+  purple200: lightThemeColors.infoSoft,
+  purple300: lightThemeColors.borderMuted,
+  purple400: lightThemeColors.info,
+  purple500: lightThemeColors.primaryHover,
+  purple600: lightThemeColors.primary,
+  purple700: lightThemeColors.primaryStrong,
+  purple900: lightThemeColors.textPrimary,
+  brandPrimary: lightThemeColors.primary,
+  black: lightThemeColors.textPrimary,
 };
 
 const DARK_COLORS = {
-  white: "#0F0B1A",
-  purple100: "#2D1F46",
-  purple200: "#3A235A",
-  purple300: "#4B2C72",
-  purple400: "#6A3AA4",
-  purple500: "#8B5CF6",
-  purple600: "#A78BFA",
-  purple700: "#C4B5FD",
-  purple900: "#E0E7FF",
-  brandPrimary: "#A855F7",
-  black: "#FFFFFF",
+  white: darkColors.surface,
+  purple100: darkColors.primarySoft,
+  purple200: darkColors.infoSoft,
+  purple300: darkColors.borderMuted,
+  purple400: darkColors.info,
+  purple500: darkColors.primary,
+  purple600: darkColors.primaryHover,
+  purple700: darkColors.primaryStrong,
+  purple900: darkColors.textPrimary,
+  brandPrimary: darkColors.primary,
+  black: darkColors.textPrimary,
 };
 
 type SplashPalette = typeof LIGHT_COLORS;
@@ -89,13 +91,23 @@ const AuthShortcutRow: React.FC<AuthShortcutProps> = ({
   return (
     <View style={styles.authShortcutRow}>
       {onSignIn ? (
-        <Pressable onPress={onSignIn}>
+        <Pressable
+          onPress={onSignIn}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+          accessibilityHint="Open sign-in screen"
+        >
           <Text style={styles.authShortcutText}>Sign in</Text>
         </Pressable>
       ) : null}
       {onSignIn && onRegister ? <Text style={styles.authShortcutDot}>•</Text> : null}
       {onRegister ? (
-        <Pressable onPress={onRegister}>
+        <Pressable
+          onPress={onRegister}
+          accessibilityRole="button"
+          accessibilityLabel="Create account"
+          accessibilityHint="Open registration screen"
+        >
           <Text style={styles.authShortcutText}>Create account</Text>
         </Pressable>
       ) : null}
@@ -295,10 +307,16 @@ export function SplashScreen1({
         translucent
       />
       <View style={styles.screen}>
-      <ThemeModeSwitch style={styles.themeSwitch} />
+        <ThemeModeSwitch style={styles.themeSwitch} />
 
       {/* Skip Button */}
-      <APressable onPress={onSkip} style={styles.skipButton}>
+      <APressable
+        onPress={onSkip}
+        style={styles.skipButton}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+        accessibilityHint="Go directly to the trial and sign-in options"
+      >
         <Text style={styles.skipText}>Skip</Text>
         <Ionicons name="arrow-forward" size={16} color={palette.white} />
       </APressable>
@@ -341,7 +359,13 @@ export function SplashScreen1({
       </AView>
 
       {/* Next button */}
-      <APressable onPress={onNext} style={[styles.btn, btnStyle]}>
+      <APressable
+        onPress={onNext}
+        style={[styles.btn, btnStyle]}
+        accessibilityRole="button"
+        accessibilityLabel="Get started"
+        accessibilityHint="Continue to the next onboarding screen"
+      >
         <Text style={styles.btnText}>Get Started</Text>
       </APressable>
       <AuthShortcutRow
@@ -516,10 +540,16 @@ export function SplashScreen2({
         translucent
       />
       <View style={styles.screen}>
-      <ThemeModeSwitch style={styles.themeSwitch} />
+        <ThemeModeSwitch style={styles.themeSwitch} />
 
       {/* Skip Button */}
-      <APressable onPress={onSkip} style={styles.skipButton}>
+      <APressable
+        onPress={onSkip}
+        style={styles.skipButton}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+        accessibilityHint="Go directly to the trial and sign-in options"
+      >
         <Text style={styles.skipText}>Skip</Text>
         <Ionicons name="arrow-forward" size={16} color={palette.white} />
       </APressable>
@@ -580,6 +610,9 @@ export function SplashScreen2({
       <APressable
         onPress={onNext}
         style={[styles.btn, { zIndex: 10 }, btnStyle]}
+        accessibilityRole="button"
+        accessibilityLabel="Continue onboarding"
+        accessibilityHint="Move to the final onboarding screen"
       >
         <Text style={styles.btnText}>Continue</Text>
       </APressable>
@@ -798,7 +831,13 @@ export function SplashScreen3({
         <ThemeModeSwitch style={styles.themeSwitch} />
 
         {/* Skip Button */}
-        <APressable onPress={onSkip} style={styles.skipButton}>
+        <APressable
+          onPress={onSkip}
+          style={styles.skipButton}
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
+          accessibilityHint="Go directly to the trial and sign-in options"
+        >
           <Text style={styles.skipText}>Skip</Text>
           <Ionicons name="arrow-forward" size={16} color={palette.white} />
         </APressable>
@@ -870,7 +909,13 @@ export function SplashScreen3({
           </View>
 
           {/* CTA button */}
-          <APressable onPress={onNext} style={[styles.btnLg, ctaStyle]}>
+          <APressable
+            onPress={onNext}
+            style={[styles.btnLg, ctaStyle]}
+            accessibilityRole="button"
+            accessibilityLabel="Start learning"
+            accessibilityHint="Finish onboarding and open trial entry"
+          >
             <Text style={styles.btnText}>Start Learning</Text>
           </APressable>
           <AuthShortcutRow
@@ -998,7 +1043,7 @@ const createStyles = (palette: SplashPalette) =>
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: palette.white,
     borderRadius: 24,
     padding: 24,
     width: 320,

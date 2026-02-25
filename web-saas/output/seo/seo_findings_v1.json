@@ -1,0 +1,64 @@
+{
+  "findings": [
+    {
+      "affected_urls": [
+        "http://127.0.0.1:3060/admin/overview",
+        "http://127.0.0.1:3060/app/dashboard",
+        "http://127.0.0.1:3060/login",
+        "http://127.0.0.1:3060/register"
+      ],
+      "category": "indexability",
+      "effort": "S",
+      "evidence": {
+        "check_type": "not_noindex",
+        "count": 4
+      },
+      "id": "SEO-001",
+      "impact": "Noindex directives can suppress ranking-critical pages.",
+      "owner_hint": "Engineering",
+      "recommended_fix": "Remove unintended `noindex` directives from meta robots or X-Robots-Tag headers.",
+      "severity": "P0",
+      "verify_step": "Inspect page source and response headers; confirm no `noindex` directive remains."
+    },
+    {
+      "affected_urls": [
+        "http://127.0.0.1:3060/about",
+        "http://127.0.0.1:3060/contact",
+        "http://127.0.0.1:3060/features",
+        "http://127.0.0.1:3060/pricing"
+      ],
+      "category": "structured-data",
+      "effort": "M",
+      "evidence": {
+        "check_type": "structured_data_present",
+        "count": 4
+      },
+      "id": "SEO-002",
+      "impact": "Missing structured data can reduce eligibility for rich search enhancements.",
+      "owner_hint": "Engineering",
+      "recommended_fix": "Add JSON-LD schema matching page type and business entity details.",
+      "severity": "P2",
+      "verify_step": "Validate presence of application/ld+json scripts on affected pages."
+    }
+  ],
+  "run_metadata": {
+    "base_url": "http://127.0.0.1:3060/",
+    "generated_at_utc": "2026-02-22T15:19:47.867805Z",
+    "repo_root": "/Users/mohammedosman/Downloads/IELTS-SPEAKING-TEST-APP/web-saas",
+    "schema": "seo_findings_v1",
+    "source_inventory_schema": "seo_inventory_v1"
+  },
+  "summary": {
+    "by_category": {
+      "indexability": 1,
+      "structured-data": 1
+    },
+    "by_severity": {
+      "P0": 1,
+      "P1": 0,
+      "P2": 1
+    },
+    "pages_scanned": 9,
+    "total_findings": 2
+  }
+}

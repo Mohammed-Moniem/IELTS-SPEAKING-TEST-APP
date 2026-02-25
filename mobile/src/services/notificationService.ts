@@ -9,6 +9,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 import { notificationsApi } from "../api/services";
+import { colors as lightColors } from "../theme/tokens";
 import { logger } from "../utils/logger";
 
 // Configure notification handler
@@ -83,7 +84,7 @@ class NotificationService {
       this.isInitialized = true;
       return true;
     } catch (error) {
-      console.error("❌ Failed to initialize notifications:", error);
+      logger.warn("❌ Failed to initialize notifications:", error);
       return false;
     }
   }
@@ -110,7 +111,7 @@ class NotificationService {
           name: "Default",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#4F46E5",
+          lightColor: lightColors.primary,
         });
 
         await Notifications.setNotificationChannelAsync("reminders", {
@@ -129,7 +130,7 @@ class NotificationService {
 
       return token.data;
     } catch (error) {
-      console.error("❌ Failed to get push token:", error);
+      logger.warn("❌ Failed to get push token:", error);
       return null;
     }
   }
@@ -213,7 +214,7 @@ class NotificationService {
       console.log(`✅ Daily reminder scheduled at ${hour}:${minute}`);
       return identifier;
     } catch (error) {
-      console.error("❌ Failed to schedule daily reminder:", error);
+      logger.warn("❌ Failed to schedule daily reminder:", error);
       return null;
     }
   }
@@ -239,7 +240,7 @@ class NotificationService {
 
       console.log(`✅ Achievement notification sent: ${achievementName}`);
     } catch (error) {
-      console.error("❌ Failed to send achievement notification:", error);
+      logger.warn("❌ Failed to send achievement notification:", error);
     }
   }
 
@@ -271,7 +272,7 @@ class NotificationService {
 
       console.log(`✅ Streak notification sent: ${streakDays} days`);
     } catch (error) {
-      console.error("❌ Failed to send streak notification:", error);
+      logger.warn("❌ Failed to send streak notification:", error);
     }
   }
 
@@ -292,7 +293,7 @@ class NotificationService {
 
       console.log(`✅ Inactivity reminder sent: ${daysSinceLastPractice} days`);
     } catch (error) {
-      console.error("❌ Failed to send inactivity reminder:", error);
+      logger.warn("❌ Failed to send inactivity reminder:", error);
     }
   }
 
@@ -313,7 +314,7 @@ class NotificationService {
 
       console.log(`✅ Feedback notification sent for: ${sessionTitle}`);
     } catch (error) {
-      console.error("❌ Failed to send feedback notification:", error);
+      logger.warn("❌ Failed to send feedback notification:", error);
     }
   }
 
@@ -337,7 +338,7 @@ class NotificationService {
 
       console.log(`✅ Milestone notification sent: ${milestone}`);
     } catch (error) {
-      console.error("❌ Failed to milestone notification:", error);
+      logger.warn("❌ Failed to milestone notification:", error);
     }
   }
 
@@ -364,7 +365,7 @@ class NotificationService {
       console.log(`✅ Custom notification scheduled: ${identifier}`);
       return identifier;
     } catch (error) {
-      console.error("❌ Failed to schedule notification:", error);
+      logger.warn("❌ Failed to schedule notification:", error);
       return null;
     }
   }
@@ -383,7 +384,7 @@ class NotificationService {
         data: notif.content.data,
       }));
     } catch (error) {
-      console.error("❌ Failed to get scheduled notifications:", error);
+      logger.warn("❌ Failed to get scheduled notifications:", error);
       return [];
     }
   }
@@ -396,7 +397,7 @@ class NotificationService {
       await Notifications.cancelScheduledNotificationAsync(identifier);
       console.log(`✅ Cancelled notification: ${identifier}`);
     } catch (error) {
-      console.error("❌ Failed to cancel notification:", error);
+      logger.warn("❌ Failed to cancel notification:", error);
     }
   }
 
@@ -418,7 +419,7 @@ class NotificationService {
 
       console.log(`✅ Cancelled ${toCancel.length} ${category} notifications`);
     } catch (error) {
-      console.error("❌ Failed to cancel notifications by category:", error);
+      logger.warn("❌ Failed to cancel notifications by category:", error);
     }
   }
 
@@ -430,7 +431,7 @@ class NotificationService {
       await Notifications.cancelAllScheduledNotificationsAsync();
       console.log("✅ Cancelled all notifications");
     } catch (error) {
-      console.error("❌ Failed to cancel all notifications:", error);
+      logger.warn("❌ Failed to cancel all notifications:", error);
     }
   }
 
@@ -442,7 +443,7 @@ class NotificationService {
       const { status } = await Notifications.getPermissionsAsync();
       return status;
     } catch (error) {
-      console.error("❌ Failed to get permission status:", error);
+      logger.warn("❌ Failed to get permission status:", error);
       return "undetermined";
     }
   }
@@ -455,7 +456,7 @@ class NotificationService {
       const { status } = await Notifications.requestPermissionsAsync();
       return status === "granted";
     } catch (error) {
-      console.error("❌ Failed to request permissions:", error);
+      logger.warn("❌ Failed to request permissions:", error);
       return false;
     }
   }
@@ -485,7 +486,7 @@ class NotificationService {
     try {
       return await Notifications.getBadgeCountAsync();
     } catch (error) {
-      console.error("❌ Failed to get badge count:", error);
+      logger.warn("❌ Failed to get badge count:", error);
       return 0;
     }
   }
@@ -498,7 +499,7 @@ class NotificationService {
       await Notifications.setBadgeCountAsync(count);
       console.log(`✅ Badge count set to: ${count}`);
     } catch (error) {
-      console.error("❌ Failed to set badge count:", error);
+      logger.warn("❌ Failed to set badge count:", error);
     }
   }
 

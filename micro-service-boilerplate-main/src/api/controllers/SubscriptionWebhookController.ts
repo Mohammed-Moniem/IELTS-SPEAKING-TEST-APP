@@ -23,13 +23,11 @@ export class SubscriptionWebhookController {
     ensureResponseHeaders(res, headers);
 
     try {
-      if (!req.rawBody) {
-        this.log.error('Stripe webhook received without raw body payload');
-        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({ error: 'Webhook payload missing' });
-      }
-
       const signature = req.headers['stripe-signature'];
-      const event = this.stripeService.constructEvent(req.rawBody, signature);
+      const payloadBuffer =
+        req.rawBody ||
+        Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+      const event = this.stripeService.constructEvent(payloadBuffer, signature);
       await this.subscriptionService.handleStripeWebhook(event, headers);
 
       return res.status(HTTP_STATUS_CODES.SUCCESS).json({ received: true });

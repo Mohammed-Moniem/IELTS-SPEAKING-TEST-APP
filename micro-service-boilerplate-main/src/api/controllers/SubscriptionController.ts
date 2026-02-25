@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Body, Get, HttpCode, JsonController, Post, Put, QueryParam, Req, Res, UseBefore } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
-import { ActivatePlanRequest, CreateCheckoutSessionRequest } from '@dto/SubscriptionDto';
+import { ActivatePlanRequest, CreateCheckoutSessionRequest, CreatePortalSessionRequest } from '@dto/SubscriptionDto';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
@@ -54,9 +54,30 @@ export class SubscriptionController {
     try {
       const session = await this.subscriptionService.createCheckoutSession(req.currentUser.id, body.planType, headers, {
         successUrl: body.successUrl,
-        cancelUrl: body.cancelUrl
+        cancelUrl: body.cancelUrl,
+        billingCycle: body.billingCycle,
+        partnerCode: body.partnerCode,
+        couponCode: body.couponCode
       });
       return StandardResponse.success(res, session, 'Checkout session created', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/portal')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async createPortalSession(@Body() body: CreatePortalSessionRequest, @Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'subscription-portal');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const portalSession = await this.subscriptionService.createPortalSession(req.currentUser.id, headers, body?.returnUrl);
+      return StandardResponse.success(res, portalSession, 'Portal session created', HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }
@@ -109,58 +130,7 @@ export class SubscriptionController {
     }
 
     try {
-      const plans = [
-        {
-          tier: 'free',
-          name: 'Free',
-          price: 0,
-          priceId: '',
-          features: [
-            '3 practice sessions per month',
-            '1 simulation test per month',
-            'Basic AI feedback',
-            'Limited recording storage'
-          ],
-          limits: {
-            practiceSessionsPerMonth: 3,
-            simulationSessionsPerMonth: 1
-          }
-        },
-        {
-          tier: 'premium',
-          name: 'Premium',
-          price: 9.99,
-          priceId: 'price_premium',
-          features: [
-            'Unlimited practice sessions',
-            '10 simulation tests per month',
-            'Advanced AI feedback',
-            'Unlimited recording storage',
-            'Progress analytics'
-          ],
-          limits: {
-            practiceSessionsPerMonth: -1,
-            simulationSessionsPerMonth: 10
-          }
-        },
-        {
-          tier: 'pro',
-          name: 'Pro',
-          price: 19.99,
-          priceId: 'price_pro',
-          features: [
-            'Everything in Premium',
-            'Unlimited simulation tests',
-            'Priority AI processing',
-            'Detailed performance reports',
-            'Personalized improvement plans'
-          ],
-          limits: {
-            practiceSessionsPerMonth: -1,
-            simulationSessionsPerMonth: -1
-          }
-        }
-      ];
+      const plans = this.subscriptionService.getPlansCatalog();
       return StandardResponse.success(res, { plans }, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);

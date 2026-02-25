@@ -105,7 +105,7 @@ export class TestSimulationService {
 
     const preferences = await TestPreferenceModel.findOne({ user: userId }).lean();
 
-    const partMap = new Map(simulation.parts.map(part => [part.part, part] as const));
+    const partMap = new Map<number, any>((simulation.parts as any[]).map(part => [part.part, part] as const));
 
     const feedbackResults: IPracticeFeedback[] = [];
     for (const payload of partsPayload) {

@@ -7,14 +7,26 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:seo": "playwright test tests/e2e/seo-marketing.spec.ts",
+    "test:seo:lighthouse": "npm run build && lhci autorun --config=.lighthouserc.js",
+    "test:seo:ci": "npm run typecheck && npm run test:seo:lighthouse && npm run test:seo",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:real": "playwright test --config=playwright.real.config.ts",
+    "test:e2e:real:headed": "playwright test --config=playwright.real.config.ts --headed",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.ts"
   },
   "dependencies": {
-    "next": "15.2.4",
+    "firebase": "^12.4.0",
+    "next": "^15.5.12",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.52.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.5",

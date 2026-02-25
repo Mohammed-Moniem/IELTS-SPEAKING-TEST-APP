@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { logger } from "../utils/logger";
 
 const RESULTS_KEY = "@ielts_practice_results";
 const FULL_TEST_RESULTS_KEY = "@ielts_full_test_results";
@@ -318,7 +319,7 @@ class ResultsStorageService {
       await AsyncStorage.setItem(RESULTS_KEY, JSON.stringify(trimmed));
       console.log("✅ Practice result saved to storage:", result.id);
     } catch (error) {
-      console.error("❌ Failed to save practice result:", error);
+      logger.warn("❌ Failed to save practice result:", error);
       throw error;
     }
   }
@@ -336,7 +337,7 @@ class ResultsStorageService {
       );
       console.log("✅ Full test result saved:", normalized.id);
     } catch (error) {
-      console.error("❌ Failed to save full test result:", error);
+      logger.warn("❌ Failed to save full test result:", error);
     }
   }
 
@@ -355,7 +356,7 @@ class ResultsStorageService {
       }
       return parsed.map((item) => this.normalizeResult(item));
     } catch (error) {
-      console.error("❌ Failed to load practice results:", error);
+      logger.warn("❌ Failed to load practice results:", error);
       return [];
     }
   }
@@ -372,7 +373,7 @@ class ResultsStorageService {
       }
       return parsed.map((item) => this.normalizeFullTestResult(item));
     } catch (error) {
-      console.error("❌ Failed to load full test results:", error);
+      logger.warn("❌ Failed to load full test results:", error);
       return [];
     }
   }
@@ -385,7 +386,7 @@ class ResultsStorageService {
       const results = await this.getAllResults();
       return results.find((r) => r.id === id) || null;
     } catch (error) {
-      console.error("❌ Failed to get result:", error);
+      logger.warn("❌ Failed to get result:", error);
       return null;
     }
   }
@@ -398,7 +399,7 @@ class ResultsStorageService {
       const results = await this.getAllResults();
       return results.filter((r) => r.part === part);
     } catch (error) {
-      console.error("❌ Failed to get results by part:", error);
+      logger.warn("❌ Failed to get results by part:", error);
       return [];
     }
   }
@@ -411,7 +412,7 @@ class ResultsStorageService {
       const results = await this.getAllResults();
       return results.slice(0, limit);
     } catch (error) {
-      console.error("❌ Failed to get recent results:", error);
+      logger.warn("❌ Failed to get recent results:", error);
       return [];
     }
   }
@@ -426,7 +427,7 @@ class ResultsStorageService {
       await AsyncStorage.setItem(RESULTS_KEY, JSON.stringify(filtered));
       console.log("✅ Result deleted:", id);
     } catch (error) {
-      console.error("❌ Failed to delete result:", error);
+      logger.warn("❌ Failed to delete result:", error);
       throw error;
     }
   }
@@ -439,7 +440,7 @@ class ResultsStorageService {
       await AsyncStorage.removeItem(RESULTS_KEY);
       console.log("✅ All results cleared");
     } catch (error) {
-      console.error("❌ Failed to clear results:", error);
+      logger.warn("❌ Failed to clear results:", error);
       throw error;
     }
   }
@@ -449,7 +450,7 @@ class ResultsStorageService {
       await AsyncStorage.removeItem(FULL_TEST_RESULTS_KEY);
       console.log("✅ Full test results cleared");
     } catch (error) {
-      console.error("❌ Failed to clear full test results:", error);
+      logger.warn("❌ Failed to clear full test results:", error);
     }
   }
 
@@ -524,7 +525,7 @@ class ResultsStorageService {
         byPart,
       };
     } catch (error) {
-      console.error("❌ Failed to get statistics:", error);
+      logger.warn("❌ Failed to get statistics:", error);
       throw error;
     }
   }
@@ -565,7 +566,7 @@ class ResultsStorageService {
         console.log("✅ Question marked as used:", key);
       }
     } catch (error) {
-      console.error("❌ Failed to mark question as used:", error);
+      logger.warn("❌ Failed to mark question as used:", error);
     }
   }
 
@@ -577,7 +578,7 @@ class ResultsStorageService {
       const data = await AsyncStorage.getItem(USED_QUESTIONS_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error("❌ Failed to get used questions:", error);
+      logger.warn("❌ Failed to get used questions:", error);
       return [];
     }
   }
@@ -591,7 +592,7 @@ class ResultsStorageService {
       const key = `${part}:${question.toLowerCase().trim()}`;
       return usedQuestions.includes(key);
     } catch (error) {
-      console.error("❌ Failed to check if question used:", error);
+      logger.warn("❌ Failed to check if question used:", error);
       return false;
     }
   }
@@ -607,7 +608,7 @@ class ResultsStorageService {
       await AsyncStorage.setItem(USED_QUESTIONS_KEY, JSON.stringify(filtered));
       console.log("✅ Question unmarked:", key);
     } catch (error) {
-      console.error("❌ Failed to unmark question:", error);
+      logger.warn("❌ Failed to unmark question:", error);
     }
   }
 
@@ -619,7 +620,7 @@ class ResultsStorageService {
       await AsyncStorage.removeItem(USED_QUESTIONS_KEY);
       console.log("✅ Used questions cleared");
     } catch (error) {
-      console.error("❌ Failed to clear used questions:", error);
+      logger.warn("❌ Failed to clear used questions:", error);
     }
   }
 
@@ -639,7 +640,7 @@ class ResultsStorageService {
         part3: usedQuestions.filter((q) => q.startsWith("3:")).length,
       };
     } catch (error) {
-      console.error("❌ Failed to get used questions count:", error);
+      logger.warn("❌ Failed to get used questions count:", error);
       return { part1: 0, part2: 0, part3: 0 };
     }
   }

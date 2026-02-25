@@ -18,6 +18,7 @@ import { userApi } from "../api/services";
 import { darkColors } from "../theme/darkTokens";
 import type { ColorTokens } from "../theme/tokens";
 import { colors as lightColors } from "../theme/tokens";
+import { logger } from "../utils/logger";
 
 const THEME_STORAGE_KEY = "app_theme";
 
@@ -71,7 +72,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
     } catch (error) {
-      console.error("Failed to load theme preference:", error);
+      logger.warn("Failed to load theme preference", error);
     }
   };
 
@@ -93,11 +94,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
         // Sync to backend (non-blocking)
         userApi
           .updateProfile({ appTheme: mode })
-          .catch((err) =>
-            console.warn("Failed to sync theme to backend:", err)
-          );
+          .catch((err) => logger.warn("Failed to sync theme to backend", err));
       } catch (error) {
-        console.error("Failed to save theme preference:", error);
+        logger.warn("Failed to save theme preference", error);
       }
     },
     [systemTheme]

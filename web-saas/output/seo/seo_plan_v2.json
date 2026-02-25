@@ -1,0 +1,160 @@
+{
+  "priorities": [
+    {
+      "impact": "Noindex directives can suppress ranking-critical pages.",
+      "owner_hint": "Engineering",
+      "rank": 1,
+      "severity": "P0",
+      "step_id": "REM-001",
+      "title": "Resolve indexability issue (SEO-001)",
+      "type": "technical"
+    },
+    {
+      "impact": "Improves intent alignment, CTR, and topical coverage.",
+      "owner_hint": "Content",
+      "rank": 2,
+      "severity": "P1",
+      "step_id": "REM-002",
+      "title": "Run content refresh workflow for strategic pages",
+      "type": "content"
+    },
+    {
+      "impact": "Improves local relevance for geo-intent queries.",
+      "owner_hint": "Marketing",
+      "rank": 3,
+      "severity": "P2",
+      "step_id": "REM-003",
+      "title": "Run local SEO audit for location pages",
+      "type": "local"
+    },
+    {
+      "impact": "Improves authority signals for competitive topics.",
+      "owner_hint": "Marketing",
+      "rank": 4,
+      "severity": "P2",
+      "step_id": "REM-004",
+      "title": "Build off-page authority opportunity backlog",
+      "type": "offpage"
+    }
+  ],
+  "remediation_steps": [
+    {
+      "action": "Remove unintended `noindex` directives from meta robots or X-Robots-Tag headers.",
+      "affected_urls": [
+        "http://127.0.0.1:3060/admin/overview",
+        "http://127.0.0.1:3060/app/dashboard",
+        "http://127.0.0.1:3060/login",
+        "http://127.0.0.1:3060/register"
+      ],
+      "check_type": "not_noindex",
+      "effort": "S",
+      "impact": "Noindex directives can suppress ranking-critical pages.",
+      "owner_hint": "Engineering",
+      "severity": "P0",
+      "source_finding_id": "SEO-001",
+      "step_id": "REM-001",
+      "title": "Resolve indexability issue (SEO-001)",
+      "type": "technical",
+      "verify_step": "Inspect page source and response headers; confirm no `noindex` directive remains."
+    },
+    {
+      "action": "Use assets/templates/content-brief.md for each strategic URL and map one primary intent per page.",
+      "affected_urls": [],
+      "check_type": "manual",
+      "effort": "M",
+      "impact": "Improves intent alignment, CTR, and topical coverage.",
+      "owner_hint": "Content",
+      "severity": "P1",
+      "source_finding_id": "",
+      "step_id": "REM-002",
+      "title": "Run content refresh workflow for strategic pages",
+      "type": "content",
+      "verify_step": "Complete content briefs and confirm title/H1/intent alignment on targeted pages."
+    },
+    {
+      "action": "Use assets/templates/local-seo-audit.md to validate NAP consistency and LocalBusiness schema coverage.",
+      "affected_urls": [],
+      "check_type": "manual",
+      "effort": "M",
+      "impact": "Improves local relevance for geo-intent queries.",
+      "owner_hint": "Marketing",
+      "severity": "P2",
+      "source_finding_id": "",
+      "step_id": "REM-003",
+      "title": "Run local SEO audit for location pages",
+      "type": "local",
+      "verify_step": "Complete local worksheet and resolve any NAP/schema discrepancies."
+    },
+    {
+      "action": "Track opportunities in assets/templates/offpage-opportunities.csv and prioritize by topic fit and expected impact.",
+      "affected_urls": [],
+      "check_type": "manual",
+      "effort": "M",
+      "impact": "Improves authority signals for competitive topics.",
+      "owner_hint": "Marketing",
+      "severity": "P2",
+      "source_finding_id": "",
+      "step_id": "REM-004",
+      "title": "Build off-page authority opportunity backlog",
+      "type": "offpage",
+      "verify_step": "Populate and review the off-page opportunities tracker."
+    }
+  ],
+  "run_metadata": {
+    "base_url": "http://127.0.0.1:3060/",
+    "external_api_integrations": "disabled",
+    "generated_at_utc": "2026-02-22T15:26:37.000078Z",
+    "locale": "us-en",
+    "read_only_mode": true,
+    "repo_root": "/Users/mohammedosman/Downloads/IELTS-SPEAKING-TEST-APP/web-saas",
+    "schema": "seo_plan_v1",
+    "source_technical_schema": "seo_findings_v1"
+  },
+  "verification_steps": [
+    {
+      "affected_urls": [
+        "http://127.0.0.1:3060/admin/overview",
+        "http://127.0.0.1:3060/app/dashboard",
+        "http://127.0.0.1:3060/login",
+        "http://127.0.0.1:3060/register"
+      ],
+      "check_type": "not_noindex",
+      "command": "Inspect page source and response headers; confirm no `noindex` directive remains.",
+      "kind": "automated",
+      "status": "pending",
+      "step_id": "REM-001",
+      "title": "Verify Resolve indexability issue (SEO-001)",
+      "verification_id": "VER-001"
+    },
+    {
+      "affected_urls": [],
+      "check_type": "manual",
+      "command": "Complete content briefs and confirm title/H1/intent alignment on targeted pages.",
+      "kind": "manual",
+      "status": "pending",
+      "step_id": "REM-002",
+      "title": "Verify Run content refresh workflow for strategic pages",
+      "verification_id": "VER-002"
+    },
+    {
+      "affected_urls": [],
+      "check_type": "manual",
+      "command": "Complete local worksheet and resolve any NAP/schema discrepancies.",
+      "kind": "manual",
+      "status": "pending",
+      "step_id": "REM-003",
+      "title": "Verify Run local SEO audit for location pages",
+      "verification_id": "VER-003"
+    },
+    {
+      "affected_urls": [],
+      "check_type": "manual",
+      "command": "Populate and review the off-page opportunities tracker.",
+      "kind": "manual",
+      "status": "pending",
+      "step_id": "REM-004",
+      "title": "Verify Build off-page authority opportunity backlog",
+      "verification_id": "VER-004"
+    }
+  ]
+}

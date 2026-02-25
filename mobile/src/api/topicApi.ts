@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { logger } from "../utils/logger";
 
 export interface GeneratedTopic {
   questionId?: string;
@@ -44,7 +45,7 @@ export const getRandomTopic = async (
     );
     return response.data.data;
   } catch (error) {
-    console.error("❌ Get random topic error:", error);
+    logger.warn("❌ Get random topic error:", error);
     throw error;
   }
 };
@@ -75,7 +76,7 @@ export const generateTopics = async (
     console.log(`✅ Generated ${response.data.data.topics.length} topics`);
     return response.data.data.topics;
   } catch (error) {
-    console.error("❌ Generate topics error:", error);
+    logger.warn("❌ Generate topics error:", error);
     throw error;
   }
 };
@@ -102,7 +103,7 @@ export const getCommonTopics = async (
     );
     return response.data.data.topics;
   } catch (error) {
-    console.error("❌ Get common topics error:", error);
+    logger.warn("❌ Get common topics error:", error);
     throw error;
   }
 };
@@ -225,7 +226,7 @@ export const getCachedRandomTopic = async (
 
     return topic;
   } catch (error) {
-    console.error("Failed to get random topic, falling back to generation");
+    logger.warn("Failed to get random topic, falling back to generation");
     // Fallback: generate batch if random endpoint fails
     const topics = await generateTopics(category, 10, difficulty);
     topicCache.set(category, difficulty, topics);

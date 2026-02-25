@@ -3,6 +3,7 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import { Platform } from "react-native";
 import { apiClient, API_KEY } from "../api/client";
 import type { UploadResult } from "./api/mediaUploadService";
+import { logger } from "../utils/logger";
 
 /**
  * Video metadata interface
@@ -55,7 +56,7 @@ class VideoRecordingService {
 
       return true;
     } catch (error) {
-      console.error("Error requesting permissions:", error);
+      logger.warn("Error requesting permissions:", error);
       return false;
     }
   }
@@ -95,7 +96,7 @@ class VideoRecordingService {
 
       return video;
     } catch (error) {
-      console.error("Error recording video:", error);
+      logger.warn("Error recording video:", error);
       throw error;
     }
   }
@@ -134,7 +135,7 @@ class VideoRecordingService {
 
       return video;
     } catch (error) {
-      console.error("Error picking video:", error);
+      logger.warn("Error picking video:", error);
       throw error;
     }
   }
@@ -150,7 +151,7 @@ class VideoRecordingService {
       });
       return uri;
     } catch (error) {
-      console.error("Error generating thumbnail:", error);
+      logger.warn("Error generating thumbnail:", error);
       throw error;
     }
   }
@@ -173,7 +174,7 @@ class VideoRecordingService {
         thumbnail,
       };
     } catch (error) {
-      console.error("Error getting video metadata:", error);
+      logger.warn("Error getting video metadata:", error);
       throw error;
     }
   }
@@ -241,7 +242,7 @@ class VideoRecordingService {
 
       return result;
     } catch (error) {
-      console.error("Error uploading video:", error);
+      logger.warn("Error uploading video:", error);
       throw error;
     }
   }
@@ -271,7 +272,7 @@ class VideoRecordingService {
 
       return result;
     } catch (error) {
-      console.error("Error sending video message:", error);
+      logger.warn("Error sending video message:", error);
       throw error;
     }
   }

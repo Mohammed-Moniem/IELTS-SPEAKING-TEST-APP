@@ -89,7 +89,11 @@ export class WritingController {
     try {
       const limit = query.limit ?? 20;
       const offset = query.offset ?? 0;
-      const history = await this.writingService.getHistory(req.currentUser.id, limit, offset);
+      const history = await this.writingService.getHistory(req.currentUser.id, limit, offset, {
+        track: query.track,
+        from: query.from,
+        to: query.to
+      });
       return StandardResponse.success(res, history, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);

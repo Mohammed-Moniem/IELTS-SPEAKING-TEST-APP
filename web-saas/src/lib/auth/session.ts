@@ -25,9 +25,21 @@ export const saveStoredSession = (session: StoredSession) => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
 };
 
+export const updateStoredTokens = (accessToken: string, refreshToken: string) => {
+  const session = loadStoredSession();
+  if (!session) return;
+
+  saveStoredSession({
+    ...session,
+    accessToken,
+    refreshToken
+  });
+};
+
 export const clearStoredSession = () => {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(STORAGE_KEY);
 };
 
 export const getStoredAccessToken = () => loadStoredSession()?.accessToken || null;
+export const getStoredRefreshToken = () => loadStoredSession()?.refreshToken || null;

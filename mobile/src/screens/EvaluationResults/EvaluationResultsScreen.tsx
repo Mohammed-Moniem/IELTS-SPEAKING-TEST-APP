@@ -10,7 +10,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { saveTestResult, TestResult } from "../../api/analyticsApi";
-import { colors, radii, shadows, spacing } from "../../theme/tokens";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { radii, shadows, spacing } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 interface EvaluationCriteria {
   band: number;
@@ -99,6 +103,8 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
   audioRecordingId,
   showTryAgain = true,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -154,7 +160,7 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
           setSaved(true);
         }
       } catch (error) {
-        console.error("❌ Failed to save test result:", error);
+        logger.warn("Failed to save test result", error);
       } finally {
         setSaving(false);
       }
@@ -164,11 +170,11 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
   }, [sessionId, topic, saved, userId]);
 
   const getBandColor = (band: number): string => {
-    if (band >= 8) return "#10b981"; // Green
-    if (band >= 7) return "#3b82f6"; // Blue
-    if (band >= 6) return "#f59e0b"; // Orange
-    if (band >= 5) return "#ef4444"; // Red
-    return "#6b7280"; // Gray
+    if (band >= 8) return colors.success;
+    if (band >= 7) return colors.info;
+    if (band >= 6) return colors.warning;
+    if (band >= 5) return colors.danger;
+    return colors.textMuted;
   };
 
   const getBandLabel = (band: number): string => {
@@ -228,7 +234,7 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
         {strengths.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
               <Text style={styles.sectionTitle}>Strengths</Text>
             </View>
             {strengths.map((strength, index) => (
@@ -242,7 +248,7 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
         {improvements.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="trending-up" size={20} color="#f59e0b" />
+              <Ionicons name="trending-up" size={20} color={colors.warning} />
               <Text style={styles.sectionTitle}>Areas to Improve</Text>
             </View>
             {improvements.map((improvement, index) => (
@@ -427,8 +433,8 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
         {/* Corrections */}
         {correctionsList.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="warning" size={24} color="#ef4444" />
+          <View style={styles.sectionHeader}>
+              <Ionicons name="warning" size={24} color={colors.danger} />
               <Text style={styles.sectionMainTitle}>Corrections</Text>
             </View>
             {correctionsList.map((correction, index) => (
@@ -456,8 +462,8 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
         {/* Suggestions */}
         {suggestionsList.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="bulb" size={24} color="#d4a745" />
+          <View style={styles.sectionHeader}>
+              <Ionicons name="bulb" size={24} color={colors.warning} />
               <Text style={styles.sectionMainTitle}>Tips for Improvement</Text>
             </View>
             {suggestionsList.map((suggestion, index) => (
@@ -575,7 +581,7 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
               onPress={onTryAgain}
               activeOpacity={0.8}
             >
-              <Ionicons name="refresh" size={20} color="#ffffff" />
+              <Ionicons name="refresh" size={20} color={colors.primaryOn} />
               <Text style={styles.tryAgainText}>Try Again</Text>
             </TouchableOpacity>
           )}
@@ -598,7 +604,8 @@ export const EvaluationResultsScreen: React.FC<EvaluationResultsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -729,7 +736,7 @@ const styles = StyleSheet.create({
   bandBadgeText: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#ffffff",
+    color: colors.primaryOn,
   },
   feedbackText: {
     fontSize: 15,

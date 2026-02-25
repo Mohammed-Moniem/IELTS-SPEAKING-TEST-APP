@@ -1,6 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 interface GifMessageProps {
   gifUrl: string;
@@ -25,6 +28,8 @@ export const GifMessage: React.FC<GifMessageProps> = ({
   isLoading = false,
   headers,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -86,14 +91,18 @@ export const GifMessage: React.FC<GifMessageProps> = ({
         {/* Loading indicator */}
         {(loading || isLoading) && !error && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.primaryOn} />
           </View>
         )}
 
         {/* Error state */}
         {error && (
           <View style={styles.errorOverlay}>
-            <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
+            <Ionicons
+              name="alert-circle-outline"
+              size={48}
+              color={colors.danger}
+            />
             <Text style={styles.errorText}>Failed to load GIF</Text>
           </View>
         )}
@@ -113,7 +122,7 @@ export const GifMessage: React.FC<GifMessageProps> = ({
           <Ionicons
             name="checkmark-done"
             size={16}
-            color="#34B7F1"
+            color={colors.info}
             style={styles.readReceipt}
           />
         )}
@@ -127,7 +136,8 @@ export const GifMessage: React.FC<GifMessageProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     maxWidth: "75%",
     borderRadius: 12,
@@ -137,18 +147,18 @@ const styles = StyleSheet.create({
   },
   ownMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "#DCF8C6",
+    backgroundColor: colors.successSoft,
     marginRight: 8,
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     marginLeft: 8,
   },
   gifContainer: {
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#E5E5E5",
+    backgroundColor: colors.borderMuted,
     position: "relative",
   },
   gif: {
@@ -157,13 +167,13 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: colors.surfaceSubtle,
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
@@ -171,20 +181,20 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 8,
     fontSize: 12,
-    color: "#FF6B6B",
+    color: colors.danger,
     textAlign: "center",
   },
   gifBadge: {
     position: "absolute",
     top: 8,
     left: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: colors.overlayBackdrop,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   gifBadgeText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 11,
     fontWeight: "bold",
     letterSpacing: 0.5,
@@ -199,10 +209,10 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 11,
-    color: "#667781",
+    color: colors.textMuted,
   },
   ownTimestamp: {
-    color: "#667781",
+    color: colors.textMuted,
   },
   readReceipt: {
     marginLeft: 4,
@@ -220,9 +230,9 @@ const styles = StyleSheet.create({
     borderRightWidth: 0,
     borderTopWidth: 10,
     borderBottomWidth: 0,
-    borderLeftColor: "#DCF8C6",
+    borderLeftColor: colors.successSoft,
     borderRightColor: "transparent",
-    borderTopColor: "#DCF8C6",
+    borderTopColor: colors.successSoft,
     borderBottomColor: "transparent",
   },
   otherTail: {
@@ -232,8 +242,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 10,
     borderBottomWidth: 0,
     borderLeftColor: "transparent",
-    borderRightColor: "#FFFFFF",
-    borderTopColor: "#FFFFFF",
+    borderRightColor: colors.surface,
+    borderTopColor: colors.surface,
     borderBottomColor: "transparent",
   },
 });

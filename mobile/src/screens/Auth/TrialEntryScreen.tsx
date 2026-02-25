@@ -107,6 +107,13 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
         activeOpacity={trialUsed ? 1 : 0.85}
         onPress={handleTryNow}
         disabled={trialUsed || loading}
+        accessibilityRole="button"
+        accessibilityLabel="Start free test now"
+        accessibilityHint={
+          trialUsed
+            ? "Trial already used. Create an account to continue."
+            : "Starts your one complimentary full IELTS speaking test."
+        }
       >
         <View style={styles.cardIcon}>
           <Ionicons
@@ -166,12 +173,18 @@ export const TrialEntryScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.authButton, styles.primaryButton]}
             onPress={() => handleAuthNavigate("Register")}
+            accessibilityRole="button"
+            accessibilityLabel="Create account"
+            accessibilityHint="Open registration screen"
           >
             <Text style={styles.primaryButtonText}>Create account</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.authButton, styles.secondaryButton]}
             onPress={() => handleAuthNavigate("Login")}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
+            accessibilityHint="Open sign-in screen"
           >
             <Text style={styles.secondaryButtonText}>Sign in</Text>
           </TouchableOpacity>

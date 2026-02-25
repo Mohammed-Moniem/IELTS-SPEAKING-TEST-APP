@@ -10,6 +10,7 @@ import { logger } from "../utils/logger";
 import { rateLimiter } from "../utils/rateLimiter";
 
 export const API_URL = API_BASE_URL;
+export { API_KEY };
 
 // Log the API URL for debugging
 logger.info("🌐", "API Base URL:", API_URL);
@@ -203,10 +204,10 @@ apiClient.interceptors.response.use(
 
       // Network error specific logging
       if (error.message === "Network Error") {
-        logger.error("🔴 NETWORK ERROR - Check:");
-        logger.error("1. Backend running on", API_URL, "?");
-        logger.error("2. Mobile and computer on same WiFi?");
-        logger.error("3. Firewall blocking port 4000?");
+        logger.warn("🔴 NETWORK ERROR - Check:");
+        logger.warn("1. Backend running on", API_URL, "?");
+        logger.warn("2. Mobile and computer on same WiFi?");
+        logger.warn("3. Firewall blocking port 4000?");
       }
     }
 

@@ -11,8 +11,10 @@ import {
   QueryParam
 } from 'routing-controllers';
 import { Logger } from '../../lib/logger';
-import { emitToUser } from '../../loaders/SocketIOLoader';
+import { emitToUser, isUserOnline } from '../../loaders/SocketIOLoader';
+import Container from 'typedi';
 import { friendService } from '../services/FriendService';
+import { NotificationService } from '../services/NotificationService';
 
 const log = new Logger(__filename);
 
@@ -37,6 +39,17 @@ export class FriendController {
         requestId: request._id,
         timestamp: new Date()
       });
+
+      if (!isUserOnline(body.recipientId)) {
+        const notificationService = Container.get(NotificationService);
+        notificationService
+          .notifyFriendRequest({
+            recipientId: body.recipientId,
+            senderId: currentUser.id,
+            requestId: request._id.toString()
+          })
+          .catch(err => log.error('Failed to send friend request push notification', err));
+      }
 
       // Serialize the Mongoose document
       const cleanRequest = JSON.parse(JSON.stringify(request));
@@ -97,7 +110,25 @@ export class FriendController {
   @Post('/accept/:requestId')
   async acceptFriendRequest(@CurrentUser({ required: true }) currentUser: any, @Param('requestId') requestId: string) {
     try {
-      await friendService.acceptFriendRequest(requestId);
+      const request = await friendService.acceptFriendRequest(requestId);
+      const senderId = request.senderId.toString();
+
+      emitToUser(senderId, 'friend:request:accepted', {
+        requestId,
+        accepterId: currentUser.id,
+        timestamp: new Date()
+      });
+
+      if (!isUserOnline(senderId)) {
+        const notificationService = Container.get(NotificationService);
+        notificationService
+          .notifyFriendAccepted({
+            recipientId: senderId,
+            accepterId: currentUser.id,
+            requestId
+          })
+          .catch(err => log.error('Failed to send friend acceptance push notification', err));
+      }
 
       return {
         success: true,

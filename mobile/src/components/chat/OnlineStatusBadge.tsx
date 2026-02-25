@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View, ViewStyle } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   UserPresence,
   userPresenceService,
 } from "../../services/userPresenceService";
+import type { ColorTokens } from "../../theme/tokens";
 
 interface OnlineStatusBadgeProps {
   userId: string;
@@ -22,6 +25,8 @@ export const OnlineStatusBadge: React.FC<OnlineStatusBadgeProps> = ({
   size = "medium",
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [presence, setPresence] = useState<UserPresence | null>(
     userPresenceService.getPresence(userId)
   );
@@ -57,13 +62,16 @@ export const OnlineStatusBadge: React.FC<OnlineStatusBadgeProps> = ({
             width: badgeSize,
             height: badgeSize,
             borderRadius: badgeSize / 2,
-            backgroundColor: isOnline ? "#25D366" : "#95A5A6",
+            backgroundColor: isOnline ? colors.success : colors.textMuted,
           },
         ]}
       />
       {showText && (
         <Text
-          style={[styles.text, { color: isOnline ? "#25D366" : "#95A5A6" }]}
+          style={[
+            styles.text,
+            { color: isOnline ? colors.success : colors.textMuted },
+          ]}
         >
           {lastSeenText}
         </Text>
@@ -72,18 +80,19 @@ export const OnlineStatusBadge: React.FC<OnlineStatusBadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  badge: {
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  text: {
-    fontSize: 12,
-    marginLeft: 6,
-    fontWeight: "500",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    badge: {
+      borderWidth: 2,
+      borderColor: colors.surface,
+    },
+    text: {
+      fontSize: 12,
+      marginLeft: 6,
+      fontWeight: "500",
+    },
+  });

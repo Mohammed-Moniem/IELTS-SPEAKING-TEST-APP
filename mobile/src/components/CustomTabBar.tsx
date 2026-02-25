@@ -101,13 +101,21 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         };
 
         const color = isFocused ? colors.primary : colors.tabInactive;
+        const routeLabel = getLabel(route.name);
+        const accessibilityLabel =
+          options.tabBarAccessibilityLabel || `${routeLabel} tab`;
 
         return (
           <TouchableOpacity
             key={route.key}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
+            accessibilityLabel={accessibilityLabel}
+            accessibilityHint={
+              isFocused
+                ? `${routeLabel} is currently selected`
+                : `Switch to ${routeLabel}`
+            }
             onPress={onPress}
             onLongPress={onLongPress}
             style={styles.tab}
@@ -116,6 +124,9 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
             <View style={styles.tabContent}>
               {renderIcon(route.name, isFocused, color)}
               <Text
+                allowFontScaling
+                maxFontSizeMultiplier={1.2}
+                numberOfLines={1}
                 style={[
                   styles.label,
                   { color },
@@ -146,6 +157,7 @@ const createStyles = (colors: ColorTokens) =>
     },
     tab: {
       width: TAB_WIDTH,
+      minHeight: 48,
       justifyContent: "center",
       alignItems: "center",
     },

@@ -37,7 +37,20 @@ export const MODEL_TABLE_MAP: Record<string, string> = {
   Coupon: 'coupons',
   CouponUsage: 'coupon_usages',
   PointsTransaction: 'points_transactions',
-  DiscountRedemption: 'discount_redemptions'
+  DiscountRedemption: 'discount_redemptions',
+  Partner: 'partners',
+  PartnerMember: 'partner_members',
+  PartnerCode: 'partner_codes',
+  PartnerAttributionTouch: 'partner_attribution_touches',
+  PartnerConversion: 'partner_conversions',
+  PartnerTarget: 'partner_targets',
+  PartnerTargetAward: 'partner_target_awards',
+  PartnerPayoutBatch: 'partner_payout_batches',
+  PartnerPayoutItem: 'partner_payout_items',
+  ProcessedWebhookEvent: 'processed_webhook_events',
+  NotificationEndpoint: 'notification_endpoints',
+  NotificationCampaign: 'notification_campaigns',
+  NotificationDelivery: 'notification_deliveries'
 };
 
 export const EXTRA_TABLES = {

@@ -371,7 +371,9 @@ export class AchievementService {
     const allAchievements = await Achievement.find({ isActive: true }).sort({ category: 1, order: 1 });
     const userAchievements = await UserAchievement.find({ userId: new Types.ObjectId(userId) });
 
-    const achievementMap = new Map(userAchievements.map(ua => [ua.achievementKey, ua]));
+    const achievementMap = new Map<string, (typeof userAchievements)[number]>(
+      userAchievements.map(ua => [ua.achievementKey, ua])
+    );
 
     return allAchievements.map(achievement => {
       const userProgress = achievementMap.get(achievement.key);

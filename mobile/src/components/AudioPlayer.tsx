@@ -7,6 +7,9 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 
 interface AudioPlayerProps {
@@ -29,6 +32,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   autoPlay = false,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const {
     isPlaying,
     isLoading,
@@ -111,9 +116,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           maximumValue={1}
           value={progress}
           onSlidingComplete={handleSeek}
-          minimumTrackTintColor="#6366F1"
-          maximumTrackTintColor="#E5E7EB"
-          thumbTintColor="#6366F1"
+          minimumTrackTintColor={colors.primary}
+          maximumTrackTintColor={colors.borderMuted}
+          thumbTintColor={colors.primary}
           disabled={isLoading || duration === 0}
         />
         <Text style={styles.timeText}>{formattedDuration}</Text>
@@ -130,7 +135,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           <Ionicons
             name="refresh"
             size={24}
-            color={isLoading ? "#9CA3AF" : "#374151"}
+            color={isLoading ? colors.textMuted : colors.textPrimary}
           />
         </TouchableOpacity>
 
@@ -143,25 +148,25 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           {isLoading ? (
             <Text style={styles.loadingText}>...</Text>
           ) : isPlaying ? (
-            <Ionicons name="pause" size={32} color="#FFFFFF" />
+            <Ionicons name="pause" size={32} color={colors.primaryOn} />
           ) : (
-            <Ionicons name="play" size={32} color="#FFFFFF" />
+            <Ionicons name="play" size={32} color={colors.primaryOn} />
           )}
         </TouchableOpacity>
 
         {/* Volume Control */}
         {showVolumeControl && (
           <View style={styles.volumeContainer}>
-            <Ionicons name="volume-medium" size={20} color="#374151" />
+            <Ionicons name="volume-medium" size={20} color={colors.textPrimary} />
             <Slider
               style={styles.volumeSlider}
               minimumValue={0}
               maximumValue={1}
               value={volume}
               onSlidingComplete={handleVolumeChange}
-              minimumTrackTintColor="#6366F1"
-              maximumTrackTintColor="#E5E7EB"
-              thumbTintColor="#6366F1"
+              minimumTrackTintColor={colors.primary}
+              maximumTrackTintColor={colors.borderMuted}
+              thumbTintColor={colors.primary}
             />
           </View>
         )}
@@ -197,13 +202,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.borderMuted,
   },
   progressContainer: {
     flexDirection: "row",
@@ -217,7 +223,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "500",
     width: 45,
     textAlign: "center",
@@ -232,23 +238,23 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     marginHorizontal: 8,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.borderMuted,
   },
   playButton: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#6366F1",
+    backgroundColor: colors.primary,
     borderWidth: 0,
   },
   loadingText: {
     fontSize: 24,
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontWeight: "bold",
   },
   volumeContainer: {
@@ -267,11 +273,11 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    borderTopColor: colors.borderMuted,
   },
   speedLabel: {
     fontSize: 12,
-    color: "#6B7280",
+    color: colors.textMuted,
     fontWeight: "600",
     marginRight: 8,
   },
@@ -279,21 +285,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.borderMuted,
   },
   speedButtonActive: {
-    backgroundColor: "#6366F1",
-    borderColor: "#6366F1",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   speedButtonText: {
     fontSize: 12,
-    color: "#374151",
+    color: colors.textPrimary,
     fontWeight: "500",
   },
   speedButtonTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
 });

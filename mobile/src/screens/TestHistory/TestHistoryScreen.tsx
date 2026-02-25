@@ -17,11 +17,15 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   deleteTest,
   getTestHistory,
   TestHistory,
 } from "../../api/analyticsApi";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +34,8 @@ type SortBy = "date-desc" | "date-asc" | "score-desc" | "score-asc";
 
 export const TestHistoryScreen: React.FC = () => {
   const { user, initializing: authInitializing } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [tests, setTests] = useState<TestHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +44,7 @@ export const TestHistoryScreen: React.FC = () => {
   const [filter, setFilter] = useState<TestType>("all");
   const [sortBy, setSortBy] = useState<SortBy>("date-desc");
   const [skip, setSkip] = useState(0);
+  const headerGradientColors = [colors.primaryStrong, colors.primary] as const;
 
   const userId = user?._id ?? null;
 
@@ -95,7 +102,7 @@ export const TestHistoryScreen: React.FC = () => {
       setHasMore(response.tests.length === PAGE_SIZE);
       setSkip(newSkip + response.tests.length);
     } catch (error) {
-      console.error("Failed to load tests:", error);
+      logger.warn("⚠️ Failed to load tests:", error);
       Alert.alert("Error", "Failed to load test history");
     } finally {
       setLoading(false);
@@ -164,10 +171,10 @@ export const TestHistoryScreen: React.FC = () => {
   };
 
   const getBandColor = (band: number): string => {
-    if (band >= 8) return "#10b981";
-    if (band >= 7) return "#3b82f6";
-    if (band >= 6) return "#f59e0b";
-    return "#ef4444";
+    if (band >= 8) return colors.success;
+    if (band >= 7) return colors.primary;
+    if (band >= 6) return colors.warning;
+    return colors.danger;
   };
 
   const formatDate = (dateStr: string): string => {
@@ -210,7 +217,7 @@ export const TestHistoryScreen: React.FC = () => {
               <Ionicons
                 name={test.testType === "practice" ? "school" : "trophy"}
                 size={14}
-                color="#ffffff"
+                color={colors.primaryOn}
               />
               <Text style={styles.testTypeText}>
                 {test.testType === "practice" ? "Practice" : "Simulation"}
@@ -225,7 +232,7 @@ export const TestHistoryScreen: React.FC = () => {
             onPress={() => handleDelete(test._id)}
             style={styles.deleteButton}
           >
-            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
           </TouchableOpacity>
         </View>
 
@@ -235,19 +242,23 @@ export const TestHistoryScreen: React.FC = () => {
         {/* Metadata */}
         <View style={styles.testMetadata}>
           <View style={styles.metadataItem}>
-            <Ionicons name="calendar-outline" size={14} color="#9ca3af" />
+            <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metadataText}>
               {formatDate(test.completedAt)}
             </Text>
           </View>
           <View style={styles.metadataItem}>
-            <Ionicons name="time-outline" size={14} color="#9ca3af" />
+            <Ionicons name="time-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metadataText}>
               {formatTime(test.completedAt)}
             </Text>
           </View>
           <View style={styles.metadataItem}>
-            <Ionicons name="stopwatch-outline" size={14} color="#9ca3af" />
+            <Ionicons
+              name="stopwatch-outline"
+              size={14}
+              color={colors.textMuted}
+            />
             <Text style={styles.metadataText}>
               {formatDuration(test.durationSeconds)}
             </Text>
@@ -296,7 +307,7 @@ export const TestHistoryScreen: React.FC = () => {
         {/* Audio Recording Indicator */}
         {test.audioRecordingId && (
           <View style={styles.audioIndicator}>
-            <Ionicons name="musical-notes" size={12} color="#3b82f6" />
+            <Ionicons name="musical-notes" size={12} color={colors.primary} />
             <Text style={styles.audioText}>Audio recording available</Text>
           </View>
         )}
@@ -354,7 +365,7 @@ export const TestHistoryScreen: React.FC = () => {
               setSortBy(options[nextIndex]);
             }}
           >
-            <Ionicons name="funnel-outline" size={16} color="#ffffff" />
+            <Ionicons name="funnel-outline" size={16} color={colors.primaryOn} />
             <Text style={styles.sortText}>
               {sortBy === "date-desc"
                 ? "Newest"
@@ -373,11 +384,11 @@ export const TestHistoryScreen: React.FC = () => {
   if (authInitializing) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>Test History</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading your account...</Text>
         </View>
       </View>
@@ -387,11 +398,15 @@ export const TestHistoryScreen: React.FC = () => {
   if (!userId) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>Test History</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Ionicons
+            name="lock-closed-outline"
+            size={64}
+            color={colors.textMuted}
+          />
           <Text style={styles.emptyTitle}>Sign in to view history</Text>
           <Text style={styles.emptySubtitle}>
             Create an account or log in to sync your IELTS progress
@@ -404,11 +419,11 @@ export const TestHistoryScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>Test History</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading tests...</Text>
         </View>
       </View>
@@ -418,11 +433,15 @@ export const TestHistoryScreen: React.FC = () => {
   if (tests.length === 0) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>Test History</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <Ionicons name="document-text-outline" size={64} color="#4b5563" />
+          <Ionicons
+            name="document-text-outline"
+            size={64}
+            color={colors.textMuted}
+          />
           <Text style={styles.emptyTitle}>No Tests Yet</Text>
           <Text style={styles.emptySubtitle}>
             Complete some tests to see your history
@@ -435,7 +454,7 @@ export const TestHistoryScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+      <LinearGradient colors={headerGradientColors} style={styles.header}>
         <Text style={styles.headerTitle}>Test History</Text>
         <Text style={styles.headerSubtitle}>
           {tests.length} test{tests.length !== 1 ? "s" : ""}
@@ -454,7 +473,7 @@ export const TestHistoryScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor="#3b82f6"
+            tintColor={colors.primary}
           />
         }
         onScroll={({ nativeEvent }) => {
@@ -472,7 +491,7 @@ export const TestHistoryScreen: React.FC = () => {
 
         {loadingMore && (
           <View style={styles.loadingMore}>
-            <ActivityIndicator size="small" color="#3b82f6" />
+            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={styles.loadingMoreText}>Loading more...</Text>
           </View>
         )}
@@ -487,230 +506,231 @@ export const TestHistoryScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#d4a745",
-  },
-  filtersContainer: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2d2d2d",
-  },
-  filterTabs: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  filterTab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 10,
-    borderRadius: 20,
-    backgroundColor: "#1a1a1a",
-  },
-  filterTabActive: {
-    backgroundColor: "#3b82f6",
-  },
-  filterTabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#9ca3af",
-  },
-  filterTabTextActive: {
-    color: "#ffffff",
-  },
-  sortContainer: {
-    paddingHorizontal: 20,
-  },
-  sortButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-  },
-  sortText: {
-    fontSize: 12,
-    color: "#d1d5db",
-    fontWeight: "600",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  testCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#2d2d2d",
-  },
-  testHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  testTypeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  testTypeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  practiceBadge: {
-    backgroundColor: "#3b82f6",
-  },
-  simulationBadge: {
-    backgroundColor: "#d4a745",
-  },
-  testTypeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  testPart: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  deleteButton: {
-    padding: 5,
-  },
-  testTopic: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-    marginBottom: 10,
-  },
-  testMetadata: {
-    flexDirection: "row",
-    gap: 15,
-    marginBottom: 15,
-  },
-  metadataItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  metadataText: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  bandContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  bandBadge: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bandScore: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
-  bandLabel: {
-    fontSize: 10,
-    color: "#ffffff",
-    opacity: 0.8,
-  },
-  criteriaGrid: {
-    flex: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  criteriaItem: {
-    alignItems: "center",
-    width: "22%",
-  },
-  criteriaLabel: {
-    fontSize: 10,
-    color: "#9ca3af",
-    marginBottom: 3,
-  },
-  criteriaScore: {
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  audioIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#2d2d2d",
-  },
-  audioText: {
-    fontSize: 11,
-    color: "#3b82f6",
-  },
-  loadingMore: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 20,
-  },
-  loadingMoreText: {
-    fontSize: 14,
-    color: "#9ca3af",
-  },
-  endText: {
-    textAlign: "center",
-    fontSize: 14,
-    color: "#6b7280",
-    paddingVertical: 20,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: "#9ca3af",
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: "#9ca3af",
-    textAlign: "center",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingTop: 60,
+      paddingBottom: 20,
+      paddingHorizontal: 20,
+    },
+    headerTitle: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.primaryOn,
+      marginBottom: 5,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.warning,
+    },
+    filtersContainer: {
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    filterTabs: {
+      paddingHorizontal: 20,
+      marginBottom: 10,
+    },
+    filterTab: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      marginRight: 10,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceSubtle,
+    },
+    filterTabActive: {
+      backgroundColor: colors.primary,
+    },
+    filterTabText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+    filterTabTextActive: {
+      color: colors.primaryOn,
+    },
+    sortContainer: {
+      paddingHorizontal: 20,
+    },
+    sortButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      alignSelf: "flex-start",
+    },
+    sortText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    testCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 15,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    testHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    testTypeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    testTypeBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+    },
+    practiceBadge: {
+      backgroundColor: colors.primary,
+    },
+    simulationBadge: {
+      backgroundColor: colors.warning,
+    },
+    testTypeText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.primaryOn,
+    },
+    testPart: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    deleteButton: {
+      padding: 5,
+    },
+    testTopic: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: 10,
+    },
+    testMetadata: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 15,
+    },
+    metadataItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    metadataText: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    bandContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 15,
+    },
+    bandBadge: {
+      width: 70,
+      height: 70,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    bandScore: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.primaryOn,
+    },
+    bandLabel: {
+      fontSize: 10,
+      color: colors.primaryOn,
+      opacity: 0.8,
+    },
+    criteriaGrid: {
+      flex: 1,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    criteriaItem: {
+      alignItems: "center",
+      width: "22%",
+    },
+    criteriaLabel: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginBottom: 3,
+    },
+    criteriaScore: {
+      fontSize: 14,
+      fontWeight: "bold",
+    },
+    audioIndicator: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderMuted,
+    },
+    audioText: {
+      fontSize: 11,
+      color: colors.primary,
+    },
+    loadingMore: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 20,
+    },
+    loadingMoreText: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    endText: {
+      textAlign: "center",
+      fontSize: 14,
+      color: colors.textMuted,
+      paddingVertical: 20,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 40,
+    },
+    loadingText: {
+      marginTop: 15,
+      fontSize: 16,
+      color: colors.textMuted,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginTop: 20,
+      marginBottom: 10,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+  });

@@ -1,0 +1,64 @@
+{
+  "scenarios": [
+    {
+      "name": "speaking-topics-practice",
+      "method": "GET",
+      "url": "http://127.0.0.1:4000/api/v1/topics/practice?limit=10&offset=0&excludeCompleted=true&category=part1",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    },
+    {
+      "name": "speaking-practice-history",
+      "method": "GET",
+      "url": "http://127.0.0.1:4000/api/v1/practice/sessions?limit=10&offset=0",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    },
+    {
+      "name": "speaking-simulation-history",
+      "method": "GET",
+      "url": "http://127.0.0.1:4000/api/v1/test-simulations?limit=10&offset=0",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    }
+  ]
+}

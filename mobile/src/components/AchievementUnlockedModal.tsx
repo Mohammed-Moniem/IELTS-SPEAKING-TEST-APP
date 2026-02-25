@@ -9,6 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
 
 interface AchievementUnlockedModalProps {
   visible: boolean;
@@ -26,6 +29,8 @@ const { width } = Dimensions.get("window");
 export const AchievementUnlockedModal: React.FC<
   AchievementUnlockedModalProps
 > = ({ visible, achievement, onClose }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -115,7 +120,7 @@ export const AchievementUnlockedModal: React.FC<
               { transform: [{ rotate: starRotateInterpolate }] },
             ]}
           >
-            <Ionicons name="star" size={20} color="#FFD60A" />
+            <Ionicons name="star" size={20} color={colors.warning} />
           </Animated.View>
           <Animated.View
             style={[
@@ -124,7 +129,7 @@ export const AchievementUnlockedModal: React.FC<
               { transform: [{ rotate: starRotateInterpolate }] },
             ]}
           >
-            <Ionicons name="star" size={16} color="#FFD60A" />
+            <Ionicons name="star" size={16} color={colors.warning} />
           </Animated.View>
           <Animated.View
             style={[
@@ -133,7 +138,7 @@ export const AchievementUnlockedModal: React.FC<
               { transform: [{ rotate: starRotateInterpolate }] },
             ]}
           >
-            <Ionicons name="star" size={14} color="#FFD60A" />
+            <Ionicons name="star" size={14} color={colors.warning} />
           </Animated.View>
 
           {/* Header */}
@@ -157,7 +162,7 @@ export const AchievementUnlockedModal: React.FC<
 
             {/* Points Badge */}
             <View style={styles.pointsBadge}>
-              <Ionicons name="star" size={18} color="#FFD60A" />
+              <Ionicons name="star" size={18} color={colors.warning} />
               <Text style={styles.pointsText}>
                 +{achievement.points} points
               </Text>
@@ -174,10 +179,11 @@ export const AchievementUnlockedModal: React.FC<
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -186,11 +192,11 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: width * 0.85,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -217,7 +223,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#000000",
+    color: colors.textPrimary,
     textAlign: "center",
   },
   badgeContainer: {
@@ -227,12 +233,12 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: colors.surfaceSubtle,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 4,
-    borderColor: "#007AFF",
-    shadowColor: "#007AFF",
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -248,13 +254,13 @@ const styles = StyleSheet.create({
   achievementName: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#000000",
+    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: "center",
   },
   achievementDescription: {
     fontSize: 15,
-    color: "#8E8E93",
+    color: colors.textMuted,
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 20,
@@ -262,7 +268,7 @@ const styles = StyleSheet.create({
   pointsBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF9E5",
+    backgroundColor: colors.warningSoft,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -271,11 +277,11 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FFD60A",
+    color: colors.warning,
   },
   closeButton: {
     width: "100%",
-    backgroundColor: "#007AFF",
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
@@ -283,6 +289,6 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
 });

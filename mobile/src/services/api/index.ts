@@ -6,6 +6,7 @@ export { default as friendService } from "./friendService";
 export { default as groupService } from "./groupService";
 export { default as leaderboardService } from "./leaderboardService";
 export { default as mediaUploadService } from "./mediaUploadService";
+export { default as partnerService } from "./partnerService";
 export { default as pointsService } from "./pointsService";
 export { default as profileService } from "./profileService";
 export { default as referralService } from "./referralService";
@@ -57,3 +58,5 @@ export type {
 } from "./pointsService";
 
 export type { UserProfile, UserStatistics } from "./profileService";
+
+export type { PartnerApplicationPayload, PartnerPortalMe } from "./partnerService";

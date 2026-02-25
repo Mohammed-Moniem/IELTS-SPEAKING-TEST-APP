@@ -98,8 +98,13 @@ export class TopicGenerationService {
         throw new Error('AI response is not an array of topics');
       }
 
-      this.logger.info(`Generated ${topics.length} topics successfully`);
-      return topics;
+      const validTopics = (topics as GeneratedTopic[]).filter(topic => this.validateTopic(topic));
+      if (!validTopics.length) {
+        throw new Error('AI response did not include valid IELTS topics');
+      }
+
+      this.logger.info(`Generated ${validTopics.length} topics successfully`);
+      return validTopics;
     } catch (error: any) {
       this.logger.error('Topic generation error:', {
         message: error.message,

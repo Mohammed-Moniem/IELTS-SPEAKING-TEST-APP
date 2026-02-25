@@ -1,32 +1,46 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { useAuth } from '@/components/auth/AuthProvider';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const links = [
   { href: '/', label: 'Home' },
+  { href: '/ielts', label: 'Guides' },
   { href: '/features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
+  { href: '/methodology', label: 'Methodology' },
   { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' }
 ];
 
 export function MarketingShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
+  const pathname = usePathname();
 
   return (
-    <div className="section-wrap" style={{ minHeight: '100vh' }}>
-      <header className="top-strip" style={{ margin: '1rem', position: 'sticky', top: '0.9rem', zIndex: 10 }}>
-        <div className="shell-logo">Spokio</div>
-        <nav>
+    <div className="experience experience-marketing">
+      <header className="top-strip marketing-header">
+        <Link href="/" className="marketing-brand">
+          <span className="shell-logo">Spokio</span>
+          <span className="small marketing-brand-note">IELTS SaaS Platform</span>
+        </Link>
+        <nav className="marketing-nav">
           {links.map(item => (
-            <Link key={item.href} href={item.href} className="shell-nav-link">
+            <Link
+              key={item.href}
+              href={item.href}
+              className="shell-nav-link"
+              data-active={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+            >
               {item.label}
             </Link>
           ))}
         </nav>
-        <div className="cta-row" style={{ marginLeft: 'auto' }}>
+        <div className="cta-row marketing-header-actions">
+          <ThemeToggle />
           {isAuthenticated ? (
             <Link className="btn btn-secondary" href="/app/dashboard">
               Open App
@@ -43,7 +57,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </header>
-      <main style={{ maxWidth: 1160, margin: '0 auto', padding: '0.2rem 1rem 2.4rem', width: '100%' }}>{children}</main>
+      <main className="marketing-main">{children}</main>
     </div>
   );
 }

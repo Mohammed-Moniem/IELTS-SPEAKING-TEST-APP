@@ -8,6 +8,7 @@ import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
 import { SubscriptionPlan, UserDocument } from '@models/UserModel';
 import { referralService } from '@services/ReferralService';
+import { PartnerProgramService } from '@services/PartnerProgramService';
 import { Service } from 'typedi';
 
 interface AuthResult {
@@ -20,6 +21,8 @@ interface AuthResult {
 export class AuthService {
   private log = new Logger(__filename);
 
+  constructor(private readonly partnerProgramService: PartnerProgramService) {}
+
   public async register(payload: RegisterRequest, headers: IRequestHeaders): Promise<AuthResult> {
     const logMessage = constructLogMessage(__filename, 'register', headers);
     this.log.info(`${logMessage} :: Attempting to register user ${payload.email}`);
@@ -30,6 +33,7 @@ export class AuthService {
     }
 
     const normalizedReferral = payload.referralCode?.trim().toUpperCase();
+    const normalizedPartnerCode = payload.partnerCode?.trim().toUpperCase();
 
     // Create user and handle referral redemption atomically
     let createdUser: UserDocument | null = null;
@@ -46,16 +50,26 @@ export class AuthService {
       if (normalizedReferral) {
         await referralService.redeemReferralCode(normalizedReferral, createdUser._id.toString(), payload.email);
       }
+
+      if (normalizedPartnerCode) {
+        await this.partnerProgramService.recordAttributionTouch({
+          code: normalizedPartnerCode,
+          source: 'register',
+          userId: createdUser._id.toString(),
+          email: payload.email,
+          strict: true
+        });
+      }
     } catch (error: any) {
       if (createdUser) {
         await userRepository.deleteById(createdUser._id.toString());
       }
 
-      if (normalizedReferral) {
+      if (normalizedReferral || normalizedPartnerCode) {
         throw new CSError(
           HTTP_STATUS_CODES.BAD_REQUEST,
           CODES.InvalidBody,
-          error?.message || 'Unable to apply referral code'
+          error?.message || 'Unable to apply referral or partner code'
         );
       }
 

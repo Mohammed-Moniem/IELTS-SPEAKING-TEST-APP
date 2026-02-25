@@ -9,7 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import audioRecordingService from "../../services/api/audioRecordingService";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 interface VoiceRecorderProps {
   onSend: (audioUri: string, duration: number) => void;
@@ -20,6 +24,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   onSend,
   onCancel,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [audioUri, setAudioUri] = useState<string | null>(null);
@@ -92,7 +98,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       setIsPreviewPlaying(false);
       setAudioUri(null);
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording", error);
       Alert.alert("Error", "Failed to start recording. Please try again.");
     }
   };
@@ -113,7 +119,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       }
       setPreviewProgress(0);
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording", error);
       Alert.alert("Error", "Failed to stop recording. Please try again.");
     }
   };
@@ -132,7 +138,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       setIsPreviewPlaying(false);
       onCancel();
     } catch (error) {
-      console.error("Failed to cancel recording:", error);
+      logger.warn("Failed to cancel recording", error);
       setIsPreviewPlaying(false);
       onCancel();
     }
@@ -202,7 +208,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         setIsPreviewPlaying(true);
       }
     } catch (error) {
-      console.error("Failed to toggle preview playback:", error);
+      logger.warn("Failed to toggle preview playback", error);
       setIsPreviewPlaying(false);
     }
   };
@@ -257,7 +263,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     <View style={styles.container}>
       {/* Slide to cancel hint */}
       <View style={styles.slideHint}>
-        <Ionicons name="chevron-back" size={16} color="#999" />
+        <Ionicons name="chevron-back" size={16} color={colors.textMuted} />
         <Text style={styles.slideText}>Slide to cancel</Text>
       </View>
 
@@ -287,7 +293,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       <View style={styles.controls}>
         {/* Cancel button */}
         <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-          <Ionicons name="close" size={28} color="#FF3B30" />
+          <Ionicons name="close" size={28} color={colors.danger} />
         </TouchableOpacity>
 
         {/* Record/Stop button */}
@@ -303,21 +309,21 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         >
           {audioUri ? (
             isPreviewPlaying ? (
-              <Ionicons name="pause" size={28} color="#FFFFFF" />
+              <Ionicons name="pause" size={28} color={colors.primaryOn} />
             ) : (
-              <Ionicons name="play" size={28} color="#FFFFFF" />
+              <Ionicons name="play" size={28} color={colors.primaryOn} />
             )
           ) : isRecording ? (
             <View style={styles.stopIcon} />
           ) : (
-            <Ionicons name="mic" size={32} color="#FFFFFF" />
+            <Ionicons name="mic" size={32} color={colors.primaryOn} />
           )}
         </TouchableOpacity>
 
         {/* Send button (only show after recording) */}
         {audioUri && (
           <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Ionicons name="checkmark" size={28} color="#128C7E" />
+            <Ionicons name="checkmark" size={28} color={colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -333,12 +339,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: colors.surfaceSubtle,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    borderTopColor: colors.borderMuted,
   },
   slideHint: {
     flexDirection: "row",
@@ -348,7 +355,7 @@ const styles = StyleSheet.create({
   },
   slideText: {
     fontSize: 12,
-    color: "#999",
+    color: colors.textMuted,
     marginLeft: 4,
   },
   waveformContainer: {
@@ -361,13 +368,13 @@ const styles = StyleSheet.create({
   },
   waveBar: {
     width: 3,
-    backgroundColor: "#128C7E",
+    backgroundColor: colors.primary,
     borderRadius: 1.5,
   },
   duration: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#000",
+    color: colors.textPrimary,
     textAlign: "center",
     marginBottom: 16,
   },
@@ -381,10 +388,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -394,32 +401,32 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#FF3B30",
+    backgroundColor: colors.danger,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 5,
   },
   recordButtonStopped: {
-    backgroundColor: "#128C7E",
+    backgroundColor: colors.primary,
   },
   stopIcon: {
     width: 24,
     height: 24,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.primaryOn,
     borderRadius: 4,
   },
   sendButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -435,12 +442,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FF3B30",
+    backgroundColor: colors.danger,
     marginRight: 6,
   },
   recordingText: {
     fontSize: 12,
-    color: "#FF3B30",
+    color: colors.danger,
     fontWeight: "500",
   },
 });

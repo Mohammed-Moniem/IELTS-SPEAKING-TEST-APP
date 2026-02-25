@@ -8,85 +8,67 @@
 }
 
 :root {
-  /* Sophisticated warm off-whites with subtle education-focused blue undertones */
-  --background: oklch(0.96 0.005 270);
-  --foreground: oklch(0.12 0.02 270);
+  /* Simple, elegant, and clean color palette */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.15 0 0);
   
-  --card: oklch(0.98 0.003 270);
-  --card-foreground: oklch(0.12 0.02 270);
-  --popover: oklch(1.00 0 0);
-  --popover-foreground: oklch(0.12 0.02 270);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
   
-  /* Deep academic navy as primary - trustworthy, professional, scholarly */
-  --primary: oklch(0.60 0.25 320);
-  --primary-foreground: oklch(0.98 0.003 270);
+  /* Elegant primary color (e.g., a deep, sophisticated indigo/blue) */
+  --primary: oklch(0.45 0.1 260);
+  --primary-foreground: oklch(0.98 0 0);
   
-  /* Soft sage secondary - calm, balanced, intellectual */
-  --secondary: oklch(0.88 0.08 280);
-  --secondary-foreground: oklch(0.20 0.03 270);
+  /* Subtle secondary */
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.25 0 0);
   
-  /* Gentle academic grays with blue undertones */
-  --muted: oklch(0.92 0.01 270);
-  --muted-foreground: oklch(0.40 0.02 270);
+  /* Clean grays */
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.45 0 0);
   
-  /* Warm gold accent - achievement, success, confidence */
-  --accent: oklch(0.70 0.22 180);
-  --accent-foreground: oklch(0.12 0.02 270);
+  /* Tasteful accent (e.g., a refined teal or gold) */
+  --accent: oklch(0.65 0.15 190);
+  --accent-foreground: oklch(0.98 0 0);
   
-  /* Sophisticated error red */
-  --destructive: oklch(0.65 0.25 15);
-  --destructive-foreground: oklch(0.98 0.003 270);
+  /* Destructive */
+  --destructive: oklch(0.6 0.2 20);
+  --destructive-foreground: oklch(0.98 0 0);
   
-  /* Refined borders and inputs with blue undertones */
-  --border: oklch(0.85 0.02 270);
-  --input: oklch(0.85 0.02 270);
-  --ring: oklch(0.60 0.25 320);
+  /* Borders and inputs */
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.92 0 0);
+  --ring: oklch(0.45 0.1 260);
   
-  --radius: 0.25rem;
+  --radius: 0.5rem;
   
-  --chart-1: oklch(0.60 0.25 320);
+  --chart-1: oklch(0.45 0.1 260);
+  --chart-2: oklch(0.6 0.1 200);
+  --chart-3: oklch(0.5 0.1 40);
+  --chart-4: oklch(0.7 0.1 280);
+  --chart-5: oklch(0.8 0.1 340);
   
-  --chart-2: oklch(0.70 0.22 180);
+  --sidebar: oklch(0.98 0 0);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.45 0.1 260);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.96 0 0);
+  --sidebar-accent-foreground: oklch(0.25 0 0);
+  --sidebar-border: oklch(0.92 0 0);
+  --sidebar-ring: oklch(0.45 0.1 260);
   
-  --chart-3: oklch(0.55 0.28 60);
-  
-  --chart-4: oklch(0.65 0.20 240);
-  
-  --chart-5: oklch(0.75 0.15 360);
-  
-  --sidebar: oklch(0.94 0.005 270);
-  
-  --sidebar-foreground: oklch(0.12 0.02 270);
-  
-  --sidebar-primary: oklch(0.60 0.25 320);
-  
-  --sidebar-primary-foreground: oklch(0.98 0.003 270);
-  
-  --sidebar-accent: oklch(0.88 0.08 280);
-  
-  --sidebar-accent-foreground: oklch(0.20 0.03 270);
-  
-  --sidebar-border: oklch(0.85 0.02 270);
-  
-  --sidebar-ring: oklch(0.60 0.25 320);
-  
-  --shadow-color: oklch(0.60 0.25 320);
-  
-  --shadow-opacity: 0.25;
-  
-  --shadow-blur: 12px;
-  
+  --shadow-color: oklch(0 0 0);
+  --shadow-opacity: 0.05;
+  --shadow-blur: 10px;
   --shadow-spread: 0px;
+  --shadow-offset-x: 0px;
+  --shadow-offset-y: 4px;
   
-  --shadow-offset-x: 2px;
-  
-  --shadow-offset-y: 6px;
-  
-  --font-sans: "Outfit";
-  
-  --font-serif: "Cormorant";
-  
-  --font-mono: "Fira Code";
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: "Georgia", serif;
+  --font-mono: "Menlo", monospace;
 }
 
 @theme {
@@ -112,64 +94,72 @@
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  background: linear-gradient(135deg, oklch(0.98 0.008 220) 0%, oklch(0.95 0.015 210) 100%);
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Modern glassmorphism effect for cards */
+/* Clean, elegant card style */
 .glass-card {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-/* Enhanced button styles */
+.glass-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* Elegant button styles */
 .modern-button {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateY(0);
+  transition: all 0.2s ease;
+  font-weight: 500;
+  border-radius: var(--radius);
 }
 
 .modern-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
 }
 
 .modern-button:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
-/* Gradient text for headings */
+/* Simple text for headings instead of gradient */
 .gradient-text {
-  background: linear-gradient(135deg, oklch(0.35 0.08 240), oklch(0.68 0.12 85));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--foreground);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-/* Modern input styles */
+/* Clean input styles */
 .modern-input {
   transition: all 0.2s ease;
-  border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  background: var(--background);
+  border-radius: var(--radius);
 }
 
 .modern-input:focus {
-  border-color: oklch(0.35 0.08 240);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 4px oklch(0.35 0.08 240 / 0.1);
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+  outline: none;
 }
 
 /* Smooth animations */
 .fade-in {
-  animation: fadeIn 0.5s ease-out;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -177,20 +167,20 @@ body {
   }
 }
 
-/* Modern scrollbar */
+/* Minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: oklch(0.94 0.015 215);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.68 0.12 85);
-  border-radius: 4px;
+  background: var(--border);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.64 0.12 85);
+  background: var(--muted-foreground);
 }
