@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import videoRecordingService from "../../services/videoRecordingService";
+import type { ColorTokens } from "../../theme/tokens";
 import { VideoPlayer } from "./VideoPlayer";
 
 interface VideoMessageProps {
@@ -38,6 +41,8 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
   isLoading = false,
   headers,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [playerVisible, setPlayerVisible] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
 
@@ -104,7 +109,7 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
           {/* Loading overlay */}
           {(isLoading || thumbnailLoading) && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="large" color={colors.primaryOn} />
             </View>
           )}
 
@@ -112,7 +117,7 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
           {!isLoading && !thumbnailLoading && (
             <View style={styles.playOverlay}>
               <View style={styles.playButton}>
-                <Ionicons name="play" size={32} color="#FFFFFF" />
+                <Ionicons name="play" size={32} color={colors.primaryOn} />
               </View>
             </View>
           )}
@@ -120,7 +125,7 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
           {/* Duration badge */}
           {duration > 0 && (
             <View style={styles.durationBadge}>
-              <Ionicons name="videocam" size={12} color="#FFFFFF" />
+              <Ionicons name="videocam" size={12} color={colors.primaryOn} />
               <Text style={styles.durationText}>
                 {videoRecordingService.formatDuration(duration)}
               </Text>
@@ -137,7 +142,7 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
             <Ionicons
               name="checkmark-done"
               size={16}
-              color="#34B7F1"
+              color={colors.info}
               style={styles.readReceipt}
             />
           )}
@@ -166,7 +171,8 @@ export const VideoMessage: React.FC<VideoMessageProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     maxWidth: "75%",
     borderRadius: 12,
@@ -176,18 +182,18 @@ const styles = StyleSheet.create({
   },
   ownMessage: {
     alignSelf: "flex-end",
-    backgroundColor: "#DCF8C6",
+    backgroundColor: colors.successSoft,
     marginRight: 8,
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     marginLeft: 8,
   },
   thumbnailContainer: {
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#E5E5E5",
+    backgroundColor: colors.borderMuted,
     position: "relative",
   },
   thumbnail: {
@@ -197,7 +203,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -205,13 +211,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: colors.overlayBackdrop,
   },
   playButton: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -221,13 +227,13 @@ const styles = StyleSheet.create({
     right: 8,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: colors.overlayBackdrop,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   durationText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 11,
     fontWeight: "600",
     marginLeft: 4,
@@ -242,10 +248,10 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 11,
-    color: "#667781",
+    color: colors.textMuted,
   },
   ownTimestamp: {
-    color: "#667781",
+    color: colors.textMuted,
   },
   readReceipt: {
     marginLeft: 4,
@@ -263,9 +269,9 @@ const styles = StyleSheet.create({
     borderRightWidth: 0,
     borderTopWidth: 10,
     borderBottomWidth: 0,
-    borderLeftColor: "#DCF8C6",
+    borderLeftColor: colors.successSoft,
     borderRightColor: "transparent",
-    borderTopColor: "#DCF8C6",
+    borderTopColor: colors.successSoft,
     borderBottomColor: "transparent",
   },
   otherTail: {
@@ -275,8 +281,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 10,
     borderBottomWidth: 0,
     borderLeftColor: "transparent",
-    borderRightColor: "#FFFFFF",
-    borderTopColor: "#FFFFFF",
+    borderRightColor: colors.surface,
+    borderTopColor: colors.surface,
     borderBottomColor: "transparent",
   },
 });

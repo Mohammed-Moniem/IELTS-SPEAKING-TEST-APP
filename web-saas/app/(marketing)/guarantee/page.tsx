@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
-
 export const metadata: Metadata = {
   title: 'Band Score Improvement Guarantee',
   description:
@@ -76,59 +72,31 @@ const faqs = [
   },
 ];
 
-export default async function GuaranteePage() {
-  const marketingVariant = await getServerMarketingVariant();
-  const isMotionVariant = marketingVariant === 'motion';
-
+export default function GuaranteePage() {
   return (
     <div className="space-y-8 max-w-3xl mx-auto">
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'verified', text: 'Score Guarantee' }}
-          title="Band Score Improvement Guarantee"
-          description="Follow your personalised study plan on a Pro subscription for 90 days. If your overall band score does not improve by at least 0.5 bands, we extend your subscription free for another 90 days."
-          ctas={[
-            {
-              href: '/register',
-              label: 'Get Started With Pro',
-              ctaId: 'guarantee_hero_start_pro',
-              section: 'guarantee-hero'
-            },
-            {
-              href: '/pricing',
-              label: 'View Plans',
-              tone: 'secondary',
-              ctaId: 'guarantee_hero_view_plans',
-              section: 'guarantee-hero'
-            }
-          ]}
-        />
-      ) : (
-        <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-500/5 dark:to-gray-900 p-8 space-y-5 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-500/10 mx-auto">
-            <span className="material-symbols-outlined text-[36px] text-emerald-600 dark:text-emerald-400">verified</span>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Band Score Improvement Guarantee</h1>
-          <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
-            Follow your personalised study plan on a Pro subscription for 90 days. If your overall band score doesn&apos;t
-            improve by at least 0.5 bands, we&apos;ll extend your subscription free for another 90 days.
-          </p>
-          <Link
-            href="/register"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/25"
-          >
-            Get Started With Pro
-          </Link>
+      {/* Hero */}
+      <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-500/5 dark:to-gray-900 p-8 space-y-5 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-500/10 mx-auto">
+          <span className="material-symbols-outlined text-[36px] text-emerald-600 dark:text-emerald-400">verified</span>
         </div>
-      )}
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Band Score Improvement Guarantee</h1>
+        <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+          Follow your personalised study plan on a Pro subscription for 90 days. If your overall band score doesn&apos;t
+          improve by at least 0.5 bands, we&apos;ll extend your subscription free for another 90 days.
+        </p>
+        <Link
+          href="/register"
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/25"
+        >
+          Get Started With Pro
+        </Link>
+      </div>
 
       {/* How It Works */}
-      <section className="relative isolate overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-5">
-        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-        <h2 className="relative z-10 text-xl font-bold text-gray-900 dark:text-white">How It Works</h2>
-        <div className="relative z-10 grid gap-4 sm:grid-cols-2">
+      <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-5">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">How It Works</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
           {howItWorks.map(item => (
             <div key={item.step} className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-5 space-y-2">
               <span className="inline-block rounded-full bg-emerald-100 dark:bg-emerald-500/10 px-3 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">

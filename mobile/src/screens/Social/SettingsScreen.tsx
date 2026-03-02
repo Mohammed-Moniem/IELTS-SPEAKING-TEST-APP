@@ -9,9 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import type { SocialStackParamList } from "../../navigation/SocialNavigator";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 
 export const SettingsScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const navigation =
     useNavigation<NativeStackNavigationProp<SocialStackParamList>>();
 
@@ -28,38 +34,34 @@ export const SettingsScreen: React.FC = () => {
       icon: "person",
       route: "EditProfile" as keyof SocialStackParamList,
     },
-    {
-      title: "Notifications",
-      description: "Manage notification preferences",
-      icon: "notifications",
-    },
-    {
-      title: "Blocked Users",
-      description: "View and manage blocked users",
-      icon: "ban",
-    },
   ];
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
-        {settingsOptions.map((option, index) => (
+        {settingsOptions.map((option) => (
           <TouchableOpacity
-            key={index}
+            key={option.title}
             style={styles.optionCard}
-            onPress={() =>
-              option.route && navigation.navigate(option.route as any)
-            }
+            onPress={() => navigation.navigate(option.route as any)}
           >
             <View style={styles.optionIcon}>
-              <Ionicons name={option.icon as any} size={24} color="#007AFF" />
+              <Ionicons
+                name={option.icon as any}
+                size={24}
+                color={colors.primary}
+              />
             </View>
             <View style={styles.optionInfo}>
               <Text style={styles.optionTitle}>{option.title}</Text>
               <Text style={styles.optionDescription}>{option.description}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textMuted}
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -75,68 +77,69 @@ export const SettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  section: {
-    paddingVertical: 16,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8E8E93",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  optionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  optionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F4FF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  optionInfo: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 2,
-  },
-  optionDescription: {
-    fontSize: 13,
-    color: "#8E8E93",
-  },
-  infoCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  infoLabel: {
-    fontSize: 17,
-    color: "#000000",
-  },
-  infoValue: {
-    fontSize: 17,
-    color: "#8E8E93",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.backgroundMuted,
+    },
+    section: {
+      paddingVertical: spacing.md,
+    },
+    sectionTitle: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+    },
+    optionCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    optionIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primarySoft,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: spacing.sm,
+    },
+    optionInfo: {
+      flex: 1,
+    },
+    optionTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    optionDescription: {
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+    infoCard: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+    infoLabel: {
+      fontSize: 17,
+      color: colors.textPrimary,
+    },
+    infoValue: {
+      fontSize: 17,
+      color: colors.textMuted,
+    },
+  });

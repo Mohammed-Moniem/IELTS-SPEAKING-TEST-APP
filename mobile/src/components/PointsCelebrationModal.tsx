@@ -39,6 +39,17 @@ export const PointsCelebrationModal: React.FC<PointsCelebrationModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const confettiPalette = React.useMemo(
+    () => [
+      colors.warning,
+      colors.primary,
+      colors.secondary,
+      colors.info,
+      colors.success,
+      colors.danger,
+    ],
+    [colors]
+  );
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
   const confettiAnims = React.useRef(
     Array.from({ length: 15 }, () => ({
@@ -115,14 +126,6 @@ export const PointsCelebrationModal: React.FC<PointsCelebrationModalProps> = ({
       <View style={styles.overlay}>
         {/* Confetti */}
         {confettiAnims.map((anim, index) => {
-          const confettiPalette = [
-            "#FFD700",
-            "#FFA500",
-            "#FF69B4",
-            "#00CED1",
-            "#9370DB",
-            "#32CD32",
-          ];
           const color = confettiPalette[index % confettiPalette.length];
 
           return (
@@ -197,85 +200,85 @@ export const PointsCelebrationModal: React.FC<PointsCelebrationModalProps> = ({
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xl,
-  },
-  content: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: spacing.xxl,
-    alignItems: "center",
-    maxWidth: 320,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  confetti: {
-    position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 2,
-  },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.warningSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing.lg,
-  },
-  pointsEarned: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  reason: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-  },
-  balanceContainer: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.backgroundMuted,
-    borderRadius: 12,
-    marginBottom: spacing.xl,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginBottom: spacing.xs,
-  },
-  balanceValue: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: colors.primary,
-  },
-  closeButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderRadius: 24,
-    width: "100%",
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.primaryOn,
-    textAlign: "center",
-  },
+    overlay: {
+      flex: 1,
+      backgroundColor: colors.overlayBackdrop,
+    },
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.xl,
+    },
+    content: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: spacing.xxl,
+      alignItems: "center",
+      maxWidth: 320,
+      width: "100%",
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    confetti: {
+      position: "absolute",
+      width: 10,
+      height: 10,
+      borderRadius: 2,
+    },
+    iconContainer: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.warningSoft,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: spacing.lg,
+    },
+    pointsEarned: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    reason: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: spacing.xl,
+    },
+    balanceContainer: {
+      alignItems: "center",
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      backgroundColor: colors.backgroundMuted,
+      borderRadius: 12,
+      marginBottom: spacing.xl,
+    },
+    balanceLabel: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginBottom: spacing.xs,
+    },
+    balanceValue: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: colors.primary,
+    },
+    closeButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xxl,
+      borderRadius: 24,
+      width: "100%",
+    },
+    closeButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.primaryOn,
+      textAlign: "center",
+    },
   });

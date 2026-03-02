@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -8,10 +9,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
 import { useProfile } from "../../hooks";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 export const PrivacySettingsScreen: React.FC = () => {
   const { loadMyProfile, updatePrivacySettings } = useProfile();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -23,35 +31,52 @@ export const PrivacySettingsScreen: React.FC = () => {
   });
 
   useEffect(() => {
-    loadSettings();
+    void loadSettings();
   }, []);
 
   const loadSettings = async () => {
-    const profile = await loadMyProfile();
-    if (profile) {
-      setSettings({
-        profileVisibility: profile.privacy.profileVisibility,
-        leaderboardOptIn: profile.privacy.leaderboardOptIn,
-        showStatistics: profile.privacy.showStatistics,
-        showActivity: profile.privacy.showActivity,
-        showOnlineStatus: profile.social.showOnlineStatus,
-      });
+    try {
+      const profile = await loadMyProfile();
+      if (profile) {
+        setSettings({
+          profileVisibility: profile.privacy.profileVisibility,
+          leaderboardOptIn: profile.privacy.leaderboardOptIn,
+          showStatistics: profile.privacy.showStatistics,
+          showActivity: profile.privacy.showActivity,
+          showOnlineStatus: profile.social.showOnlineStatus,
+        });
+      }
+    } catch (error) {
+      logger.warn("Unable to load privacy settings", error);
+      Alert.alert(
+        "Unable to load settings",
+        "Please try again in a moment."
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    const success = await updatePrivacySettings({
-      profileVisibility: settings.profileVisibility,
-      leaderboardOptIn: settings.leaderboardOptIn,
-      showStatistics: settings.showStatistics,
-      showActivity: settings.showActivity,
-    });
-    setSaving(false);
+    try {
+      const success = await updatePrivacySettings({
+        profileVisibility: settings.profileVisibility,
+        leaderboardOptIn: settings.leaderboardOptIn,
+        showStatistics: settings.showStatistics,
+        showActivity: settings.showActivity,
+      });
 
-    if (success) {
-      Alert.alert("Success", "Privacy settings updated");
+      if (success) {
+        Alert.alert("Saved", "Privacy settings updated.");
+      } else {
+        Alert.alert(
+          "Update failed",
+          "We couldn't update your settings. Please try again."
+        );
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -85,6 +110,17 @@ export const PrivacySettingsScreen: React.FC = () => {
       isBoolean: true,
     },
   ];
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading privacy settings...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -149,6 +185,13 @@ export const PrivacySettingsScreen: React.FC = () => {
             <Switch
               value={settings[option.key] as boolean}
               onValueChange={() => toggleSetting(option.key)}
+              trackColor={{
+                false: colors.borderMuted,
+                true: colors.primarySoft,
+              }}
+              thumbColor={
+                settings[option.key] ? colors.primary : colors.surface
+              }
             />
           </View>
         ))}
@@ -165,7 +208,7 @@ export const PrivacySettingsScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || loading}
         >
           <Text style={styles.saveButtonText}>
             {saving ? "Saving..." : "Save Changes"}
@@ -176,136 +219,150 @@ export const PrivacySettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  content: {
-    paddingBottom: 100,
-  },
-  section: {
-    padding: 24,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#000000",
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 15,
-    color: "#8E8E93",
-    lineHeight: 22,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8E8E93",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    textTransform: "uppercase",
-  },
-  visibilitySection: {
-    backgroundColor: "#FFFFFF",
-    marginTop: 24,
-  },
-  visibilityOption: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  visibilityInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  visibilityTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 4,
-  },
-  visibilityDescription: {
-    fontSize: 13,
-    color: "#8E8E93",
-    lineHeight: 18,
-  },
-  radio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#C7C7CC",
-  },
-  radioSelected: {
-    borderColor: "#007AFF",
-    backgroundColor: "#007AFF",
-  },
-  optionCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  optionInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  optionTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 13,
-    color: "#8E8E93",
-    lineHeight: 18,
-  },
-  infoBox: {
-    backgroundColor: "#F2F2F7",
-    padding: 16,
-    margin: 16,
-    borderRadius: 12,
-  },
-  infoText: {
-    fontSize: 13,
-    color: "#8E8E93",
-    lineHeight: 18,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
-  },
-  saveButton: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.backgroundMuted,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    content: {
+      paddingBottom: 100,
+    },
+    section: {
+      padding: spacing.xl,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    sectionTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    sectionDescription: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+    sectionHeader: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textMuted,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      textTransform: "uppercase",
+    },
+    visibilitySection: {
+      backgroundColor: colors.surface,
+      marginTop: spacing.xl,
+    },
+    visibilityOption: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    visibilityInfo: {
+      flex: 1,
+      marginRight: spacing.md,
+    },
+    visibilityTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: spacing.xxs,
+    },
+    visibilityDescription: {
+      fontSize: 13,
+      color: colors.textMuted,
+      lineHeight: 18,
+    },
+    radio: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    radioSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    optionCard: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    optionInfo: {
+      flex: 1,
+      marginRight: spacing.md,
+    },
+    optionTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: spacing.xxs,
+    },
+    optionDescription: {
+      fontSize: 13,
+      color: colors.textMuted,
+      lineHeight: 18,
+    },
+    infoBox: {
+      backgroundColor: colors.surfaceSubtle,
+      padding: spacing.md,
+      margin: spacing.md,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    infoText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    footer: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderMuted,
+    },
+    saveButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    saveButtonDisabled: {
+      opacity: 0.5,
+    },
+    saveButtonText: {
+      color: colors.primaryOn,
+      fontSize: 17,
+      fontWeight: "600",
+    },
+  });

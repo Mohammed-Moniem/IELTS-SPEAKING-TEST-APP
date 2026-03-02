@@ -16,10 +16,23 @@ export const StatCard: React.FC<StatCardProps> = ({ label, value, hint }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   return (
-    <View style={styles.card}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+    <View
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={`${label}: ${String(value)}${hint ? `. ${hint}` : ""}`}
+      style={styles.card}
+    >
+      <Text allowFontScaling maxFontSizeMultiplier={1.3} style={styles.label}>
+        {label}
+      </Text>
+      <Text allowFontScaling maxFontSizeMultiplier={1.3} style={styles.value}>
+        {value}
+      </Text>
+      {hint ? (
+        <Text allowFontScaling maxFontSizeMultiplier={1.3} style={styles.hint}>
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 };

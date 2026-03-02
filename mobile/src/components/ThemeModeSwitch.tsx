@@ -45,6 +45,7 @@ export const ThemeModeSwitch: React.FC<ThemeModeSwitchProps> = ({ style }) => {
       accessibilityRole="button"
       accessibilityLabel={`Theme mode: ${MODE_LABEL[themeMode]}`}
       accessibilityHint={`Switch to ${MODE_LABEL[nextMode]} mode`}
+      accessibilityValue={{ text: MODE_LABEL[themeMode] }}
       style={({ pressed }) => [
         styles.container,
         {
@@ -57,7 +58,11 @@ export const ThemeModeSwitch: React.FC<ThemeModeSwitchProps> = ({ style }) => {
     >
       <View style={styles.content}>
         <Ionicons name={MODE_ICON[themeMode]} size={16} color={colors.primary} />
-        <Text style={[styles.label, { color: colors.textPrimary }]}>
+        <Text
+          allowFontScaling
+          maxFontSizeMultiplier={1.2}
+          style={[styles.label, { color: colors.textPrimary }]}
+        >
           {MODE_LABEL[themeMode]}
         </Text>
       </View>
@@ -69,6 +74,7 @@ const styles = StyleSheet.create({
   container: {
     borderWidth: 1,
     borderRadius: 999,
+    minHeight: 44,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: spacing.xs + 2,
   },

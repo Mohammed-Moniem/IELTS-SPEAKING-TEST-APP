@@ -16,13 +16,15 @@ describe('ErrorHandlerMiddleware', () => {
   beforeEach(() => {
     middleware = new ErrorHandlerMiddleware();
     mockRequest = {
-      headers: { 'Unique-Reference-Code': '123' },
+      headers: { 'unique-reference-code': '123' },
       method: 'GET',
       url: '/test'
     };
     mockResponse = {
       status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis()
+      json: jest.fn().mockReturnThis(),
+      headersSent: false,
+      writableEnded: false
     };
     nextFunction = jest.fn();
   });
@@ -33,6 +35,17 @@ describe('ErrorHandlerMiddleware', () => {
 
     expect(mockResponse.status).toHaveBeenCalledWith(StatusCodes.BAD_REQUEST);
     expect(mockResponse.json).toHaveBeenCalledWith({ errors: new ErrorResponse(httpError).get() });
-    expect(nextFunction).toHaveBeenCalled();
+    expect(nextFunction).not.toHaveBeenCalled();
+  });
+
+  it('should pass through to next when headers are already sent', () => {
+    const httpError = new HttpError(StatusCodes.BAD_REQUEST, 'Test error');
+    mockResponse.headersSent = true;
+
+    middleware.error(httpError, mockRequest as express.Request, mockResponse as express.Response, nextFunction);
+
+    expect(nextFunction).toHaveBeenCalledWith(httpError);
+    expect(mockResponse.status).not.toHaveBeenCalled();
+    expect(mockResponse.json).not.toHaveBeenCalled();
   });
 });

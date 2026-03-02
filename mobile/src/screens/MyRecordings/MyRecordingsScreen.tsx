@@ -18,15 +18,21 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   AudioRecording,
   deleteRecording,
   getAudioUrl,
   listUserRecordings,
 } from "../../api/audioApi";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 export const MyRecordingsScreen: React.FC = () => {
   const { user, initializing: authInitializing } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [recordings, setRecordings] = useState<AudioRecording[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,6 +42,7 @@ export const MyRecordingsScreen: React.FC = () => {
     "all"
   );
   const userId = user?._id ?? null;
+  const headerGradientColors = [colors.primaryStrong, colors.primary] as const;
 
   useEffect(() => {
     if (authInitializing) {
@@ -71,7 +78,7 @@ export const MyRecordingsScreen: React.FC = () => {
       });
       setRecordings(result.recordings);
     } catch (error) {
-      console.error("Failed to load recordings:", error);
+      logger.warn("⚠️ Failed to load recordings:", error);
       Alert.alert("Error", "Failed to load recordings");
     } finally {
       setLoading(false);
@@ -119,7 +126,7 @@ export const MyRecordingsScreen: React.FC = () => {
         setPlayingId(recording.id);
       }
     } catch (error) {
-      console.error("Error playing audio:", error);
+      logger.warn("⚠️ Error playing audio:", error);
       Alert.alert("Error", "Failed to play recording");
     }
   };
@@ -174,10 +181,10 @@ export const MyRecordingsScreen: React.FC = () => {
   };
 
   const getBandColor = (band: number): string => {
-    if (band >= 8) return "#10b981";
-    if (band >= 7) return "#3b82f6";
-    if (band >= 6) return "#f59e0b";
-    return "#ef4444";
+    if (band >= 8) return colors.success;
+    if (band >= 7) return colors.primary;
+    if (band >= 6) return colors.warning;
+    return colors.danger;
   };
 
   const renderRecordingCard = (recording: AudioRecording) => {
@@ -193,7 +200,7 @@ export const MyRecordingsScreen: React.FC = () => {
                 recording.recordingType === "practice" ? "school" : "trophy"
               }
               size={14}
-              color="#ffffff"
+              color={colors.primaryOn}
             />
             <Text style={styles.typeBadgeText}>
               {recording.recordingType === "practice"
@@ -223,19 +230,27 @@ export const MyRecordingsScreen: React.FC = () => {
         {/* Metadata */}
         <View style={styles.metadataRow}>
           <View style={styles.metadataItem}>
-            <Ionicons name="time-outline" size={14} color="#9ca3af" />
+            <Ionicons name="time-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metadataText}>
               {formatDuration(recording.durationSeconds)}
             </Text>
           </View>
           <View style={styles.metadataItem}>
-            <Ionicons name="calendar-outline" size={14} color="#9ca3af" />
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={colors.textMuted}
+            />
             <Text style={styles.metadataText}>
               {formatDate(recording.createdAt)}
             </Text>
           </View>
           <View style={styles.metadataItem}>
-            <Ionicons name="document-outline" size={14} color="#9ca3af" />
+            <Ionicons
+              name="document-outline"
+              size={14}
+              color={colors.textMuted}
+            />
             <Text style={styles.metadataText}>
               {formatFileSize(recording.fileSizeBytes)}
             </Text>
@@ -289,7 +304,7 @@ export const MyRecordingsScreen: React.FC = () => {
             <Ionicons
               name={isPlaying ? "pause" : "play"}
               size={20}
-              color="#3b82f6"
+              color={colors.primary}
             />
             <Text style={styles.actionButtonText}>
               {isPlaying ? "Pause" : "Play"}
@@ -300,8 +315,8 @@ export const MyRecordingsScreen: React.FC = () => {
             style={styles.actionButton}
             onPress={() => handleDelete(recording)}
           >
-            <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            <Text style={[styles.actionButtonText, { color: "#ef4444" }]}>
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+            <Text style={[styles.actionButtonText, styles.deleteActionText]}>
               Delete
             </Text>
           </TouchableOpacity>
@@ -310,7 +325,7 @@ export const MyRecordingsScreen: React.FC = () => {
         {/* Expiry warning */}
         {recording.expiresAt && (
           <View style={styles.expiryWarning}>
-            <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+            <Ionicons name="warning-outline" size={14} color={colors.warning} />
             <Text style={styles.expiryText}>
               Expires on {formatDate(recording.expiresAt)}
             </Text>
@@ -323,11 +338,11 @@ export const MyRecordingsScreen: React.FC = () => {
   if (authInitializing) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>My Recordings</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading recordings...</Text>
         </View>
       </View>
@@ -337,11 +352,15 @@ export const MyRecordingsScreen: React.FC = () => {
   if (!userId) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <Text style={styles.headerTitle}>My Recordings</Text>
         </LinearGradient>
         <View style={styles.centerContainer}>
-          <Ionicons name="lock-closed-outline" size={64} color="#4b5563" />
+          <Ionicons
+            name="lock-closed-outline"
+            size={64}
+            color={colors.textMuted}
+          />
           <Text style={styles.emptyTitle}>Sign in to access recordings</Text>
           <Text style={styles.emptySubtitle}>
             Log in to sync your practice audio and feedback
@@ -354,7 +373,7 @@ export const MyRecordingsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+      <LinearGradient colors={headerGradientColors} style={styles.header}>
         <Text style={styles.headerTitle}>My Recordings</Text>
         <Text style={styles.headerSubtitle}>
           {recordings.length} recording{recordings.length !== 1 ? "s" : ""}
@@ -413,12 +432,16 @@ export const MyRecordingsScreen: React.FC = () => {
       {/* Content */}
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading recordings...</Text>
         </View>
       ) : recordings.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Ionicons name="musical-notes-outline" size={64} color="#4b5563" />
+          <Ionicons
+            name="musical-notes-outline"
+            size={64}
+            color={colors.textMuted}
+          />
           <Text style={styles.emptyTitle}>No Recordings Yet</Text>
           <Text style={styles.emptySubtitle}>
             Your practice and simulation recordings will appear here
@@ -433,203 +456,210 @@ export const MyRecordingsScreen: React.FC = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#3b82f6"
+              tintColor={colors.primary}
             />
           }
         >
           {recordings.map(renderRecordingCard)}
-          <View style={{ height: 40 }} />
+          <View style={styles.bottomSpacing} />
         </ScrollView>
       )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#d1d5db",
-  },
-  filterContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    gap: 10,
-    backgroundColor: "#0f172a",
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    backgroundColor: "#1a1a1a",
-    alignItems: "center",
-  },
-  filterTabActive: {
-    backgroundColor: "#3b82f6",
-  },
-  filterTabText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#9ca3af",
-  },
-  filterTabTextActive: {
-    color: "#ffffff",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  recordingCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#2d2d2d",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  typeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#2d5a8f",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    gap: 5,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  bandBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  bandBadgeText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
-  topicText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-    marginBottom: 10,
-  },
-  metadataRow: {
-    flexDirection: "row",
-    gap: 15,
-    marginBottom: 10,
-  },
-  metadataItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  metadataText: {
-    fontSize: 12,
-    color: "#9ca3af",
-  },
-  scoresRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
-  },
-  scoreItem: {
-    flex: 1,
-    backgroundColor: "#2d2d2d",
-    padding: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  scoreLabel: {
-    fontSize: 10,
-    color: "#9ca3af",
-    marginBottom: 2,
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    backgroundColor: "#2d2d2d",
-    borderRadius: 10,
-    gap: 5,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3b82f6",
-  },
-  expiryWarning: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#2d2d2d",
-  },
-  expiryText: {
-    fontSize: 12,
-    color: "#f59e0b",
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 40,
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: "#9ca3af",
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: "#9ca3af",
-    textAlign: "center",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingTop: 60,
+      paddingBottom: 20,
+      paddingHorizontal: 20,
+    },
+    headerTitle: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.primaryOn,
+      marginBottom: 5,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    filterContainer: {
+      flexDirection: "row",
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+      gap: 10,
+      backgroundColor: colors.surfaceSubtle,
+    },
+    filterTab: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 15,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+    },
+    filterTabActive: {
+      backgroundColor: colors.primary,
+    },
+    filterTabText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+    filterTabTextActive: {
+      color: colors.primaryOn,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    recordingCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 15,
+      padding: 15,
+      marginBottom: 15,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    typeBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.primary,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      gap: 5,
+    },
+    typeBadgeText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.primaryOn,
+    },
+    bandBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 12,
+    },
+    bandBadgeText: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: colors.primaryOn,
+    },
+    topicText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: 10,
+    },
+    metadataRow: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 10,
+    },
+    metadataItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    metadataText: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    scoresRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 10,
+    },
+    scoreItem: {
+      flex: 1,
+      backgroundColor: colors.surfaceSubtle,
+      padding: 8,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    scoreLabel: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginBottom: 2,
+    },
+    scoreValue: {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 10,
+      gap: 5,
+    },
+    actionButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.primary,
+    },
+    deleteActionText: {
+      color: colors.danger,
+    },
+    expiryWarning: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderMuted,
+    },
+    expiryText: {
+      fontSize: 12,
+      color: colors.warning,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 40,
+    },
+    loadingText: {
+      marginTop: 15,
+      fontSize: 16,
+      color: colors.textMuted,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginTop: 20,
+      marginBottom: 10,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+    bottomSpacing: {
+      height: 40,
+    },
+  });

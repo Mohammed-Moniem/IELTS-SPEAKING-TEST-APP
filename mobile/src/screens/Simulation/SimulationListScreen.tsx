@@ -15,14 +15,16 @@ import { simulationApi } from "../../api/services";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { EmptyState } from "../../components/EmptyState";
-import { OfflineBanner } from "../../components/OfflineBanner";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { Tag } from "../../components/Tag";
 import { UsageLimitModal } from "../../components/UsageLimitModal";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { useUsageGuard } from "../../hooks";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { TestSimulation } from "../../types/api";
 import { formatDateTime } from "../../utils/date";
 import { extractErrorMessage } from "../../utils/errors";
@@ -31,6 +33,8 @@ export const SimulationListScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<SimulationStackParamList>>();
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { ensureCanStart, limitState, dismissLimit, refreshUsage } =
     useUsageGuard();
 
@@ -108,7 +112,6 @@ export const SimulationListScreen: React.FC = () => {
 
   return (
     <ScreenContainer scrollable>
-      <OfflineBanner showQueueCount />
       <SectionHeading title="Practice full simulations">
         Build exam stamina across all three IELTS speaking parts.
       </SectionHeading>
@@ -159,23 +162,24 @@ export const SimulationListScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  meta: {
-    color: colors.textMuted,
-  },
-  summary: {
-    marginTop: spacing.sm,
-    color: colors.textSecondary,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.sm,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    meta: {
+      color: colors.textMuted,
+    },
+    summary: {
+      marginTop: spacing.sm,
+      color: colors.textSecondary,
+    },
+  });

@@ -14,6 +14,7 @@ import { Tag } from "../../components/Tag";
 import { SimulationStackParamList } from "../../navigation/SimulationNavigator";
 import { colors, spacing } from "../../theme/tokens";
 import { formatDateTime } from "../../utils/date";
+import { logger } from "../../utils/logger";
 
 export type SimulationDetailScreenProps = NativeStackScreenProps<
   SimulationStackParamList,
@@ -43,7 +44,7 @@ export const SimulationDetailScreen: React.FC<SimulationDetailScreenProps> = ({
     },
     onError: (error) => {
       Alert.alert("Error", "Failed to start new simulation. Please try again.");
-      console.error("Retry simulation error:", error);
+      logger.warn("Retry simulation failed", error);
     },
   });
 

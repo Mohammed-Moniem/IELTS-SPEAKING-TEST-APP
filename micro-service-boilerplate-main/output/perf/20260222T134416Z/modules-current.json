@@ -1,0 +1,319 @@
+{
+  "generated_at": "2026-02-22T13:44:38.689274+00:00",
+  "tool": "http_load_test.py",
+  "config": {
+    "default_concurrency": [
+      1,
+      2,
+      4
+    ],
+    "requests_per_level": 20,
+    "warmup_requests": 20,
+    "profile": "sweep",
+    "ramp_step_seconds": 20.0,
+    "soak_duration_seconds": 300.0,
+    "spike_baseline_seconds": 20.0,
+    "spike_duration_seconds": 15.0,
+    "spike_recovery_seconds": 20.0,
+    "spike_multiplier": 3.0,
+    "insecure_tls": false
+  },
+  "runs": [
+    {
+      "scenario": "writing-task-generate",
+      "url": "http://127.0.0.1:4000/api/v1/writing/tasks/generate",
+      "method": "POST",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:38.891903+00:00",
+      "ended_at": "2026-02-22T13:44:40.499825+00:00",
+      "duration_s": 1.608,
+      "throughput_rps": 4.975,
+      "success_rps": 4.975,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 196.768,
+        "mean": 200.802,
+        "p50": 200.857,
+        "p90": 203.017,
+        "p95": 203.354,
+        "p99": 203.623,
+        "max": 203.69
+      }
+    },
+    {
+      "scenario": "writing-task-generate",
+      "url": "http://127.0.0.1:4000/api/v1/writing/tasks/generate",
+      "method": "POST",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:40.500104+00:00",
+      "ended_at": "2026-02-22T13:44:41.302461+00:00",
+      "duration_s": 0.802,
+      "throughput_rps": 9.971,
+      "success_rps": 9.971,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 196.921,
+        "mean": 200.148,
+        "p50": 199.66,
+        "p90": 202.938,
+        "p95": 204.482,
+        "p99": 205.717,
+        "max": 206.026
+      }
+    },
+    {
+      "scenario": "reading-start",
+      "url": "http://127.0.0.1:4000/api/v1/reading/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:42.562389+00:00",
+      "ended_at": "2026-02-22T13:44:50.650867+00:00",
+      "duration_s": 8.088,
+      "throughput_rps": 0.989,
+      "success_rps": 0.989,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 992.654,
+        "mean": 1010.915,
+        "p50": 1002.291,
+        "p90": 1036.569,
+        "p95": 1042.45,
+        "p99": 1047.155,
+        "max": 1048.331
+      }
+    },
+    {
+      "scenario": "reading-start",
+      "url": "http://127.0.0.1:4000/api/v1/reading/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:50.651034+00:00",
+      "ended_at": "2026-02-22T13:44:55.341097+00:00",
+      "duration_s": 4.69,
+      "throughput_rps": 1.706,
+      "success_rps": 1.706,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 984.216,
+        "mean": 1090.158,
+        "p50": 1001.334,
+        "p90": 1331.672,
+        "p95": 1368.236,
+        "p99": 1397.487,
+        "max": 1404.8
+      }
+    },
+    {
+      "scenario": "reading-start",
+      "url": "http://127.0.0.1:4000/api/v1/reading/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 4,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:55.341362+00:00",
+      "ended_at": "2026-02-22T13:44:57.669929+00:00",
+      "duration_s": 2.329,
+      "throughput_rps": 3.436,
+      "success_rps": 3.436,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 1006.041,
+        "mean": 1112.682,
+        "p50": 1017.994,
+        "p90": 1308.677,
+        "p95": 1309.175,
+        "p99": 1309.574,
+        "max": 1309.674
+      }
+    },
+    {
+      "scenario": "listening-start",
+      "url": "http://127.0.0.1:4000/api/v1/listening/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:58.680315+00:00",
+      "ended_at": "2026-02-22T13:45:06.684569+00:00",
+      "duration_s": 8.004,
+      "throughput_rps": 0.999,
+      "success_rps": 0.999,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 987.659,
+        "mean": 1000.382,
+        "p50": 997.204,
+        "p90": 1017.081,
+        "p95": 1017.507,
+        "p99": 1017.848,
+        "max": 1017.933
+      }
+    },
+    {
+      "scenario": "listening-start",
+      "url": "http://127.0.0.1:4000/api/v1/listening/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:45:06.684800+00:00",
+      "ended_at": "2026-02-22T13:45:10.907289+00:00",
+      "duration_s": 4.222,
+      "throughput_rps": 1.895,
+      "success_rps": 1.895,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 992.724,
+        "mean": 1031.59,
+        "p50": 1006.509,
+        "p90": 1078.389,
+        "p95": 1140.386,
+        "p99": 1189.983,
+        "max": 1202.382
+      }
+    },
+    {
+      "scenario": "listening-start",
+      "url": "http://127.0.0.1:4000/api/v1/listening/tests/start",
+      "method": "POST",
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 4,
+      "requests": 8,
+      "planned_requests": 8,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:45:10.907624+00:00",
+      "ended_at": "2026-02-22T13:45:13.556169+00:00",
+      "duration_s": 2.649,
+      "throughput_rps": 3.021,
+      "success_rps": 3.021,
+      "success_count": 8,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "201": 8
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 1009.341,
+        "mean": 1197.782,
+        "p50": 1214.137,
+        "p90": 1301.835,
+        "p95": 1369.108,
+        "p99": 1422.926,
+        "max": 1436.38
+      }
+    }
+  ]
+}

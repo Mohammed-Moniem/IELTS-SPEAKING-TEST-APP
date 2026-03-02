@@ -10,6 +10,9 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   feedbackNotificationsEnabled: true,
   directMessagesEnabled: true,
   groupMessagesEnabled: true,
+  friendRequestsEnabled: true,
+  friendAcceptancesEnabled: true,
   systemAnnouncementsEnabled: true,
   offersEnabled: true,
+  partnerOffersEnabled: true,
 };

@@ -85,4 +85,26 @@ describe('WritingController', () => {
       expect.objectContaining({ urc: 'writing-submit-test' })
     );
   });
+
+  it('supports additive history filters without breaking contract', async () => {
+    const mockService = {
+      getHistory: jest.fn().mockResolvedValue([])
+    } as unknown as WritingService;
+
+    Container.set({ id: WritingService, value: mockService });
+    const app = createApp();
+
+    const response = await request(app)
+      .get('/api/v1/writing/history?limit=5&offset=0&track=general&from=2026-01-01&to=2026-01-31')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Unique-Reference-Code', 'writing-history-filter-test');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(mockService.getHistory).toHaveBeenCalledWith('507f1f77bcf86cd799439011', 5, 0, {
+      track: 'general',
+      from: '2026-01-01',
+      to: '2026-01-31'
+    });
+  });
 });

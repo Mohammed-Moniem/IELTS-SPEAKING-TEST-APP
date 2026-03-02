@@ -20,6 +20,7 @@ import { resultsStorage } from "../services/resultsStorage";
 import { ttsService } from "../services/textToSpeechService";
 import type { ColorTokens } from "../theme/tokens";
 import { spacing } from "../theme/tokens";
+import { logger } from "../utils/logger";
 import { VoiceOrb } from "./VoiceOrb";
 
 /**
@@ -234,7 +235,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
       // Start the test
       startIntroduction();
     } catch (error) {
-      console.error("Failed to initialize test:", error);
+      logger.warn("Failed to initialize test:", error);
       Alert.alert(
         "Error",
         "Failed to load test questions. Please check your connection and try again.",
@@ -278,7 +279,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
           }, 2000);
         },
         onError: (error) => {
-          console.error("❌ TTS Error:", error);
+          logger.warn("❌ TTS Error:", error);
           Alert.alert(
             "Audio Error",
             "Failed to play examiner voice. Please check your device volume and try again.",
@@ -290,7 +291,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
         },
       });
     } catch (error) {
-      console.error("❌ Failed to start introduction:", error);
+      logger.warn("❌ Failed to start introduction:", error);
       Alert.alert("Error", "Failed to start test. Please try again.", [
         { text: "OK", onPress: onExit },
       ]);
@@ -350,7 +351,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
           await startRecording(60, 1); // 60 seconds max for Part 1
         },
         onError: (error) => {
-          console.error("❌ TTS Error in Part 1:", error);
+          logger.warn("❌ TTS Error in Part 1:", error);
           Alert.alert(
             "Audio Error",
             "Failed to play question. Please check your connection.",
@@ -368,7 +369,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
         },
       });
     } catch (error) {
-      console.error("❌ Error in askNextPart1Question:", error);
+      logger.warn("❌ Error in askNextPart1Question:", error);
       Alert.alert("Error", "An error occurred. Would you like to continue?", [
         { text: "Try Again", onPress: () => askNextPart1Question() },
         { text: "Exit", onPress: onExit },
@@ -396,7 +397,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
       console.log("🔐 Requesting microphone permissions...");
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
-        console.error("❌ Microphone permission denied!");
+        logger.warn("❌ Microphone permission denied!");
         Alert.alert(
           "Permission Required",
           "Microphone access is required to record your answers. Please grant permission in settings.",
@@ -457,10 +458,10 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
 
       console.log("🎤 Recording setup complete. Waiting for your answer...\n");
     } catch (error) {
-      console.error("❌ ============================================");
-      console.error("❌ FAILED TO START RECORDING!");
-      console.error("❌ Error:", error);
-      console.error("❌ ============================================");
+      logger.warn("❌ ============================================");
+      logger.warn("❌ FAILED TO START RECORDING!");
+      logger.warn("❌ Error:", error);
+      logger.warn("❌ ============================================");
       Alert.alert(
         "Recording Error",
         "Failed to start recording. Please check your microphone permissions and try again.",
@@ -587,7 +588,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
         }, 2000);
       }
     } catch (error) {
-      console.error("❌ Failed to stop recording:", error);
+      logger.warn("❌ Failed to stop recording:", error);
       Alert.alert("Error", "Failed to save your recording. Please try again.", [
         {
           text: "Continue",
@@ -647,7 +648,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
           }, 2000);
         },
         onError: (error) => {
-          console.error("❌ TTS Error in Part 1 closing:", error);
+          logger.warn("❌ TTS Error in Part 1 closing:", error);
           // Still proceed to Part 2
           setTimeout(() => {
             startPart2();
@@ -655,7 +656,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
         },
       });
     } catch (error) {
-      console.error("❌ Error finishing Part 1:", error);
+      logger.warn("❌ Error finishing Part 1:", error);
       // Still proceed to Part 2
       setTimeout(() => {
         startPart2();
@@ -904,7 +905,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleExitAttempt} style={styles.exitButton}>
-          <Ionicons name="close" size={24} color="#ffffff" />
+          <Ionicons name="close" size={24} color={colors.primaryOn} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>{getHeaderText()}</Text>
@@ -981,7 +982,7 @@ export const AuthenticFullTest: React.FC<AuthenticTestProps> = ({
           style={[styles.promptOverlay, { opacity: promptOpacity }]}
         >
           <View style={styles.promptBadge}>
-            <Ionicons name="mic" size={16} color="#ffffff" />
+            <Ionicons name="mic" size={16} color={colors.primaryOn} />
             <Text style={styles.promptText}>{promptMessage}</Text>
           </View>
         </Animated.View>
@@ -1016,11 +1017,11 @@ const createStyles = (colors: ColorTokens) =>
     headerTitle: {
       fontSize: 18,
       fontWeight: "700",
-      color: "#ffffff",
+      color: colors.primaryOn,
     },
     headerSubtitle: {
       fontSize: 14,
-      color: "#ffffff",
+      color: colors.primaryOn,
       opacity: 0.9,
       marginTop: 2,
     },
@@ -1058,7 +1059,7 @@ const createStyles = (colors: ColorTokens) =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: "#ef4444",
+      backgroundColor: colors.danger,
       marginRight: spacing.xs,
     },
     timerText: {
@@ -1075,7 +1076,7 @@ const createStyles = (colors: ColorTokens) =>
       backgroundColor: colors.surface,
       padding: spacing.lg,
       borderRadius: 16,
-      shadowColor: "#000",
+      shadowColor: colors.textPrimary,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
@@ -1113,7 +1114,7 @@ const createStyles = (colors: ColorTokens) =>
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.sm,
       borderRadius: 24,
-      shadowColor: "#000",
+      shadowColor: colors.textPrimary,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
       shadowRadius: 4,
@@ -1122,7 +1123,7 @@ const createStyles = (colors: ColorTokens) =>
     promptText: {
       fontSize: 14,
       fontWeight: "600",
-      color: "#ffffff",
+      color: colors.primaryOn,
       marginLeft: spacing.xs,
     },
     loadingContainer: {

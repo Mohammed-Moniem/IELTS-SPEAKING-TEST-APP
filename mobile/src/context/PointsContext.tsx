@@ -56,9 +56,18 @@ interface PointsContextType {
 
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
+const getErrorStatus = (err: unknown): number | undefined => {
+  const status =
+    (err as any)?.response?.status ??
+    (err as any)?.status ??
+    (err as any)?.response?.data?.status ??
+    (err as any)?.data?.status;
+  return typeof status === "number" ? status : undefined;
+};
+
 const isUnauthorizedError = (err: unknown): boolean => {
-  const status = (err as { response?: { status?: number } })?.response?.status;
-  return status === 401;
+  const status = getErrorStatus(err);
+  return status === 401 || status === 403;
 };
 
 export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -75,8 +84,6 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
    * Fetch points summary from API
    */
   const fetchSummary = useCallback(async () => {
-    console.log("📊 fetchSummary called, accessToken:", !!accessToken);
-
     if (!accessToken || user?.isGuest) {
       setSummary(null);
       setLoading(false);
@@ -86,23 +93,24 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       setError(null);
-      console.log("📊 Fetching points summary from API...");
       const data = await pointsService.getPointsSummary();
-      console.log("✅ Points summary fetched successfully:", data.balance);
       setSummary(data);
       return data;
     } catch (err) {
       if (isUnauthorizedError(err)) {
-        logger.warn("⚠️ Points summary unauthorized during startup; skipping.");
+        logger.info(
+          "ℹ️",
+          "Points summary unavailable for current session; skipping startup sync."
+        );
         setSummary(null);
         setError(null);
         return null;
       }
       const message =
         err instanceof Error ? err.message : "Failed to fetch points";
-      logger.error("❌ Error fetching points summary:", err);
+      logger.warn("⚠️ Points summary fetch failed", err);
       setError(message);
-      throw err;
+      return null;
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -114,38 +122,27 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const fetchTransactions = useCallback(
     async (limit: number = 20): Promise<PointsTransaction[]> => {
-      console.log(
-        "📜 fetchTransactions called, limit:",
-        limit,
-        "accessToken:",
-        !!accessToken
-      );
-
       if (!accessToken || user?.isGuest) {
         setTransactions([]);
         return [];
       }
 
       try {
-        console.log("📜 Fetching transactions from API...");
         const data = await pointsService.getTransactions(limit);
-        console.log(
-          "✅ Transactions fetched successfully:",
-          data.length,
-          "items"
-        );
         setTransactions(data);
         return data;
       } catch (err) {
         if (isUnauthorizedError(err)) {
-          logger.warn(
-            "⚠️ Points transactions unauthorized during startup; skipping."
+          logger.info(
+            "ℹ️",
+            "Points transactions unavailable for current session; skipping startup sync."
           );
           setTransactions([]);
+          setError(null);
           return [];
         }
-        logger.error("❌ Error fetching transactions:", err);
-        throw err;
+        logger.warn("⚠️ Points transactions fetch failed", err);
+        return [];
       }
     },
     [accessToken, user?.isGuest]
@@ -163,7 +160,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       await Promise.all([fetchSummary(), fetchTransactions()]);
     } catch (err) {
-      logger.error("❌ Error refreshing points data:", err);
+      logger.warn("⚠️ Error refreshing points data:", err);
     }
   }, [accessToken, user?.isGuest, fetchSummary, fetchTransactions]);
 
@@ -178,7 +175,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
         await fetchSummary();
         return result;
       } catch (err) {
-        logger.error("❌ Error redeeming discount:", err);
+        logger.warn("⚠️ Error redeeming discount:", err);
         throw err;
       }
     },
@@ -243,13 +240,7 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
    * Subscribe to socket events and fetch initial data
    */
   useEffect(() => {
-    console.log(
-      "🔍 PointsContext useEffect triggered, accessToken:",
-      !!accessToken
-    );
-
     if (!accessToken) {
-      console.log("🔍 PointsContext: No accessToken, clearing state");
       setLoading(false);
       setTransactions([]);
       setSummary(null);
@@ -257,7 +248,6 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     if (user?.isGuest) {
-      console.log("🔍 PointsContext: Guest session, skipping points fetch");
       setLoading(false);
       setTransactions([]);
       setSummary(null);
@@ -265,15 +255,14 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     // Initial fetch
-    console.log("📊 PointsContext: Fetching initial data...");
     fetchSummary().catch((err) => {
       if (!isUnauthorizedError(err)) {
-        logger.error("❌ Initial points summary fetch failed:", err);
+        logger.warn("⚠️ Initial points summary fetch failed:", err);
       }
     });
     fetchTransactions().catch((err) => {
       if (!isUnauthorizedError(err)) {
-        logger.error("❌ Initial points transactions fetch failed:", err);
+        logger.warn("⚠️ Initial points transactions fetch failed:", err);
       }
     });
 
@@ -282,7 +271,6 @@ export const PointsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Cleanup
     return () => {
-      console.log("🔍 PointsContext: Cleaning up socket listener");
       socketService.off("points:granted", handlePointsGranted);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Campaign Orchestration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", 
+              "primary-hover": "#6D28D9",
+              "background-light": "#F3F4F6", 
+              "background-dark": "#0F1115", 
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#18181B", 
+              "surface-darker": "#131316", 
+              "text-light": "#1F2937", 
+              "text-dark": "#F9FAFB", 
+              "text-muted-light": "#6B7280", 
+              "text-muted-dark": "#9CA3AF", 
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.5rem", 
+              'xl': "0.75rem", 
+              '2xl': "1rem", 
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        .step-active {
+            @apply border-primary text-primary bg-primary/5;
+        }
+        .step-completed {
+            @apply border-primary bg-primary text-white;
+        }
+        .step-inactive {
+            @apply border-gray-200 text-gray-400 dark:border-gray-700 dark:text-gray-600;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-surface-light dark:bg-surface-darker border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 hidden lg:flex">
+<div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-800/50">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">S</div>
+<span class="text-lg font-bold tracking-tight text-gray-900 dark:text-white">Spokio <span class="text-xs font-normal text-gray-500 uppercase ml-1">Admin</span></span>
+</div>
+</div>
+<nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+<div class="px-3 mb-2 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">Overview</div>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+            Dashboard
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-[20px]">people</span>
+            Users
+        </a>
+<div class="px-3 mt-8 mb-2 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">Engagement</div>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-300 group" href="#">
+<span class="material-symbols-outlined text-[20px]">campaign</span>
+            Campaigns
+        </a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+            Push Logs
+        </a>
+<div class="px-3 mt-8 mb-2 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">System</div>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+            Settings
+        </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<button class="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">JD</div>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Jane Doe</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Super Admin</p>
+</div>
+<span class="material-symbols-outlined ml-auto text-gray-400 text-sm">expand_more</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen">
+<header class="lg:hidden h-16 bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg dark:text-white">Admin</span>
+</div>
+<button class="p-2 text-gray-500 hover:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-6xl mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<div>
+<div class="flex items-center gap-2 text-sm text-text-muted-light dark:text-gray-400 mb-1">
+<a class="hover:text-primary" href="#">Campaigns</a>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span>New Campaign</span>
+</div>
+<h1 class="text-2xl font-bold text-gray-900 dark:text-white">Create Notification Campaign</h1>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-surface-dark border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    Save Draft
+                </button>
+<button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors shadow-lg shadow-primary/20">
+                    Review &amp; Publish
+                </button>
+</div>
+</div>
+<div class="mb-8">
+<nav aria-label="Progress">
+<ol class="flex items-center" role="list">
+<li class="relative pr-8 sm:pr-20">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="h-0.5 w-full bg-primary"></div>
+</div>
+<a class="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary hover:bg-primary-hover" href="#">
+<span class="material-symbols-outlined text-white text-sm">check</span>
+</a>
+<span class="absolute top-10 left-1/2 -translate-x-1/2 text-xs font-medium text-primary hidden sm:block">Audience</span>
+</li>
+<li class="relative pr-8 sm:pr-20">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="h-0.5 w-full bg-primary"></div>
+</div>
+<a class="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary hover:bg-primary-hover" href="#">
+<span class="material-symbols-outlined text-white text-sm">check</span>
+</a>
+<span class="absolute top-10 left-1/2 -translate-x-1/2 text-xs font-medium text-primary hidden sm:block">Channels</span>
+</li>
+<li class="relative pr-8 sm:pr-20">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="h-0.5 w-full bg-gray-200 dark:bg-gray-700"></div>
+</div>
+<a aria-current="step" class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary bg-surface-light dark:bg-surface-dark" href="#">
+<span aria-hidden="true" class="h-2.5 w-2.5 rounded-full bg-primary"></span>
+</a>
+<span class="absolute top-10 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-900 dark:text-white hidden sm:block">Content</span>
+</li>
+<li class="relative pr-8 sm:pr-20">
+<div aria-hidden="true" class="absolute inset-0 flex items-center">
+<div class="h-0.5 w-full bg-gray-200 dark:bg-gray-700"></div>
+</div>
+<a class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 dark:border-gray-600 bg-surface-light dark:bg-surface-dark hover:border-gray-400" href="#">
+<span aria-hidden="true" class="h-2.5 w-2.5 rounded-full bg-transparent"></span>
+</a>
+<span class="absolute top-10 left-1/2 -translate-x-1/2 text-xs font-medium text-gray-500 hidden sm:block">Scheduling</span>
+</li>
+<li class="relative">
+<a class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 dark:border-gray-600 bg-surface-light dark:bg-surface-dark hover:border-gray-400" href="#">
+<span aria-hidden="true" class="h-2.5 w-2.5 rounded-full bg-transparent"></span>
+</a>
+<span class="absolute top-10 left-1/2 -translate-x-1/2 text-xs font-medium text-gray-500 hidden sm:block">Safety</span>
+</li>
+</ol>
+</nav>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
+<div class="lg:col-span-2 space-y-6">
+<div class="bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center justify-between shadow-sm opacity-70">
+<div class="flex items-center gap-4">
+<div class="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-2 rounded-lg">
+<span class="material-symbols-outlined text-xl">group</span>
+</div>
+<div>
+<h3 class="text-sm font-bold text-gray-900 dark:text-white">Target Audience</h3>
+<p class="text-xs text-gray-500">Users with Partner Code: <span class="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded text-gray-700 dark:text-gray-300">ALEX20</span> • Approx. 1,420 users</p>
+</div>
+</div>
+<button class="text-sm text-primary font-medium hover:underline">Edit</button>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm">
+<div class="p-6 border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center justify-between">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">edit_note</span>
+                                Message Composition
+                            </h2>
+<div class="flex gap-2 text-xs">
+<span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">mail</span> Email
+                                </span>
+<span class="px-2 py-1 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">notifications_active</span> Push
+                                </span>
+</div>
+</div>
+</div>
+<div class="p-6 space-y-6">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Campaign Name (Internal)</label>
+<input class="w-full bg-gray-50 dark:bg-surface-darker border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary dark:text-white" placeholder="e.g. Q4 IELTS Promo - Alex Cohort" type="text" value="Q4 IELTS Promo - Alex Cohort"/>
+</div>
+<div class="border-t border-gray-100 dark:border-gray-800 pt-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-sm font-semibold text-gray-900 dark:text-white">Content Variables</h3>
+<button class="text-xs text-primary font-medium flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-sm">data_object</span> Insert Variable
+                                </button>
+</div>
+<div class="mb-4">
+<label class="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Notification Title / Email Subject</label>
+<div class="relative">
+<input class="w-full bg-white dark:bg-surface-darker border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary dark:text-white pr-16" type="text" value="Unlock your full potential with Premium 🚀"/>
+<span class="absolute right-3 top-2.5 text-xs text-gray-400">42/60</span>
+</div>
+</div>
+<div class="mb-4">
+<label class="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Body Content</label>
+<textarea class="w-full bg-white dark:bg-surface-darker border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary dark:text-white resize-none" rows="5">Hi {{user.first_name}},
+We noticed you've been practicing hard on your IELTS Speaking modules. 
+Use code ALEX20 to get 20% off your first month of Spokio Premium and unlock unlimited AI feedback.
+Keep learning!</textarea>
+<div class="flex justify-between mt-2">
+<p class="text-xs text-gray-400">Supports Basic Markdown</p>
+<span class="text-xs text-gray-400">184 chars</span>
+</div>
+</div>
+<div>
+<label class="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Primary Action Link</label>
+<div class="relative flex rounded-lg shadow-sm">
+<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 text-sm">
+                                        https://
+                                    </span>
+<input class="flex-1 min-w-0 block w-full px-3 py-2.5 rounded-none rounded-r-lg bg-white dark:bg-surface-darker border border-gray-300 dark:border-gray-700 text-sm focus:ring-primary focus:border-primary dark:text-white" type="text" value="spokio.app/pricing?ref=alex20"/>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-gray-50 dark:bg-surface-darker/50 px-6 py-4 rounded-b-xl border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
+<button class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium">Back</button>
+<button class="px-6 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                            Next Step <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<div class="lg:col-span-1 space-y-6">
+<div class="bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg overflow-hidden sticky top-6">
+<div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-surface-darker">
+<h3 class="text-sm font-bold text-gray-900 dark:text-white">Live Preview</h3>
+<div class="flex bg-gray-200 dark:bg-gray-800 rounded p-1">
+<button class="p-1 rounded bg-white dark:bg-gray-600 shadow-sm text-gray-800 dark:text-white">
+<span class="material-symbols-outlined text-sm">smartphone</span>
+</button>
+<button class="p-1 rounded text-gray-500 hover:text-gray-700 dark:text-gray-400">
+<span class="material-symbols-outlined text-sm">laptop</span>
+</button>
+</div>
+</div>
+<div class="p-6 bg-gray-100 dark:bg-[#0F1115] min-h-[400px] flex items-center justify-center relative">
+<div class="w-full max-w-[280px] bg-black rounded-[2rem] p-3 shadow-2xl border-4 border-gray-800">
+<div class="bg-white dark:bg-gray-900 rounded-[1.5rem] overflow-hidden h-[480px] relative">
+<div class="h-6 w-full flex justify-between px-4 items-center pt-2">
+<span class="text-[10px] font-bold text-gray-900 dark:text-white">9:41</span>
+<div class="flex gap-1">
+<div class="w-3 h-3 bg-gray-900 dark:bg-white rounded-full opacity-20"></div>
+<div class="w-3 h-3 bg-gray-900 dark:bg-white rounded-full opacity-20"></div>
+</div>
+</div>
+<div class="absolute top-12 left-2 right-2 mx-auto">
+<div class="bg-white/90 dark:bg-gray-800/95 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+<span class="text-white font-bold text-lg">S</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<p class="text-xs font-bold text-gray-900 dark:text-white truncate">Spokio • Now</p>
+</div>
+<p class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5 leading-tight">Unlock your full potential with Premium 🚀</p>
+<p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3">
+                                                    Hi Student, We noticed you've been practicing hard on your IELTS Speaking modules. Use code ALEX20 to get 20% off...
+                                                </p>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 px-4 opacity-30 pointer-events-none filter blur-[1px]">
+<div class="h-32 bg-gray-200 dark:bg-gray-800 rounded-xl mb-4 w-full"></div>
+<div class="h-16 bg-gray-200 dark:bg-gray-800 rounded-xl mb-4 w-full"></div>
+<div class="h-16 bg-gray-200 dark:bg-gray-800 rounded-xl mb-4 w-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+<h3 class="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-yellow-500 text-lg">verified_user</span>
+                        Safety Review
+                    </h3>
+<div class="space-y-3">
+<div class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-green-500 text-lg mt-0.5">check_circle</span>
+<div>
+<p class="font-medium text-gray-700 dark:text-gray-300">Audience Size Limit</p>
+<p class="text-xs text-gray-500">Targeting &lt; 5,000 users. No approval required.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-green-500 text-lg mt-0.5">check_circle</span>
+<div>
+<p class="font-medium text-gray-700 dark:text-gray-300">Frequency Cap</p>
+<p class="text-xs text-gray-500">Users haven't received a message in 24h.</p>
+</div>
+</div>
+<div class="flex items-start gap-3 text-sm opacity-50">
+<span class="material-symbols-outlined text-gray-400 text-lg mt-0.5">radio_button_unchecked</span>
+<div>
+<p class="font-medium text-gray-700 dark:text-gray-300">Link Validation</p>
+<p class="text-xs text-gray-500">Pending next step...</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50">
+<button class="bg-surface-dark text-white dark:bg-white dark:text-gray-900 p-3 rounded-full shadow-lg hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined block dark:hidden">dark_mode</span>
+<span class="material-symbols-outlined hidden dark:block">light_mode</span>
+</button>
+</div>
+
+</body></html>

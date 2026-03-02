@@ -19,25 +19,22 @@ type ToneStyle = {
 
 type TagTone = NonNullable<TagProps["tone"]>;
 
-const getToneStyles = (
-  colors: ColorTokens,
-  isDark: boolean
-): Record<TagTone, ToneStyle> => ({
+const getToneStyles = (colors: ColorTokens): Record<TagTone, ToneStyle> => ({
   default: { background: colors.borderMuted, text: colors.textPrimary },
   success: { background: colors.successSoft, text: colors.successOn },
   warning: { background: colors.warningSoft, text: colors.warningOn },
   info: { background: colors.infoSoft, text: colors.info },
   premium: {
-    background: isDark ? "#FACC15" : "#FDE68A",
-    text: isDark ? "#1F1400" : "#4A3200",
-    border: isDark ? "#FDE047" : "#EAB308",
+    background: colors.badgePremiumBackground,
+    text: colors.badgePremiumText,
+    border: colors.badgePremiumBorder,
   },
 });
 
 export const Tag: React.FC<TagProps> = ({ label, tone = "default" }) => {
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const palette = getToneStyles(colors, theme === "dark")[tone];
+  const palette = getToneStyles(colors)[tone];
   return (
     <View
       style={[

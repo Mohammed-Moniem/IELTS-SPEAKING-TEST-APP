@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Dimensions, StyleSheet, View } from "react-native";
 
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+
 interface VoiceOrbProps {
   isListening: boolean;
   isSpeaking: boolean;
@@ -13,6 +16,7 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   isListening,
   isSpeaking,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -130,63 +134,64 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  orb: {
-    width: ORB_SIZE,
-    height: ORB_SIZE,
-    borderRadius: ORB_SIZE / 2,
-    overflow: "hidden",
-    backgroundColor: "#1a365d", // Deep navy
-  },
-  glow: {
-    position: "absolute",
-    width: ORB_SIZE * 1.3,
-    height: ORB_SIZE * 1.3,
-    borderRadius: (ORB_SIZE * 1.3) / 2,
-    backgroundColor: "#d4a745", // Warm gold
-    opacity: 0.3,
-  },
-  gradient1: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#2d5a8f",
-    opacity: 0.8,
-  },
-  gradient2: {
-    position: "absolute",
-    width: "80%",
-    height: "80%",
-    top: "10%",
-    left: "10%",
-    borderRadius: ORB_SIZE / 2,
-    backgroundColor: "#4a7bb5",
-    opacity: 0.6,
-  },
-  gradient3: {
-    position: "absolute",
-    width: "60%",
-    height: "60%",
-    top: "20%",
-    left: "20%",
-    borderRadius: ORB_SIZE / 2,
-    backgroundColor: "#6b9ed9",
-    opacity: 0.4,
-  },
-  highlight: {
-    position: "absolute",
-    width: ORB_SIZE * 0.3,
-    height: ORB_SIZE * 0.3,
-    top: ORB_SIZE * 0.15,
-    left: ORB_SIZE * 0.35,
-    borderRadius: (ORB_SIZE * 0.3) / 2,
-    backgroundColor: "#ffffff",
-    opacity: 0.2,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      width: ORB_SIZE,
+      height: ORB_SIZE,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    orb: {
+      width: ORB_SIZE,
+      height: ORB_SIZE,
+      borderRadius: ORB_SIZE / 2,
+      overflow: "hidden",
+      backgroundColor: colors.backgroundMuted,
+    },
+    glow: {
+      position: "absolute",
+      width: ORB_SIZE * 1.3,
+      height: ORB_SIZE * 1.3,
+      borderRadius: (ORB_SIZE * 1.3) / 2,
+      backgroundColor: colors.warning,
+      opacity: 0.3,
+    },
+    gradient1: {
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backgroundColor: colors.primaryStrong,
+      opacity: 0.8,
+    },
+    gradient2: {
+      position: "absolute",
+      width: "80%",
+      height: "80%",
+      top: "10%",
+      left: "10%",
+      borderRadius: ORB_SIZE / 2,
+      backgroundColor: colors.primary,
+      opacity: 0.6,
+    },
+    gradient3: {
+      position: "absolute",
+      width: "60%",
+      height: "60%",
+      top: "20%",
+      left: "20%",
+      borderRadius: ORB_SIZE / 2,
+      backgroundColor: colors.info,
+      opacity: 0.4,
+    },
+    highlight: {
+      position: "absolute",
+      width: ORB_SIZE * 0.3,
+      height: ORB_SIZE * 0.3,
+      top: ORB_SIZE * 0.15,
+      left: ORB_SIZE * 0.35,
+      borderRadius: (ORB_SIZE * 0.3) / 2,
+      backgroundColor: colors.primaryOn,
+      opacity: 0.2,
+    },
+  });

@@ -89,7 +89,7 @@ export function SubscriptionPlans({ onBack, onSelectPlan, currentPlan = "free" }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4">
+    <div className="min-h-screen p-4 fade-in">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -123,7 +123,7 @@ export function SubscriptionPlans({ onBack, onSelectPlan, currentPlan = "free" }
             return (
               <Card 
                 key={plan.id}
-                className={`relative glass-card transition-all duration-300 hover:shadow-xl ${
+                className={`relative glass-card transition-all duration-300 hover:shadow-md ${
                   plan.popular ? 'ring-2 ring-accent ring-opacity-50 scale-105' : ''
                 } ${isSelected ? 'ring-2 ring-primary' : ''}`}
               >

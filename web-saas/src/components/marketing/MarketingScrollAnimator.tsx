@@ -88,7 +88,7 @@ export function MarketingScrollAnimator() {
     };
 
     const runAfterHydration = () => {
-      // Delay initial DOM class mutations until after full load to avoid hydration mismatches.
+      // Delay initial DOM mutations until after full load to avoid hydration mismatches.
       bootTimer = setTimeout(connectTargets, 120);
     };
 

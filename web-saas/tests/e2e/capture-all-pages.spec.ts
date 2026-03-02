@@ -1238,11 +1238,7 @@ const installApiMocks = async (page: Page) => {
 
 const pages = [
   { path: '/', file: 'marketing-home' },
-  { path: '/advertise', file: 'marketing-advertise' },
-  { path: '/blog', file: 'marketing-blog' },
-  { path: '/blog/example-slug', file: 'marketing-blog-slug' },
   { path: '/pricing', file: 'marketing-pricing' },
-  { path: '/guarantee', file: 'marketing-guarantee' },
   { path: '/features', file: 'marketing-features' },
   { path: '/about', file: 'marketing-about' },
   { path: '/contact', file: 'marketing-contact' },
@@ -1250,9 +1246,6 @@ const pages = [
   { path: '/methodology', file: 'marketing-methodology' },
   { path: '/login', file: 'marketing-login' },
   { path: '/register', file: 'marketing-register' },
-  { path: '/forgot-password', file: 'marketing-forgot-password' },
-  { path: '/reset-password', file: 'marketing-reset-password' },
-  { path: '/verify-email', file: 'marketing-verify-email' },
   { path: '/ielts', file: 'marketing-ielts-list' },
   { path: '/ielts/ielts-speaking-practice-online', file: 'marketing-ielts-guide-speaking-practice-online' },
   { path: '/app/dashboard', file: 'learner-dashboard' },

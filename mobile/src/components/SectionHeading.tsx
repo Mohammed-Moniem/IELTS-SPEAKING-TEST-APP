@@ -17,8 +17,19 @@ export const SectionHeading: React.FC<
   return (
     <View style={styles.container}>
       <View>
-        <Text style={styles.title}>{title}</Text>
-        {children ? <Text style={styles.subtitle}>{children}</Text> : null}
+        <Text
+          accessibilityRole="header"
+          allowFontScaling
+          maxFontSizeMultiplier={1.35}
+          style={styles.title}
+        >
+          {title}
+        </Text>
+        {children ? (
+          <Text allowFontScaling maxFontSizeMultiplier={1.35} style={styles.subtitle}>
+            {children}
+          </Text>
+        ) : null}
       </View>
       {action}
     </View>

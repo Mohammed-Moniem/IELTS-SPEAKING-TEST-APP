@@ -17,3 +17,15 @@ This is a comprehensive Express.js microservice boilerplate built with TypeScrip
 - **Rate Limiting**: Built-in request rate limiting
 - **CORS Support**: Configurable cross-origin resource sharing
 - **Health Checks**: `/v1/health` exposes liveness, readiness (MongoDB, RabbitMQ, optional cache) and diagnostics toggled via env
+
+## Local Stripe test mode
+
+To run end-to-end billing locally (Checkout + Customer Portal + webhooks):
+
+1. Authenticate Stripe CLI in test mode:
+   - `stripe login`
+2. Bootstrap local `.env` with test keys and price IDs:
+   - `./scripts/ops/bootstrap_stripe_test_mode.sh`
+3. Run webhook forwarding in a second terminal:
+   - `stripe listen --forward-to http://localhost:4000/api/v1/subscription/webhook`
+4. Keep the listener running while testing checkout/webhook flows.

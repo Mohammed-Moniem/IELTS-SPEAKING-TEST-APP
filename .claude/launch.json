@@ -1,0 +1,37 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ielts-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "autoPort": true,
+      "cwd": "ielts-speaking-test-main"
+    },
+    {
+      "name": "web-saas",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "web-saas"
+    },
+    {
+      "name": "backend-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve"],
+      "port": 4000,
+      "autoPort": true,
+      "cwd": "micro-service-boilerplate-main"
+    },
+    {
+      "name": "mobile-expo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start"],
+      "port": 8081,
+      "autoPort": true,
+      "cwd": "mobile"
+    }
+  ]
+}

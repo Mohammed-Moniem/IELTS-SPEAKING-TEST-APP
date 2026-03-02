@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Payout Batch Confirmation Modal - Spokio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#7c3aed", // Updated to purple as requested
+                        "primary-hover": "#6d28d9",
+                        "background-light": "#f3f4f6",
+                        "surface-white": "#ffffff",
+                        "surface-grey": "#f9fafb",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    boxShadow: {
+                        "modal": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-background-light font-display flex items-center justify-center min-h-screen p-4 text-slate-900">
+<div class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+<div class="relative w-full max-w-5xl bg-surface-white rounded-xl shadow-modal border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
+<div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+<div class="flex items-center gap-4">
+<div class="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-2xl">payments</span>
+</div>
+<div>
+<h1 class="text-xl font-bold leading-tight text-slate-900">Confirm Payout Batch #8921</h1>
+<p class="text-sm text-slate-500">Created on Oct 24, 2023 • 09:42 AM</p>
+</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600 transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="overflow-y-auto custom-scrollbar p-8 flex-1 bg-white">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+<div class="flex flex-col gap-1 rounded-lg p-5 bg-surface-grey border border-slate-100">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-slate-400 text-xl">group</span>
+<p class="text-sm font-medium text-slate-500">Total Partners</p>
+</div>
+<p class="text-3xl font-bold text-slate-900">32</p>
+</div>
+<div class="flex flex-col gap-1 rounded-lg p-5 bg-surface-grey border border-slate-100">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-emerald-500 text-xl">attach_money</span>
+<p class="text-sm font-medium text-slate-500">Total Payout</p>
+</div>
+<p class="text-3xl font-bold text-slate-900">$12,450.00</p>
+</div>
+<div class="flex flex-col gap-1 rounded-lg p-5 bg-surface-grey border border-slate-100">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-orange-400 text-xl">account_balance_wallet</span>
+<p class="text-sm font-medium text-slate-500">Processing Fee</p>
+</div>
+<p class="text-3xl font-bold text-slate-900">$24.50</p>
+</div>
+</div>
+<div class="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-amber-600 mt-0.5">warning</span>
+<div class="flex-1">
+<h3 class="text-sm font-bold text-amber-900">Action Required: Flagged Accounts Detected</h3>
+<p class="mt-1 text-sm text-amber-800">2 partners have been flagged for unusual activity. Please review these accounts before processing the batch.</p>
+</div>
+</div>
+</div>
+<div class="mb-8">
+<h2 class="text-lg font-bold leading-tight mb-4 flex items-center gap-2 text-slate-900">
+<span class="material-symbols-outlined text-amber-500">flag</span>
+                        Flagged Accounts
+                    </h2>
+<div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+<div class="w-full overflow-x-auto">
+<table class="w-full min-w-[600px]">
+<thead>
+<tr class="bg-surface-grey border-b border-slate-200">
+<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Partner Name</th>
+<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Amount</th>
+<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Status</th>
+<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">Risk Factor</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="group hover:bg-slate-50 transition-colors">
+<td class="px-4 py-4 text-sm font-medium text-slate-900">
+<div class="flex items-center gap-3">
+<div class="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">AC</div>
+                                                Alex Chen
+                                            </div>
+</td>
+<td class="px-4 py-4 text-sm font-medium text-slate-900">$4,200.00</td>
+<td class="px-4 py-4">
+<span class="inline-flex items-center rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">Review Required</span>
+</td>
+<td class="px-4 py-4 text-sm text-slate-500">High Referral Velocity</td>
+</tr>
+<tr class="group hover:bg-slate-50 transition-colors">
+<td class="px-4 py-4 text-sm font-medium text-slate-900">
+<div class="flex items-center gap-3">
+<div class="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">SJ</div>
+                                                Sarah Jones
+                                            </div>
+</td>
+<td class="px-4 py-4 text-sm font-medium text-slate-900">$1,150.00</td>
+<td class="px-4 py-4">
+<span class="inline-flex items-center rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700">Blocked</span>
+</td>
+<td class="px-4 py-4 text-sm text-slate-500">Duplicate IP Address</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="mb-2">
+<h2 class="text-lg font-bold leading-tight mb-4 flex items-center gap-2 text-slate-900">
+<span class="material-symbols-outlined text-purple-600">leaderboard</span>
+                        Top Payouts Summary
+                    </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<div class="p-4 rounded-lg border border-slate-100 bg-surface-grey flex justify-between items-center">
+<div>
+<p class="text-xs text-slate-500 uppercase font-semibold">Top Earner</p>
+<p class="font-medium text-slate-900 mt-1">Michael Scott</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-emerald-600">$2,840.00</p>
+</div>
+</div>
+<div class="p-4 rounded-lg border border-slate-100 bg-surface-grey flex justify-between items-center">
+<div>
+<p class="text-xs text-slate-500 uppercase font-semibold">Most Referrals</p>
+<p class="font-medium text-slate-900 mt-1">Jim Halpert</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-purple-600">142 Refs</p>
+</div>
+</div>
+<div class="p-4 rounded-lg border border-slate-100 bg-surface-grey flex justify-between items-center">
+<div>
+<p class="text-xs text-slate-500 uppercase font-semibold">Avg. Commission</p>
+<p class="font-medium text-slate-900 mt-1">Global</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-slate-600">$389.06</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-8 py-6 border-t border-slate-100 bg-surface-grey">
+<div class="flex flex-col gap-4">
+<label class="flex items-center gap-3 cursor-pointer group select-none">
+<div class="relative flex items-center">
+<input class="peer sr-only form-checkbox h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary" type="checkbox"/>
+<div class="h-5 w-5 rounded border-2 border-slate-300 bg-white peer-checked:border-primary peer-checked:bg-primary transition-all flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-white text-[16px] opacity-0 peer-checked:opacity-100">check</span>
+</div>
+</div>
+<span class="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
+                            I have verified the commission logic and reviewed all flagged accounts.
+                        </span>
+</label>
+<div class="flex justify-end gap-3 pt-2">
+<button class="px-6 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200 shadow-sm">
+                            Cancel
+                        </button>
+<button class="px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white font-medium shadow-lg shadow-purple-500/20 transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+                            Confirm &amp; Execute Payout
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</body></html>

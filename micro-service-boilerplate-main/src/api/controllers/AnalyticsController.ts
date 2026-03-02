@@ -3,7 +3,7 @@
  * Provides endpoints for progress tracking and performance analytics
  */
 
-import { Body, Delete, Get, JsonController, Param, Post, QueryParam } from 'routing-controllers';
+import { Body, Delete, Get, JsonController, Param, Post, QueryParam, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { Logger } from '../../lib/logger';
 import { TestType } from '../models/TestHistory';
@@ -264,11 +264,27 @@ export class AnalyticsController {
    * DELETE /api/v1/analytics/test/:testId
    */
   @Delete('/test/:testId')
-  async deleteTest(@Param('testId') testId: string): Promise<any> {
+  async deleteTest(@Param('testId') testId: string, @Req() req: any): Promise<any> {
     try {
       this.log.info(`🗑️  Delete test: ${testId}`);
 
-      // TODO: Add authorization check
+      const test = await this.analyticsService.getTestDetails(testId);
+      if (!test) {
+        return {
+          success: false,
+          error: 'Test not found'
+        };
+      }
+
+      const requesterId = req.currentUser?.id;
+      const roles = new Set<string>(req.currentUser?.roles || []);
+      const isPrivileged = roles.has('superadmin') || roles.has('support_agent');
+      if (!isPrivileged && test.userId !== requesterId) {
+        return {
+          success: false,
+          error: 'Forbidden'
+        };
+      }
 
       await this.analyticsService.deleteTest(testId);
 

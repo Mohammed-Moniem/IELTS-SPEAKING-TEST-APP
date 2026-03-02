@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Learner Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", // Violet-600 (Brand Purple)
+              "primary-hover": "#6D28D9", // Violet-700
+              "background-page": "#FFFFFF", // Pure white
+              "sidebar-bg": "#F9FAFB", // Very light grey
+              "card-bg": "#FFFFFF", // White cards
+              "border-light": "#E5E7EB", // Gray-200
+              "text-heading": "#111827", // Gray-900 (Deep slate/black)
+              "text-body": "#4B5563", // Gray-600 (Medium grey)
+              "text-muted": "#6B7280", // Gray-500
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", // 12px
+              'xl': "1rem", // 16px
+              '2xl': "1.5rem", // 24px
+            },
+            boxShadow: {
+                'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            }
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+    </style>
+</head>
+<body class="bg-background-page text-text-body font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-sidebar-bg border-r border-border-light flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-border-light">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl shadow-sm shadow-primary/30">S</div>
+<span class="text-xl font-bold tracking-tight text-text-heading">Spokio</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl bg-white border border-border-light text-primary shadow-subtle group" href="#">
+<span class="material-icons-round text-xl">dashboard</span>
+            Dashboard
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-bold text-text-muted uppercase tracking-wider">
+            Practice Areas
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">mic</span>
+            Speaking
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">edit</span>
+            Writing
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">menu_book</span>
+            Reading
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">headphones</span>
+            Listening
+        </a>
+<div class="pt-6 pb-2 px-4 text-xs font-bold text-text-muted uppercase tracking-wider">
+            Assessment
+        </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">assignment</span>
+            Full Exams
+        </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-body hover:bg-white hover:border hover:border-border-light hover:text-text-heading hover:shadow-subtle transition-all group" href="#">
+<span class="material-icons-round text-xl text-text-muted group-hover:text-primary transition-colors">bar_chart</span>
+            Progress &amp; Stats
+        </a>
+</nav>
+<div class="p-4 border-t border-border-light bg-sidebar-bg">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white hover:shadow-subtle border border-transparent hover:border-border-light transition-all">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border border-border-light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-text-heading">Student One</p>
+<p class="text-xs text-text-muted">Free Plan</p>
+</div>
+<span class="material-icons-round ml-auto text-text-muted">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen bg-background-page">
+<header class="lg:hidden h-16 bg-white border-b border-border-light flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold shadow-sm">S</div>
+<span class="font-bold text-lg text-text-heading">Spokio</span>
+</div>
+<button class="p-2 text-text-body hover:text-primary">
+<span class="material-icons-round">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-7xl mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+<div>
+<h1 class="text-3xl font-extrabold text-text-heading mb-2">Welcome back, Student 👋</h1>
+<p class="text-text-body max-w-xl">
+                    Ready to boost your IELTS score today? Your speaking simulation is waiting.
+                </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-border-light text-text-muted hover:text-primary hover:border-primary transition-colors shadow-sm">
+<span class="material-icons-round">notifications</span>
+</button>
+<button class="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-colors shadow-sm shadow-primary/20">
+<span class="material-icons-round text-lg">add</span>
+                    Start New Test
+                </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light shadow-subtle relative overflow-hidden group hover:border-primary/30 transition-colors">
+<div class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-icons-round text-6xl text-primary">school</span>
+</div>
+<p class="text-sm font-medium text-text-muted mb-1">Average Band Score</p>
+<div class="flex items-end gap-2">
+<h3 class="text-3xl font-bold text-text-heading">6.5</h3>
+<span class="text-green-600 text-sm font-medium mb-1 flex items-center bg-green-50 px-1.5 py-0.5 rounded">
+<span class="material-icons-round text-sm mr-0.5">trending_up</span> +0.5
+                    </span>
+</div>
+<div class="w-full bg-gray-100 h-1.5 rounded-full mt-4 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 65%"></div>
+</div>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light shadow-subtle relative overflow-hidden hover:border-primary/30 transition-colors">
+<p class="text-sm font-medium text-text-muted mb-1">Current Streak</p>
+<div class="flex items-end gap-2">
+<h3 class="text-3xl font-bold text-text-heading">4 Days</h3>
+</div>
+<div class="flex gap-1 mt-4">
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-primary"></div>
+<div class="h-2 flex-1 rounded-full bg-gray-200"></div>
+</div>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light shadow-subtle hover:border-primary/30 transition-colors">
+<p class="text-sm font-medium text-text-muted mb-1">Tests Completed</p>
+<h3 class="text-3xl font-bold text-text-heading">12</h3>
+<p class="text-xs text-text-muted mt-4">Total 8 hours practiced</p>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light shadow-subtle flex flex-col justify-between hover:border-primary/30 transition-colors">
+<div>
+<p class="text-sm font-medium text-text-muted mb-1">Next Goal</p>
+<h3 class="text-xl font-bold text-text-heading">Band 7.0</h3>
+</div>
+<div class="mt-2">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-100">
+                        Intermediate
+                    </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-2 space-y-8">
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold text-text-heading">Quick Practice</h2>
+<a class="text-sm text-primary font-semibold hover:underline" href="#">View all topics</a>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="group bg-gradient-to-br from-primary to-[#5B21B6] p-6 rounded-2xl text-white relative overflow-hidden shadow-lg shadow-primary/20 cursor-pointer transition-transform hover:-translate-y-1">
+<div class="absolute -right-6 -top-6 w-32 h-32 bg-white opacity-10 rounded-full blur-xl"></div>
+<div class="absolute -bottom-10 -left-6 w-40 h-40 bg-black opacity-10 rounded-full blur-xl"></div>
+<div class="relative z-10">
+<div class="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-4 text-white border border-white/30">
+<span class="material-icons-round text-2xl">mic</span>
+</div>
+<h3 class="text-lg font-bold mb-1 text-white">Speaking Simulation</h3>
+<p class="text-white/90 text-sm mb-4 line-clamp-2">AI-powered interview simulation covering Part 1, 2, and 3.</p>
+<button class="w-full py-2.5 bg-white text-primary font-bold text-sm rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
+                                    Start Speaking
+                                </button>
+</div>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light hover:border-primary/50 transition-all cursor-pointer group shadow-subtle hover:shadow-md">
+<div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center mb-4 border border-orange-100">
+<span class="material-icons-round text-2xl">edit_note</span>
+</div>
+<h3 class="text-lg font-bold text-text-heading mb-1">Writing Task 1 &amp; 2</h3>
+<p class="text-text-body text-sm mb-4">Get instant AI grading and feedback on your essays.</p>
+<span class="text-primary text-sm font-bold group-hover:underline flex items-center gap-1">
+                                Practice Writing <span class="material-icons-round text-sm">arrow_forward</span>
+</span>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light hover:border-primary/50 transition-all cursor-pointer group shadow-subtle hover:shadow-md">
+<div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 border border-blue-100">
+<span class="material-icons-round text-2xl">article</span>
+</div>
+<h3 class="text-lg font-bold text-text-heading mb-1">Reading Comprehension</h3>
+<p class="text-text-body text-sm mb-4">Practice with academic texts and question types.</p>
+<span class="text-primary text-sm font-bold group-hover:underline flex items-center gap-1">
+                                Start Reading <span class="material-icons-round text-sm">arrow_forward</span>
+</span>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light hover:border-primary/50 transition-all cursor-pointer group shadow-subtle hover:shadow-md">
+<div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4 border border-emerald-100">
+<span class="material-icons-round text-2xl">headphones</span>
+</div>
+<h3 class="text-lg font-bold text-text-heading mb-1">Listening Practice</h3>
+<p class="text-text-body text-sm mb-4">Improve your listening skills with varied accents.</p>
+<span class="text-primary text-sm font-bold group-hover:underline flex items-center gap-1">
+                                Start Listening <span class="material-icons-round text-sm">arrow_forward</span>
+</span>
+</div>
+</div>
+</section>
+<section>
+<h2 class="text-xl font-bold text-text-heading mb-4">Recent Activity</h2>
+<div class="bg-card-bg rounded-2xl border border-border-light overflow-hidden shadow-subtle">
+<table class="w-full text-left text-sm">
+<thead class="bg-gray-50 text-text-muted font-semibold border-b border-border-light">
+<tr>
+<th class="px-6 py-4">Module</th>
+<th class="px-6 py-4">Topic</th>
+<th class="px-6 py-4">Date</th>
+<th class="px-6 py-4">Score</th>
+<th class="px-6 py-4">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 text-text-body">
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="font-bold text-text-heading">Speaking</span>
+</div>
+</td>
+<td class="px-6 py-4 text-text-heading font-medium">Urbanization &amp; Society</td>
+<td class="px-6 py-4 text-text-muted">Today, 2:30 PM</td>
+<td class="px-6 py-4 font-bold text-text-heading">6.5</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-100">Completed</span>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-orange-500"></div>
+<span class="font-bold text-text-heading">Writing</span>
+</div>
+</td>
+<td class="px-6 py-4 text-text-heading font-medium">Task 2: Education</td>
+<td class="px-6 py-4 text-text-muted">Yesterday</td>
+<td class="px-6 py-4 font-bold text-text-heading">-</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-100">In Progress</span>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-blue-500"></div>
+<span class="font-bold text-text-heading">Reading</span>
+</div>
+</td>
+<td class="px-6 py-4 text-text-heading font-medium">Academic Test 4</td>
+<td class="px-6 py-4 text-text-muted">Oct 24, 2023</td>
+<td class="px-6 py-4 font-bold text-text-heading">7.0</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-100">Completed</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<div class="space-y-6">
+<div class="bg-gray-900 rounded-2xl p-6 text-white relative overflow-hidden border border-gray-800 shadow-xl">
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/30 rounded-full blur-2xl"></div>
+<div class="relative z-10">
+<div class="flex items-center justify-between mb-4">
+<div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+<span class="material-icons-round">bolt</span>
+</div>
+<span class="text-xs font-bold uppercase tracking-wider bg-primary/20 px-2 py-1 rounded text-violet-200 border border-primary/20">Continue</span>
+</div>
+<h3 class="text-xl font-bold mb-2 text-white">Resume Practice</h3>
+<p class="text-gray-300 text-sm mb-6">
+                            In what ways do you believe urbanization impacts community relationships?
+                        </p>
+<div class="flex items-center gap-3 text-xs text-gray-400 mb-6">
+<span class="bg-gray-800 border border-gray-700 px-2 py-1 rounded">Part 3</span>
+<span class="bg-gray-800 border border-gray-700 px-2 py-1 rounded">Intermediate</span>
+</div>
+<button class="w-full py-3 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-colors shadow-lg shadow-primary/30">
+                            Continue Session
+                        </button>
+</div>
+</div>
+<div class="bg-card-bg p-6 rounded-2xl border border-border-light shadow-subtle">
+<h3 class="font-bold text-text-heading mb-4">Recommended for you</h3>
+<div class="space-y-4">
+<a class="block p-3 rounded-xl bg-gray-50 border border-transparent hover:border-border-light hover:bg-white transition-all group" href="#">
+<p class="text-sm font-semibold text-text-heading mb-1 group-hover:text-primary transition-colors">Social Media Influence</p>
+<div class="flex items-center gap-2 text-xs text-text-muted">
+<span class="material-icons-round text-sm">schedule</span> 15 min
+                                <span>•</span>
+<span>Speaking Part 3</span>
+</div>
+</a>
+<a class="block p-3 rounded-xl bg-gray-50 border border-transparent hover:border-border-light hover:bg-white transition-all group" href="#">
+<p class="text-sm font-semibold text-text-heading mb-1 group-hover:text-primary transition-colors">Role Models in Life</p>
+<div class="flex items-center gap-2 text-xs text-text-muted">
+<span class="material-icons-round text-sm">schedule</span> 10 min
+                                <span>•</span>
+<span>Speaking Part 2</span>
+</div>
+</a>
+<a class="block p-3 rounded-xl bg-gray-50 border border-transparent hover:border-border-light hover:bg-white transition-all group" href="#">
+<p class="text-sm font-semibold text-text-heading mb-1 group-hover:text-primary transition-colors">Environmental Changes</p>
+<div class="flex items-center gap-2 text-xs text-text-muted">
+<span class="material-icons-round text-sm">schedule</span> 20 min
+                                <span>•</span>
+<span>Writing Task 2</span>
+</div>
+</a>
+</div>
+<button class="w-full mt-4 py-2 text-sm text-primary font-medium border border-primary/20 rounded-lg hover:bg-primary/5 transition-colors">
+                        Browse Library
+                    </button>
+</div>
+<div class="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5 text-center shadow-lg">
+<span class="material-icons-round text-yellow-400 text-3xl mb-2">star</span>
+<h4 class="text-white font-bold mb-1">Go Premium</h4>
+<p class="text-gray-300 text-xs mb-3">Unlock unlimited practice &amp; detailed AI analytics.</p>
+<button class="text-xs font-bold bg-white text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                         View Plans
+                     </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

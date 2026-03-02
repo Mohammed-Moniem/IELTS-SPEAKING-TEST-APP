@@ -64,6 +64,11 @@ export class AudioStorageService {
     return recording;
   }
 
+  async getRecordingMetadata(recordingId: string): Promise<AudioRecording | null> {
+    const rows = await this.listRows();
+    return rows.find(candidate => candidate._id === recordingId) || null;
+  }
+
   async uploadAudio(params: {
     userId: string;
     sessionId: string;
@@ -76,7 +81,7 @@ export class AudioStorageService {
     testPart?: string;
     overallBand?: number;
     scores?: AudioRecording['scores'];
-    userTier?: 'free' | 'premium' | 'pro';
+    userTier?: 'free' | 'premium' | 'pro' | 'team';
   }): Promise<AudioRecording> {
     const fileSizeMB = params.audioBuffer.length / (1024 * 1024);
     if (fileSizeMB > env.storage.maxFileSizeMB) {

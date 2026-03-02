@@ -1,0 +1,61 @@
+# ── Spokio – Docker Compose (Self-Hosted) ────────────────────────────────────
+# Usage:
+#   cp micro-service-boilerplate-main/.env.example micro-service-boilerplate-main/.env
+#   cp web-saas/.env.example web-saas/.env.local
+#   # Edit both .env files with your secrets
+#   docker compose up -d --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Backend API ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./micro-service-boilerplate-main
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - ./micro-service-boilerplate-main/.env
+    environment:
+      # Override DB connection to use the Docker network hostname
+      - MONGO_URL=mongodb://mongo:27017/ielts-speaking
+      - NODE_ENV=production
+      - DB_WRITE_MODE=mongo
+      - DB_READ_MODE=mongo
+
+  # ── Frontend Web ───────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web-saas
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      # Server-side proxy: Next.js rewrites /api/v1/* to backend
+      - API_INTERNAL_BASE_URL=http://api:4000
+
+volumes:
+  mongo-data:
+    driver: local

@@ -152,10 +152,10 @@ Time Frame: ${testPreferences?.timeFrame || '3 months'}
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4">
+    <div className="min-h-screen p-4 fade-in">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-8">
           <Button
             onClick={onBack}
             variant="ghost"
@@ -165,8 +165,8 @@ Time Frame: ${testPreferences?.timeFrame || '3 months'}
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Analytics Dashboard</h1>
-            <p className="text-slate-600">Track your IELTS Speaking preparation progress</p>
+            <h1 className="text-3xl font-bold text-foreground">Performance Analytics</h1>
+            <p className="text-muted-foreground">Track your progress and identify areas for improvement</p>
           </div>
         </div>
 

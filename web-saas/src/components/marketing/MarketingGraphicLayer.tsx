@@ -1,52 +1,48 @@
-'use client';
+/**
+ * Decorative background graphic layer for marketing pages.
+ * Renders subtle animated SVG patterns behind content sections.
+ */
 
-type MarketingGraphicLayerPreset = 'hero' | 'content-highlight';
-type MarketingGraphicLayerIntensity = 'subtle' | 'balanced' | 'bold';
-
-type MarketingGraphicLayerProps = {
-  preset: MarketingGraphicLayerPreset;
-  intensity?: MarketingGraphicLayerIntensity;
+interface MarketingGraphicLayerProps {
+  preset?: 'content-highlight' | 'hero-accent' | 'card-glow';
+  intensity?: 'subtle' | 'medium' | 'bold';
   className?: string;
-};
-
-const opacityByIntensity: Record<MarketingGraphicLayerIntensity, string> = {
-  subtle: 'opacity-65',
-  balanced: 'opacity-85',
-  bold: 'opacity-100'
-};
+}
 
 export function MarketingGraphicLayer({
-  preset,
-  intensity = 'balanced',
-  className = ''
+  preset = 'content-highlight',
+  intensity = 'subtle',
+  className = '',
 }: MarketingGraphicLayerProps) {
-  const opacityClass = opacityByIntensity[intensity];
+  const opacityMap = {
+    subtle: 'opacity-[0.06]',
+    medium: 'opacity-[0.12]',
+    bold: 'opacity-[0.20]',
+  };
 
-  if (preset === 'hero') {
+  const opacity = opacityMap[intensity];
+
+  if (preset === 'hero-accent') {
     return (
-      <div
-        aria-hidden
-        data-testid="marketing-graphic-layer-hero"
-        className={`pointer-events-none absolute inset-0 overflow-hidden ${opacityClass} ${className}`}
-      >
-        <div className="absolute inset-0 bg-[url('/marketing/depth/purple-dot-grid.svg')] bg-[length:44px_44px] opacity-30" />
-        <div className="motion-float-slow absolute -left-20 top-10 h-56 w-56 rounded-full bg-violet-300/35 blur-3xl dark:bg-violet-400/25" />
-        <div className="motion-float-delayed absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-fuchsia-300/30 blur-3xl dark:bg-fuchsia-300/20" />
-        <div className="motion-gradient-drift absolute inset-y-0 right-10 w-56 rotate-12 bg-gradient-to-b from-white/20 via-violet-200/15 to-transparent blur-2xl" />
+      <div className={`pointer-events-none absolute inset-0 z-0 overflow-hidden ${className}`} aria-hidden>
+        <div className={`absolute -top-1/4 -right-1/4 h-[140%] w-[140%] rounded-full bg-gradient-to-br from-violet-400 to-violet-600 blur-3xl ${opacity}`} />
       </div>
     );
   }
 
+  if (preset === 'card-glow') {
+    return (
+      <div className={`pointer-events-none absolute inset-0 z-0 overflow-hidden ${className}`} aria-hidden>
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-3/4 w-3/4 rounded-full bg-violet-500 blur-3xl ${opacity}`} />
+      </div>
+    );
+  }
+
+  // Default: content-highlight — a subtle top-right glow
   return (
-    <div
-      aria-hidden
-      data-testid="marketing-graphic-layer-content"
-      className={`pointer-events-none absolute inset-0 overflow-hidden ${opacityClass} ${className}`}
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,rgba(167,139,250,0.16),transparent_46%),radial-gradient(circle_at_85%_78%,rgba(216,180,254,0.14),transparent_44%)]" />
-      <div className="motion-float-soft absolute -top-14 left-8 h-28 w-28 rounded-full border border-violet-300/40 bg-violet-300/15 blur-xl dark:border-violet-400/30 dark:bg-violet-400/10" />
-      <div className="motion-float-delayed absolute bottom-4 right-10 h-20 w-20 rounded-2xl border border-violet-300/35 bg-fuchsia-200/10 backdrop-blur-sm dark:border-fuchsia-400/20 dark:bg-fuchsia-300/10" />
-      <div className="absolute inset-0 bg-[url('/marketing/depth/purple-dot-grid.svg')] bg-[length:40px_40px] opacity-[0.14]" />
+    <div className={`pointer-events-none absolute inset-0 z-0 overflow-hidden ${className}`} aria-hidden>
+      <div className={`absolute -top-12 -right-12 h-48 w-48 rounded-full bg-violet-400 blur-3xl ${opacity}`} />
+      <div className={`absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-violet-300 blur-2xl ${opacity}`} />
     </div>
   );
 }

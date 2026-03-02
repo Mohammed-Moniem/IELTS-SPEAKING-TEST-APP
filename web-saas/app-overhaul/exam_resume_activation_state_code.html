@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Exam - Resume State</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#7c3bed",
+                        "background-light": "#f7f6f8",
+                        "background-dark": "#171121",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#2d243a",
+                        "text-main": "#131118",
+                        "text-muted": "#706189",
+                    },
+                    fontFamily: {
+                        "display": ["Lexend", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for passage text */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 20px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+        }
+        
+        /* Blur effect for background content when overlay is active */
+        .blur-content {
+            filter: blur(4px);
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-main dark:text-slate-100 font-display transition-colors duration-200 min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-surface-light dark:bg-surface-dark px-6 py-3 lg:px-10 shadow-sm transition-colors duration-200">
+<div class="flex items-center gap-4 text-text-main dark:text-white">
+<div class="flex items-center gap-2">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined">school</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em]">Spokio Exam</h2>
+</div>
+<div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2 hidden sm:block"></div>
+<span class="text-sm font-medium text-text-muted dark:text-slate-400 hidden sm:block">Attempt ID: #8821-XJ</span>
+</div>
+<div class="flex items-center gap-4 sm:gap-8">
+<button class="hidden sm:flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-text-main dark:text-white text-sm font-medium transition-colors">
+<span class="truncate">Save &amp; Exit</span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-700">
+<div class="text-right hidden md:block">
+<p class="text-sm font-bold text-text-main dark:text-white leading-none">Sarah Jenkins</p>
+<p class="text-xs text-text-muted dark:text-slate-400 mt-1">Student</p>
+</div>
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-10 border-2 border-white dark:border-slate-700 shadow-sm" data-alt="User profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCx6D5xOG9EPJG2dTkEil-H8TKdKmhQ120Y9wTpzI7D4tKirv5eyPCPXmk1cIIVcI4Z_4383UKYaHFz88bWx03XQ18BgsaOCVKAvU7w-35-jkDkhvQerS8PthXkd83K0IIWFjX2L7bW7cXSuWJVQPQ7vJx2YEfwHYl3PtWm2f1nu_OvyIYuOSPKGeDE2k8ivH5MlhIjd9Zu41_eqVstT87QoZzDH1ez6AixWQOyqftaSlGvlFP49wXgtKRUUu6sE1wm7r8rzeI8u0Go");'></div>
+</div>
+</div>
+</header>
+<!-- Main Content Container -->
+<div class="flex flex-1 relative w-full h-[calc(100vh-64px)] overflow-hidden">
+<!-- Sidebar / Info Panel (Left) -->
+<aside class="w-80 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark flex flex-col z-20 shadow-sm hidden lg:flex">
+<div class="p-6 border-b border-slate-100 dark:border-slate-800">
+<div class="flex justify-between items-center mb-4">
+<span class="text-xs font-bold uppercase tracking-wider text-text-muted dark:text-slate-400">Current Section</span>
+<span class="px-2 py-1 bg-primary/10 text-primary text-xs font-bold rounded">Part 2 of 4</span>
+</div>
+<h3 class="text-xl font-bold text-text-main dark:text-white mb-2">Reading Comprehension</h3>
+<p class="text-sm text-text-muted dark:text-slate-400">Urban Development &amp; History</p>
+</div>
+<div class="p-6 flex flex-col gap-6">
+<!-- Progress -->
+<div>
+<div class="flex justify-between items-end mb-2">
+<span class="text-sm font-medium text-text-main dark:text-white">Progress</span>
+<span class="text-sm font-bold text-primary">30%</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full transition-all duration-500" style="width: 30%"></div>
+</div>
+<p class="text-xs text-text-muted dark:text-slate-400 mt-2 text-right">Question 12 of 40</p>
+</div>
+<!-- Tools -->
+<div>
+<span class="text-xs font-bold uppercase tracking-wider text-text-muted dark:text-slate-400 mb-4 block">Tools</span>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-text-main dark:text-slate-300 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<span class="material-symbols-outlined text-lg">edit_note</span>
+<span>Notes</span>
+</button>
+<button class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-text-main dark:text-slate-300 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<span class="material-symbols-outlined text-lg">calculate</span>
+<span>Calc</span>
+</button>
+<button class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-text-main dark:text-slate-300 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<span class="material-symbols-outlined text-lg">flag</span>
+<span>Flag</span>
+</button>
+<button class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 text-sm text-text-main dark:text-slate-300 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<span class="material-symbols-outlined text-lg">help</span>
+<span>Help</span>
+</button>
+</div>
+</div>
+</div>
+<div class="mt-auto p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-3 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
+<span class="material-symbols-outlined">warning</span>
+<p class="text-xs font-medium leading-relaxed">Do not leave the exam window. Full screen mode is monitored.</p>
+</div>
+</div>
+</aside>
+<!-- Center Stage - Exam Content -->
+<main class="flex-1 flex flex-col relative bg-slate-50 dark:bg-slate-900/50 h-full overflow-hidden">
+<!-- Timer Bar (Sticky) -->
+<div class="bg-white dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex justify-between items-center shadow-sm z-30">
+<div class="flex items-center gap-2 text-text-muted dark:text-slate-400">
+<span class="material-symbols-outlined">timer</span>
+<span class="text-sm font-medium">Time Remaining:</span>
+</div>
+<!-- Paused Timer UI -->
+<div class="flex gap-4">
+<div class="flex flex-col items-center">
+<div class="bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 min-w-[40px] text-center">
+<span class="text-xl font-bold text-slate-400 dark:text-slate-500 font-mono">00</span>
+</div>
+<span class="text-[10px] uppercase text-text-muted mt-1">Hrs</span>
+</div>
+<span class="text-xl font-bold text-slate-300 self-start mt-1">:</span>
+<div class="flex flex-col items-center">
+<div class="bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 min-w-[40px] text-center">
+<span class="text-xl font-bold text-slate-400 dark:text-slate-500 font-mono">45</span>
+</div>
+<span class="text-[10px] uppercase text-text-muted mt-1">Min</span>
+</div>
+<span class="text-xl font-bold text-slate-300 self-start mt-1">:</span>
+<div class="flex flex-col items-center">
+<div class="bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 min-w-[40px] text-center">
+<span class="text-xl font-bold text-slate-400 dark:text-slate-500 font-mono">30</span>
+</div>
+<span class="text-[10px] uppercase text-text-muted mt-1">Sec</span>
+</div>
+</div>
+<div class="flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 rounded-full text-xs font-bold">
+<span class="material-symbols-outlined text-sm">pause</span>
+                    PAUSED
+                </div>
+</div>
+<!-- Content Area (Blurred Background Content) -->
+<div class="flex-1 overflow-hidden relative blur-content select-none opacity-40">
+<div class="flex h-full">
+<!-- Passage Pane -->
+<div class="w-1/2 p-8 pr-4 overflow-y-auto custom-scrollbar border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark">
+<h1 class="text-2xl font-bold mb-6 text-text-main dark:text-white">Passage: The Evolution of Urban Planning</h1>
+<div class="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 space-y-4">
+<p class="leading-relaxed">Urban planning, the technical and political process concerned with the use of land and design of the urban environment, has evolved significantly over centuries. From the grid layouts of ancient Indus Valley civilizations to the complex, data-driven smart cities of today, the discipline reflects humanity's changing needs and technological capabilities.</p>
+<p class="leading-relaxed">In the mid-19th century, the rapid industrialization of Europe and North America led to overcrowded, unsanitary cities. This crisis birthed modern urban planning as a distinct profession. Figures like Baron Haussmann in Paris and Frederick Law Olmsted in the United States championed the idea that cities could be engineered for health and efficiency through parks, boulevards, and sewage systems.</p>
+<p class="leading-relaxed">The 20th century saw the rise of zoning laws and the dominance of the automobile, which fundamentally reshaped urban landscapes. The "Garden City" movement sought to combine the best of town and country living, while modernist architects like Le Corbusier envisioned towering skyscrapers set in parklands—a vision that often resulted in the stark, concrete housing projects of the post-war era.</p>
+<p class="leading-relaxed">Today, the focus has shifted towards sustainability and resilience. Climate change poses new challenges, prompting planners to design green infrastructure, promote public transit, and create mixed-use developments that reduce reliance on cars. The concept of the "15-minute city," where most daily necessities can be accomplished by either walking or cycling from residents' homes, is gaining traction globally.</p>
+<div class="h-32 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"></div>
+<div class="h-32 bg-slate-100 dark:bg-slate-800 rounded animate-pulse"></div>
+</div>
+</div>
+<!-- Question Pane -->
+<div class="w-1/2 p-8 pl-4 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-slate-900/50">
+<div class="bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
+<span class="text-xs font-bold text-text-muted mb-2 block uppercase tracking-wide">Multiple Choice</span>
+<h3 class="text-lg font-bold text-text-main dark:text-white mb-6">According to the passage, what was a primary driver for the emergence of modern urban planning in the 19th century?</h3>
+<div class="space-y-3">
+<label class="flex items-start gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group">
+<div class="flex items-center justify-center w-6 h-6 rounded-full border border-slate-300 dark:border-slate-600 group-hover:border-primary shrink-0">
+<div class="w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-text-main dark:group-hover:text-white">The desire for aesthetic beauty in city centers.</span>
+</label>
+<label class="flex items-start gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group">
+<div class="flex items-center justify-center w-6 h-6 rounded-full border border-slate-300 dark:border-slate-600 group-hover:border-primary shrink-0">
+<div class="w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-text-main dark:group-hover:text-white">Overcrowding and unsanitary conditions caused by industrialization.</span>
+</label>
+<label class="flex items-start gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group">
+<div class="flex items-center justify-center w-6 h-6 rounded-full border border-slate-300 dark:border-slate-600 group-hover:border-primary shrink-0">
+<div class="w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-text-main dark:group-hover:text-white">The invention of the automobile and need for wider roads.</span>
+</label>
+<label class="flex items-start gap-3 p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 cursor-pointer transition-all group">
+<div class="flex items-center justify-center w-6 h-6 rounded-full border border-slate-300 dark:border-slate-600 group-hover:border-primary shrink-0">
+<div class="w-3 h-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-text-main dark:group-hover:text-white">Political pressure from agricultural landowners.</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Resume Overlay Modal -->
+<div class="absolute inset-0 z-50 flex items-center justify-center p-4">
+<div class="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-sm"></div>
+<div class="relative w-full max-w-lg bg-white dark:bg-surface-dark rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transform transition-all scale-100 animate-[fadeIn_0.3s_ease-out]">
+<!-- Decorative Header Pattern -->
+<div class="h-2 w-full bg-gradient-to-r from-primary via-purple-400 to-indigo-500"></div>
+<div class="p-8 md:p-10 flex flex-col items-center text-center">
+<div class="size-16 rounded-full bg-primary/10 flex items-center justify-center mb-6 text-primary">
+<span class="material-symbols-outlined text-4xl">timer_pause</span>
+</div>
+<h1 class="text-3xl font-black text-text-main dark:text-white mb-3 tracking-tight">
+                            Ready to Resume?
+                        </h1>
+<p class="text-slate-600 dark:text-slate-300 mb-8 max-w-md leading-relaxed">
+                            The timer is currently paused at <span class="font-mono font-bold text-primary">45:30</span>. Take a moment to settle in before continuing your Reading Test. Your previous answers have been saved securely.
+                        </p>
+<div class="flex flex-col w-full gap-4">
+<button class="w-full h-12 bg-primary hover:bg-violet-700 active:scale-[0.98] text-white font-bold rounded-lg shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined group-hover:animate-pulse">play_circle</span>
+                                Start Timer &amp; Continue
+                            </button>
+<button class="w-full h-12 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium rounded-lg transition-colors text-sm">
+                                Not ready? Return to Dashboard
+                            </button>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/50 px-8 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-2 text-xs text-text-muted dark:text-slate-500">
+<span class="material-symbols-outlined text-sm">lock</span>
+<span>Secure Session Active • Monitoring Enabled</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

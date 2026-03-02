@@ -39,6 +39,7 @@ type AuthContextValue = {
     lastName: string;
     phone?: string;
     referralCode?: string;
+    partnerCode?: string;
   }) => Promise<void>;
   logout: (options?: { skipServer?: boolean }) => Promise<void>;
   refreshProfile: () => Promise<User | null>;
@@ -313,6 +314,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       lastName: string;
       phone?: string;
       referralCode?: string;
+      partnerCode?: string;
     }) => {
       const response = await authApi.register(payload);
       await setSession(response);

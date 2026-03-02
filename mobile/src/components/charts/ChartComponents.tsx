@@ -3,29 +3,47 @@
  * Reusable chart components for analytics visualizations using react-native-chart-kit
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { BarChart, LineChart, PieChart } from "react-native-chart-kit";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import { ScoreDataPoint } from "../../services/analyticsService";
+import type { ColorTokens } from "../../theme/tokens";
 
 const screenWidth = Dimensions.get("window").width;
 
-const chartConfig = {
-  backgroundColor: "#FFFFFF",
-  backgroundGradientFrom: "#FFFFFF",
-  backgroundGradientTo: "#FFFFFF",
+const withOpacity = (hex: string, opacity: number): string => {
+  const clean = hex.replace("#", "");
+  const normalized =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((char) => `${char}${char}`)
+          .join("")
+      : clean;
+  const alpha = Math.round(Math.max(0, Math.min(1, opacity)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${normalized}${alpha}`;
+};
+
+const createChartConfig = (colors: ColorTokens) => ({
+  backgroundColor: colors.surface,
+  backgroundGradientFrom: colors.surface,
+  backgroundGradientTo: colors.surface,
   decimalPlaces: 1,
-  color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+  color: (opacity = 1) => withOpacity(colors.primary, opacity),
+  labelColor: (opacity = 1) => withOpacity(colors.textMuted, opacity),
   style: {
     borderRadius: 16,
   },
   propsForDots: {
     r: "6",
     strokeWidth: "2",
-    stroke: "#6366F1",
+    stroke: colors.primary,
   },
-};
+});
 
 interface ScoreLineChartProps {
   data: ScoreDataPoint[];
@@ -36,6 +54,10 @@ export const ScoreLineChart: React.FC<ScoreLineChartProps> = ({
   data,
   height = 220,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+
   if (data.length === 0) {
     return (
       <View style={[styles.emptyContainer, { height }]}>
@@ -84,6 +106,10 @@ export const BandDistributionChart: React.FC<BandDistributionChartProps> = ({
   data,
   height = 220,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+
   if (data.every((d) => d.count === 0)) {
     return (
       <View style={[styles.emptyContainer, { height }]}>
@@ -136,6 +162,10 @@ interface CategoryPerformanceChartProps {
 export const CategoryPerformanceChart: React.FC<
   CategoryPerformanceChartProps
 > = ({ data, height = 220 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+
   if (data.length === 0) {
     return (
       <View style={[styles.emptyContainer, { height }]}>
@@ -185,6 +215,10 @@ export const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({
   data,
   height = 220,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+
   if (data.length === 0) {
     return (
       <View style={[styles.emptyContainer, { height }]}>
@@ -219,7 +253,7 @@ export const TimeOfDayChart: React.FC<TimeOfDayChartProps> = ({
         height={height}
         chartConfig={{
           ...chartConfig,
-          color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+          color: (opacity = 1) => withOpacity(colors.success, opacity),
           barPercentage: 0.6,
         }}
         style={styles.chart}
@@ -247,6 +281,10 @@ export const ProgressPieChart: React.FC<ProgressPieChartProps> = ({
   data,
   height = 220,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+
   if (data.length === 0 || data.every((d) => d.population === 0)) {
     return (
       <View style={[styles.emptyContainer, { height }]}>
@@ -273,9 +311,10 @@ export const ProgressPieChart: React.FC<ProgressPieChartProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   chartContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -286,18 +325,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   emptyContainer: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.borderMuted,
     borderStyle: "dashed",
     marginVertical: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: colors.textMuted,
     fontStyle: "italic",
   },
 });

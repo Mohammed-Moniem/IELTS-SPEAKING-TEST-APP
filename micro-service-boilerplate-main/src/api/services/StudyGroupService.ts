@@ -128,7 +128,7 @@ export class StudyGroupService {
   /**
    * Update group settings
    */
-  async updateGroup(groupId: string, userId: string, updates: Partial<IStudyGroup>): Promise<IStudyGroup> {
+  async updateGroup(groupId: string, userId: string, updates: Partial<IStudyGroup>) {
     const group = await StudyGroup.findById(groupId);
 
     if (!group) {

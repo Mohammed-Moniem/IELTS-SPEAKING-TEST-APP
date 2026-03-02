@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio - Speaking Practice Topics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", // Violet-600 tailored to the screenshot
+              secondary: "#5B21B6", // Darker purple for hover/bg accents
+              "background-light": "#F3F4F6", // Gray-100
+              "background-dark": "#111827", // Gray-900 (close to black)
+              "card-light": "#FFFFFF",
+              "card-dark": "#1F2937", // Gray-800
+              "text-light": "#111827",
+              "text-dark": "#F9FAFB",
+              "muted-light": "#6B7280",
+              "muted-dark": "#9CA3AF",
+            },
+            fontFamily: {
+              display: ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "1rem",
+              'xl': '1.5rem',
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4B5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6B7280; 
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark min-h-screen transition-colors duration-200">
+<nav class="sticky top-0 z-50 bg-card-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-16">
+<div class="flex items-center">
+<div class="flex-shrink-0 flex items-center gap-2">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="text-white font-bold text-lg">S</span>
+</div>
+<span class="font-bold text-xl tracking-tight text-gray-900 dark:text-white">Spokio</span>
+</div>
+<div class="hidden md:ml-10 md:flex md:space-x-8">
+<a class="border-b-2 border-primary text-gray-900 dark:text-white inline-flex items-center px-1 pt-1 text-sm font-medium" href="#">
+<span class="material-icons-round text-primary mr-2 text-base">book</span>
+                            Practice
+                        </a>
+<a class="border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors" href="#">
+<span class="material-icons-round mr-2 text-base">mic</span>
+                            AI Coach
+                        </a>
+<a class="border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors" href="#">
+<span class="material-icons-round mr-2 text-base">emoji_events</span>
+                            Results
+                        </a>
+</div>
+</div>
+<div class="flex items-center space-x-4">
+<div class="hidden sm:flex items-center px-3 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full border border-orange-200 dark:border-orange-800">
+<span class="material-icons-round text-orange-500 text-sm mr-1">local_fire_department</span>
+<span class="text-orange-700 dark:text-orange-400 text-xs font-bold">12 Days Streak</span>
+</div>
+<button class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 focus:outline-none" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-round">light_mode</span>
+</button>
+<div class="relative flex items-center">
+<button class="flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-background-light dark:focus:ring-offset-background-dark">
+<span class="sr-only">Open user menu</span>
+<div class="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+                                JD
+                            </div>
+</button>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+<div class="mb-10">
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Choose a topic</h1>
+<p class="text-muted-light dark:text-muted-dark text-lg max-w-3xl">
+                Pick an area to practice and receive real-time, AI-powered feedback on your pronunciation, vocabulary, and fluency.
+            </p>
+</div>
+<div class="flex flex-wrap gap-3 mb-8">
+<button class="px-4 py-2 rounded-full bg-primary text-white text-sm font-medium shadow-lg shadow-primary/30 transition-transform active:scale-95">
+                All Topics
+            </button>
+<button class="px-4 py-2 rounded-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Part 1 (Intro)
+            </button>
+<button class="px-4 py-2 rounded-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Part 2 (Cue Card)
+            </button>
+<button class="px-4 py-2 rounded-full bg-white dark:bg-card-dark border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                Part 3 (Discussion)
+            </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-wide">Part 3</span>
+<span class="px-2.5 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold">Premium</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
+                            Intermediate
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        In what ways do you believe urbanization impacts community relationships?
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Discuss the social implications of city living versus rural environments and how infrastructure affects human connection.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-wide">Part 3</span>
+<span class="px-2.5 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold">Premium</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
+                            Intermediate
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        How do you think social media has changed the way people communicate?
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Analyze the shift from face-to-face interaction to digital messaging and its effect on language evolution.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold uppercase tracking-wide">Part 2</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
+                            Intermediate
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        Talk about a person who has influenced your life
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Describe someone you admire, how you met them, and explain why they have had such a significant impact on you.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-wide">Part 3</span>
+<span class="px-2.5 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold">Premium</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-red-500 mr-1.5"></span>
+                            Advanced
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        The impact of artificial intelligence on future employment
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Consider the ethical and economic ramifications of automation in the workforce.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold uppercase tracking-wide">Part 1</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-blue-400 mr-1.5"></span>
+                            Beginner
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        Your Hobbies and Interests
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Talk about what you like to do in your free time, why you enjoy it, and how often you do it.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+<div class="group bg-card-light dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:border-primary/50 dark:hover:border-primary/50 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full">
+<div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center space-x-2">
+<span class="px-2.5 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold uppercase tracking-wide">Part 2</span>
+<span class="px-2.5 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-semibold">Premium</span>
+</div>
+<span class="text-muted-light dark:text-muted-dark text-xs flex items-center">
+<span class="w-2 h-2 rounded-full bg-green-500 mr-1.5"></span>
+                            Intermediate
+                        </span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-primary transition-colors">
+                        Describe a traditional meal in your country
+                    </h3>
+<p class="text-sm text-muted-light dark:text-muted-dark mb-6 line-clamp-3">
+                        Explain the ingredients, how it is prepared, and when it is typically eaten.
+                    </p>
+</div>
+<button class="w-full bg-primary hover:bg-secondary text-white font-medium py-3 px-4 rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center justify-center">
+<span class="material-icons-round mr-2 text-lg">mic</span>
+                    Start practice
+                </button>
+</div>
+</div>
+<div class="mt-12 text-center">
+<button class="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-700 shadow-sm text-sm font-medium rounded-full text-gray-700 dark:text-gray-200 bg-white dark:bg-card-dark hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-background-dark transition-colors">
+                Load More Topics
+            </button>
+</div>
+</main>
+<footer class="bg-card-light dark:bg-card-dark border-t border-gray-200 dark:border-gray-800 mt-12 py-12">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 bg-primary rounded flex items-center justify-center">
+<span class="text-white font-bold text-xs">S</span>
+</div>
+<span class="text-gray-500 dark:text-gray-400 text-sm">© 2024 Spokio Inc.</span>
+</div>
+<div class="flex space-x-6">
+<a class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" href="#">
+<span class="sr-only">Twitter</span>
+<svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"></path></svg>
+</a>
+<a class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300" href="#">
+<span class="sr-only">GitHub</span>
+<svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" fill-rule="evenodd"></path></svg>
+</a>
+</div>
+</div>
+</footer>
+<script>
+        // Check for saved user preference, if any, on load of the website
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
+
+</body></html>

@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "next/core-web-vitals"
+  ],
+  "ignorePatterns": [
+    ".next/",
+    "node_modules/",
+    "output/",
+    "playwright-report/"
+  ],
+  "rules": {
+    "@next/next/google-font-display": "off",
+    "@next/next/no-page-custom-font": "off"
+  }
+}

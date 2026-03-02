@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Body, Get, HttpCode, JsonController, Param, Post, Req, Res, UseBefore } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
-import { StartFullExamRequest, SubmitFullExamSectionRequest } from '@dto/FullExamDto';
+import { FullExamRuntimeMutationRequest, StartFullExamRequest, SubmitFullExamSectionRequest } from '@dto/FullExamDto';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
@@ -94,6 +94,70 @@ export class FullExamController {
     try {
       const exam = await this.fullExamService.getResults(req.currentUser.id, examId);
       return StandardResponse.success(res, exam, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/:examId/pause')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async pause(
+    @Param('examId') examId: string,
+    @Body() body: FullExamRuntimeMutationRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'full-exam-pause');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const exam = await this.fullExamService.pauseExam(req.currentUser.id, examId, body, headers);
+      return StandardResponse.success(res, exam, 'Full exam paused', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/:examId/resume')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async resume(
+    @Param('examId') examId: string,
+    @Body() body: FullExamRuntimeMutationRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'full-exam-resume');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const exam = await this.fullExamService.resumeExam(req.currentUser.id, examId, body, headers);
+      return StandardResponse.success(res, exam, 'Full exam resumed', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Get('/:examId/runtime')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async runtime(@Param('examId') examId: string, @Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'full-exam-runtime');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const runtime = await this.fullExamService.getRuntime(req.currentUser.id, examId);
+      return StandardResponse.success(res, runtime, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }

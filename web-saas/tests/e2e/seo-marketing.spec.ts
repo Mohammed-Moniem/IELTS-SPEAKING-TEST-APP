@@ -100,12 +100,8 @@ test.describe('SEO marketing baseline', () => {
 
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Editorial Trust and Methodology/i }).first()).toBeVisible();
-    await expect(
-      page.getByRole('main').getByRole('link', { name: /Scoring Methodology/i }).first()
-    ).toBeVisible();
-    await expect(
-      page.getByRole('main').getByRole('link', { name: /Editorial Policy/i }).first()
-    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Scoring methodology' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Editorial policy' })).toBeVisible();
   });
 
   test('robots and sitemap expose crawl configuration for public pages only', async ({ request }) => {

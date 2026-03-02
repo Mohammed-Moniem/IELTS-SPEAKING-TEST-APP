@@ -205,13 +205,28 @@ export class AudioController {
   @Delete('/:recordingId')
   async deleteRecording(
     @Param('recordingId') recordingId: string,
-    @HeaderParam('x-user-id') userId?: string
+    @Req() req: any
   ): Promise<any> {
     try {
-      const requester = userId ?? 'unknown';
+      const requester = req.currentUser?.id ?? 'unknown';
       this.log.info(`🗑️  Delete recording request: ${recordingId} by ${requester}`);
 
-      // TODO: Add authorization check - verify userId owns this recording
+      const recording = await this.audioStorageService.getRecordingMetadata(recordingId);
+      if (!recording) {
+        return {
+          success: false,
+          error: 'Recording not found'
+        };
+      }
+
+      const roles = new Set<string>(req.currentUser?.roles || []);
+      const isPrivileged = roles.has('superadmin') || roles.has('support_agent');
+      if (!isPrivileged && recording.userId !== requester) {
+        return {
+          success: false,
+          error: 'Forbidden'
+        };
+      }
 
       await this.audioStorageService.deleteRecording(recordingId);
 
@@ -259,7 +274,6 @@ export class AudioController {
   @Post('/cleanup')
   async cleanupExpired(@HeaderParam('x-admin-key') adminKey?: string): Promise<any> {
     try {
-      // TODO: Add admin authentication
       if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
         return {
           success: false,
