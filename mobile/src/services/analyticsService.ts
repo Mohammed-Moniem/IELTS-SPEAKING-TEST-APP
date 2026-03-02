@@ -4,6 +4,7 @@
  */
 
 import { PracticeSession, TestSimulation } from "../types/api";
+import { colors } from "../theme/tokens";
 
 export interface ScoreDataPoint {
   date: string; // ISO date string
@@ -494,11 +495,11 @@ class AnalyticsService {
   getTrendColor(trend: "improving" | "declining" | "stable"): string {
     switch (trend) {
       case "improving":
-        return "#10B981"; // Green
+        return colors.success;
       case "declining":
-        return "#EF4444"; // Red
+        return colors.danger;
       case "stable":
-        return "#6B7280"; // Gray
+        return colors.textMuted;
     }
   }
 
@@ -506,11 +507,11 @@ class AnalyticsService {
    * Get color for band score
    */
   getBandColor(band: number): string {
-    if (band >= 8) return "#10B981"; // Excellent - Green
-    if (band >= 7) return "#3B82F6"; // Good - Blue
-    if (band >= 6) return "#F59E0B"; // Competent - Orange
-    if (band >= 5) return "#EF4444"; // Limited - Red
-    return "#6B7280"; // Very Limited - Gray
+    if (band >= 8) return colors.success;
+    if (band >= 7) return colors.info;
+    if (band >= 6) return colors.warning;
+    if (band >= 5) return colors.danger;
+    return colors.textMuted;
   }
 }
 

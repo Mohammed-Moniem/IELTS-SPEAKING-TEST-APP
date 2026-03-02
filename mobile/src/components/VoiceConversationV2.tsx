@@ -17,6 +17,7 @@ import {
 } from "../api/speechApi";
 import { ttsService } from "../services/textToSpeechService";
 import { colors, radii, shadows, spacing } from "../theme/tokens";
+import { logger } from "../utils/logger";
 import { VoiceOrb } from "./VoiceOrb";
 
 type ConversationMode = "practice" | "simulation";
@@ -135,7 +136,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
           }
         );
       } catch (error) {
-        console.error("Failed to speak introduction:", error);
+        logger.warn("Failed to speak introduction", error);
         setState("idle");
       }
     })();
@@ -224,7 +225,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       setRecordingStartTime(Date.now());
       setState("recording");
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording", error);
       Alert.alert(
         "Recording Error",
         "Failed to start recording. Please try again."
@@ -262,7 +263,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         await handleSimulationTurn(uri);
       }
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording", error);
       setState("idle");
     }
   };
@@ -276,7 +277,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       try {
         await ttsService.speakEvaluationTransition();
       } catch (ttsError) {
-        console.error("TTS transition error (continuing):", ttsError);
+        logger.warn("TTS transition failed; continuing", ttsError);
       }
       setState("processing");
 
@@ -316,7 +317,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
           await ttsService.speak(summaryText);
         }
       } catch (ttsError) {
-        console.error("TTS summary error (continuing):", ttsError);
+        logger.warn("TTS summary failed; continuing", ttsError);
       }
 
       setState("complete");
@@ -341,7 +342,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         });
       }
     } catch (error: any) {
-      console.error("❌ Evaluation error:", error);
+      logger.warn("Evaluation failed", error);
       const errorMessage =
         typeof error?.message === "string" &&
         error.message.toLowerCase().includes("timeout")
@@ -387,7 +388,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
       // Return to idle state after audio finishes
       setState("idle");
     } catch (error: any) {
-      console.error("❌ Conversation error:", error);
+      logger.warn("Conversation turn failed", error);
       Alert.alert(
         "Connection Error",
         error.message ||
@@ -423,7 +424,7 @@ export const VoiceConversation: React.FC<VoiceConversationProps> = ({
         }
       });
     } catch (error) {
-      console.error("❌ Audio playback error:", error);
+      logger.warn("Audio playback failed", error);
       throw error;
     }
   };

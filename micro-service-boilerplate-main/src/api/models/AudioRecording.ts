@@ -95,7 +95,7 @@ export class AudioRecordingModel {
   /**
    * Calculate expiration date based on tier
    */
-  static calculateExpiryDate(tier: 'free' | 'premium' | 'pro'): Date | undefined {
+  static calculateExpiryDate(tier: 'free' | 'premium' | 'pro' | 'team'): Date | undefined {
     const now = new Date();
 
     // Free: 30 days, Premium: 1 year, Pro: never expires
@@ -107,7 +107,7 @@ export class AudioRecordingModel {
       return now;
     }
 
-    // Pro users: no expiry
+    // Pro/Team users: no expiry
     return undefined;
   }
 }

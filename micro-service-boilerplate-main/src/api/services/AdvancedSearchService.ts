@@ -236,8 +236,25 @@ export class AdvancedSearchService {
     let filter: FilterQuery<any> = {};
 
     // Extract special query parameters
-    const { and, exact, near, within, includeDeleted, search, dateFrom, dateTo, dateField, ...queryFields } =
-      context.rawQuery;
+    const {
+      and,
+      exact,
+      near,
+      within,
+      includeDeleted,
+      search,
+      dateFrom,
+      dateTo,
+      dateField,
+      page: _page,
+      limit: _limit,
+      select: _select,
+      sort: _sort,
+      cache: _cache,
+      aggregateBy: _aggregateBy,
+      groupBy: _groupBy,
+      ...queryFields
+    } = context.rawQuery;
 
     // Build field-based filters
     if (Object.keys(queryFields).length > 0) {

@@ -90,7 +90,11 @@ export class ListeningController {
     }
 
     try {
-      const history = await this.listeningService.getHistory(req.currentUser.id, query.limit ?? 20, query.offset ?? 0);
+      const history = await this.listeningService.getHistory(req.currentUser.id, query.limit ?? 20, query.offset ?? 0, {
+        track: query.track,
+        from: query.from,
+        to: query.to
+      });
       return StandardResponse.success(res, history, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);

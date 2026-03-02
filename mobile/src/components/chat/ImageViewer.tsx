@@ -12,6 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -28,6 +31,8 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
   onClose,
   headers,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(true);
 
   return (
@@ -42,7 +47,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         {/* Status bar for Android */}
         {Platform.OS === "android" && (
           <StatusBar
-            backgroundColor="rgba(0, 0, 0, 0.9)"
+            backgroundColor={colors.overlayBackdrop}
             barStyle="light-content"
           />
         )}
@@ -50,7 +55,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         {/* Close button */}
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <View style={styles.closeButtonCircle}>
-            <Ionicons name="close" size={28} color="#FFFFFF" />
+            <Ionicons name="close" size={28} color={colors.primaryOn} />
           </View>
         </TouchableOpacity>
 
@@ -67,7 +72,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           {/* Loading indicator */}
           {loading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
+              <ActivityIndicator size="large" color={colors.primaryOn} />
             </View>
           )}
         </View>
@@ -83,41 +88,42 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.95)",
-  },
-  closeButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 20,
-    right: 20,
-    zIndex: 10,
-  },
-  closeButtonCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  imageContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  image: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
-  loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  tapArea: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: -1,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.overlayBackdrop,
+    },
+    closeButton: {
+      position: "absolute",
+      top: Platform.OS === "ios" ? 50 : 20,
+      right: 20,
+      zIndex: 10,
+    },
+    closeButtonCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    imageContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    image: {
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+    },
+    loadingContainer: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    tapArea: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: -1,
+    },
+  });

@@ -17,6 +17,7 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { OfflineBanner } from "./src/components/OfflineBanner";
 import { PointsProvider, ThemeProvider, useTheme } from "./src/context";
 import { AppNavigator } from "./src/navigation/AppNavigator";
+import { navigationRef } from "./src/navigation/navigationRef";
 import firebaseAnalyticsService from "./src/services/firebaseAnalyticsService";
 import monitoringService from "./src/services/monitoringService";
 import notificationService from "./src/services/notificationService";
@@ -99,7 +100,7 @@ const App = () => {
 
     // Initialize notifications
     notificationService.initialize().catch((error) => {
-      logger.error("❌", "Failed to initialize notifications:", error);
+      logger.warn("⚠️", "Notification initialization skipped:", error);
     });
 
     // Set up notification listeners
@@ -111,11 +112,44 @@ const App = () => {
     const responseListener =
       notificationService.addNotificationResponseListener((response) => {
         logger.info("👆", "Notification tapped:", response);
-        // Handle navigation based on notification data
+
         const data = response.notification.request.content.data;
-        if (data?.category) {
-          logger.info("Category:", data.category);
-          // TODO: Navigate to appropriate screen based on category
+        const category =
+          typeof data?.category === "string" ? data.category.toLowerCase() : "";
+
+        if (!category || !navigationRef.isReady()) {
+          return;
+        }
+
+        const currentRoute = navigationRef.getCurrentRoute()?.name;
+        const inAuthFlow = ["Onboarding", "TrialEntry", "Login", "Register"].includes(
+          String(currentRoute)
+        );
+        if (inAuthFlow) {
+          return;
+        }
+
+        try {
+          const navigator = navigationRef as any;
+
+          if (/(chat|social|friend|group)/.test(category)) {
+            navigator.navigate("MainTabs", { screen: "Social" });
+            return;
+          }
+
+          if (/(points|reward|achievement|coupon)/.test(category)) {
+            navigator.navigate("PointsDetail");
+            return;
+          }
+
+          if (/(result|feedback|practice|test)/.test(category)) {
+            navigator.navigate("MainTabs", { screen: "Results" });
+            return;
+          }
+
+          navigator.navigate("MainTabs", { screen: "Home" });
+        } catch (error) {
+          logger.warn("⚠️", "Failed to route notification response:", error);
         }
       });
 

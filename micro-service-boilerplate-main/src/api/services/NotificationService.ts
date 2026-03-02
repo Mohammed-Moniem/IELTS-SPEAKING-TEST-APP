@@ -1,5 +1,6 @@
 import { env } from '@env';
 import { UserStats } from '@models/AchievementModel';
+import { NotificationEndpointModel } from '@models/NotificationEndpointModel';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettings,
@@ -7,13 +8,16 @@ import {
   UserProfile
 } from '@models/UserProfileModel';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
+import admin from 'firebase-admin';
 import { Types } from '@lib/db/mongooseCompat';
 import { Service } from 'typedi';
+import crypto from 'crypto';
 
 import { Logger } from '../../lib/logger';
 
 const HOURS_IN_DAY = 24;
 const MIN_INACTIVITY_REMINDER_GAP_HOURS = 24;
+const PARTNER_AUDIENCE_FLAG = 'partnerOffer';
 
 interface DirectMessagePayload {
   recipientId: string;
@@ -30,6 +34,18 @@ interface GroupMessagePayload {
   groupName?: string;
 }
 
+interface FriendRequestPayload {
+  recipientId: string;
+  senderId: string;
+  requestId: string;
+}
+
+interface FriendAcceptedPayload {
+  recipientId: string;
+  accepterId: string;
+  requestId: string;
+}
+
 interface SystemMessagePayload {
   userIds?: string[];
   title: string;
@@ -38,13 +54,76 @@ interface SystemMessagePayload {
   data?: Record<string, any>;
 }
 
+type NotificationChannel = 'expo' | 'fcm_web';
+type NotificationStatus = 'sent' | 'failed' | 'skipped';
+type PushProvider = 'expo' | 'fcm';
+
+type DeliveryAttempt = {
+  userId: string;
+  channel: NotificationChannel;
+  provider: PushProvider;
+  token?: string;
+  tokenHash?: string;
+  status: NotificationStatus;
+  providerMessageId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
+type UserRecipient = {
+  userId: string;
+  settings: NotificationSettings;
+  expoTokens: string[];
+  webTokens: string[];
+};
+
+type CampaignSendInput = {
+  userIds: string[];
+  title: string;
+  body: string;
+  type: 'system' | 'offer';
+  data?: Record<string, unknown>;
+  channels?: NotificationChannel[];
+};
+
 @Service()
 export class NotificationService {
   private expo: Expo;
+  private firebaseMessaging: admin.messaging.Messaging | null = null;
   private log = new Logger(__filename);
 
   constructor() {
     this.expo = new Expo({ accessToken: env.push.expoAccessToken || undefined });
+    this.initializeFirebaseMessaging();
+  }
+
+  private initializeFirebaseMessaging() {
+    const hasFirebaseConfig = Boolean(
+      env.push.firebaseProjectId && env.push.firebaseClientEmail && env.push.firebasePrivateKey
+    );
+
+    if (!hasFirebaseConfig) {
+      return;
+    }
+
+    try {
+      const existingApp = admin.apps.length > 0 ? admin.app() : null;
+
+      if (!existingApp) {
+        admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId: env.push.firebaseProjectId,
+            clientEmail: env.push.firebaseClientEmail,
+            privateKey: env.push.firebasePrivateKey
+          })
+        });
+      }
+
+      this.firebaseMessaging = admin.app().messaging();
+    } catch (error) {
+      this.firebaseMessaging = null;
+      this.log.error('Failed to initialize Firebase Admin messaging', { error });
+    }
   }
 
   private isEnabled(): boolean {
@@ -53,6 +132,18 @@ export class NotificationService {
 
   private toObjectId(id: string) {
     return new Types.ObjectId(id);
+  }
+
+  private toObjectIds(ids: string[]): Types.ObjectId[] {
+    return ids.filter(id => Types.ObjectId.isValid(id)).map(id => new Types.ObjectId(id));
+  }
+
+  private normalizeUserIds(ids: string[]): string[] {
+    return Array.from(new Set(ids.filter(id => Types.ObjectId.isValid(id))));
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private mergeSettings(
@@ -84,39 +175,303 @@ export class NotificationService {
     return 'A friend';
   }
 
-  private async sendPush(to: string[], message: Omit<ExpoPushMessage, 'to'>): Promise<void> {
-    if (!this.isEnabled() || to.length === 0) {
-      return;
-    }
+  private async upsertEndpoint(params: {
+    userId: string;
+    channel: NotificationChannel;
+    provider: PushProvider;
+    platform: 'ios' | 'android' | 'web';
+    token: string;
+    locale?: string;
+    timezoneOffsetMinutes?: number;
+    appVersion?: string;
+    deviceId?: string;
+    userAgent?: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    if (!params.token) return;
 
-    const notifications = to
-      .filter(token => {
-        if (!Expo.isExpoPushToken(token)) {
-          this.log.warn('Skipping invalid Expo push token', { token });
-          return false;
+    await NotificationEndpointModel.findOneAndUpdate(
+      { token: params.token },
+      {
+        $set: {
+          userId: this.toObjectId(params.userId),
+          channel: params.channel,
+          provider: params.provider,
+          platform: params.platform,
+          token: params.token,
+          tokenHash: this.hashToken(params.token),
+          isActive: true,
+          locale: params.locale,
+          timezoneOffsetMinutes: params.timezoneOffsetMinutes,
+          appVersion: params.appVersion,
+          deviceId: params.deviceId,
+          userAgent: params.userAgent,
+          metadata: params.metadata || {}
         }
-        return true;
-      })
-      .map(token => ({
-        to: token,
-        ...message
-      }));
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+  }
 
-    if (notifications.length === 0) {
-      return;
+  private async deactivateEndpointToken(token: string, channel?: NotificationChannel) {
+    if (!token) return;
+    const query: Record<string, unknown> = { token };
+    if (channel) {
+      query.channel = channel;
     }
+
+    await NotificationEndpointModel.updateMany(query, {
+      $set: {
+        isActive: false
+      }
+    });
+  }
+
+  private async sendExpoPushWithResults(
+    tokens: string[],
+    message: Omit<ExpoPushMessage, 'to'>
+  ): Promise<Array<DeliveryAttempt & { channel: 'expo'; provider: 'expo' }>> {
+    const attempts: Array<DeliveryAttempt & { channel: 'expo'; provider: 'expo' }> = [];
+    if (!this.isEnabled() || tokens.length === 0) {
+      return attempts;
+    }
+
+    const valid: string[] = [];
+    const uniqueTokens = Array.from(new Set(tokens));
+
+    for (const token of uniqueTokens) {
+      if (!Expo.isExpoPushToken(token)) {
+        attempts.push({
+          userId: '',
+          channel: 'expo',
+          provider: 'expo',
+          token,
+          tokenHash: this.hashToken(token),
+          status: 'failed',
+          errorCode: 'invalid_expo_token',
+          errorMessage: 'Invalid Expo push token format'
+        });
+        await this.deactivateEndpointToken(token, 'expo');
+        continue;
+      }
+
+      valid.push(token);
+    }
+
+    if (valid.length === 0) {
+      return attempts;
+    }
+
+    const notifications = valid.map(token => ({
+      to: token,
+      ...message
+    }));
 
     const chunks = this.expo.chunkPushNotifications(notifications);
+    let indexOffset = 0;
+
     for (const chunk of chunks) {
+      const chunkTokens = valid.slice(indexOffset, indexOffset + chunk.length);
+      indexOffset += chunk.length;
+
       try {
-        await this.expo.sendPushNotificationsAsync(chunk);
+        const tickets = await this.expo.sendPushNotificationsAsync(chunk);
+        for (let i = 0; i < tickets.length; i += 1) {
+          const ticket = tickets[i];
+          const token = chunkTokens[i];
+          if (!token) continue;
+
+          if ((ticket as any).status === 'ok') {
+            attempts.push({
+              userId: '',
+              channel: 'expo',
+              provider: 'expo',
+              token,
+              tokenHash: this.hashToken(token),
+              status: 'sent',
+              providerMessageId: (ticket as any).id
+            });
+            continue;
+          }
+
+          const errorCode = (ticket as any)?.details?.error || 'expo_send_error';
+          attempts.push({
+            userId: '',
+            channel: 'expo',
+            provider: 'expo',
+            token,
+            tokenHash: this.hashToken(token),
+            status: 'failed',
+            errorCode,
+            errorMessage: (ticket as any)?.message
+          });
+
+          if (errorCode === 'DeviceNotRegistered') {
+            await Promise.all([
+              UserProfile.updateMany(
+                {
+                  deviceTokens: token
+                },
+                {
+                  $pull: { deviceTokens: token }
+                }
+              ),
+              this.deactivateEndpointToken(token, 'expo')
+            ]);
+          }
+        }
       } catch (error) {
-        this.log.error('Failed to send push notification chunk', { error });
+        this.log.error('Failed to send Expo notification chunk', { error });
+        chunkTokens.forEach(token => {
+          attempts.push({
+            userId: '',
+            channel: 'expo',
+            provider: 'expo',
+            token,
+            tokenHash: this.hashToken(token),
+            status: 'failed',
+            errorCode: 'expo_chunk_send_failed',
+            errorMessage: error instanceof Error ? error.message : JSON.stringify(error)
+          });
+        });
       }
+    }
+
+    return attempts;
+  }
+
+  private toFcmData(data?: Record<string, any>): Record<string, string> | undefined {
+    if (!data) return undefined;
+    const entries = Object.entries(data).map(([key, value]) => {
+      if (value === undefined || value === null) {
+        return [key, ''];
+      }
+      if (typeof value === 'string') {
+        return [key, value];
+      }
+      return [key, JSON.stringify(value)];
+    });
+
+    return Object.fromEntries(entries);
+  }
+
+  private isInvalidFcmTokenError(errorCode?: string): boolean {
+    return [
+      'messaging/registration-token-not-registered',
+      'messaging/invalid-registration-token',
+      'messaging/invalid-argument'
+    ].includes(errorCode || '');
+  }
+
+  private async sendWebPushWithResults(params: {
+    tokens: string[];
+    title: string;
+    body: string;
+    data?: Record<string, any>;
+  }): Promise<Array<DeliveryAttempt & { channel: 'fcm_web'; provider: 'fcm' }>> {
+    const uniqueTokens = Array.from(new Set(params.tokens.filter(Boolean)));
+    if (!this.isEnabled() || uniqueTokens.length === 0) {
+      return [];
+    }
+
+    if (!this.firebaseMessaging) {
+      return uniqueTokens.map(token => ({
+        userId: '',
+        channel: 'fcm_web',
+        provider: 'fcm',
+        token,
+        tokenHash: this.hashToken(token),
+        status: 'failed',
+        errorCode: 'fcm_not_configured',
+        errorMessage: 'FCM is not configured on backend'
+      }));
+    }
+
+    const message = {
+      tokens: uniqueTokens,
+      notification: {
+        title: params.title,
+        body: params.body
+      },
+      data: this.toFcmData(params.data),
+      webpush: {
+        notification: {
+          title: params.title,
+          body: params.body
+        }
+      }
+    };
+
+    try {
+      const result = await this.firebaseMessaging.sendEachForMulticast(message as any);
+      const attempts: Array<DeliveryAttempt & { channel: 'fcm_web'; provider: 'fcm' }> = [];
+
+      for (let i = 0; i < result.responses.length; i += 1) {
+        const response = result.responses[i];
+        const token = uniqueTokens[i];
+        if (!token) continue;
+
+        if (response.success) {
+          attempts.push({
+            userId: '',
+            channel: 'fcm_web',
+            provider: 'fcm',
+            token,
+            tokenHash: this.hashToken(token),
+            status: 'sent',
+            providerMessageId: response.messageId
+          });
+          continue;
+        }
+
+        const code = response.error?.code || 'fcm_send_error';
+        attempts.push({
+          userId: '',
+          channel: 'fcm_web',
+          provider: 'fcm',
+          token,
+          tokenHash: this.hashToken(token),
+          status: 'failed',
+          errorCode: code,
+          errorMessage: response.error?.message
+        });
+
+        if (this.isInvalidFcmTokenError(code)) {
+          await this.deactivateEndpointToken(token, 'fcm_web');
+        }
+      }
+
+      return attempts;
+    } catch (error) {
+      this.log.error('Failed to send FCM web push notifications', { error });
+      return uniqueTokens.map(token => ({
+        userId: '',
+        channel: 'fcm_web',
+        provider: 'fcm',
+        token,
+        tokenHash: this.hashToken(token),
+        status: 'failed',
+        errorCode: 'fcm_batch_send_failed',
+        errorMessage: error instanceof Error ? error.message : JSON.stringify(error)
+      }));
     }
   }
 
-  async registerDeviceToken(userId: string, token: string): Promise<void> {
+  async registerDeviceToken(
+    userId: string,
+    token: string,
+    context?: {
+      platform?: 'ios' | 'android';
+      locale?: string;
+      timezoneOffsetMinutes?: number;
+      appVersion?: string;
+      deviceId?: string;
+    }
+  ): Promise<void> {
     if (!this.isEnabled() || !token) {
       return;
     }
@@ -134,11 +489,69 @@ export class NotificationService {
       },
       { upsert: true }
     );
+
+    await this.upsertEndpoint({
+      userId,
+      channel: 'expo',
+      provider: 'expo',
+      platform: context?.platform || 'android',
+      token,
+      locale: context?.locale,
+      timezoneOffsetMinutes: context?.timezoneOffsetMinutes,
+      appVersion: context?.appVersion,
+      deviceId: context?.deviceId
+    });
+  }
+
+  async registerWebDeviceToken(
+    userId: string,
+    payload: {
+      token: string;
+      locale?: string;
+      timezoneOffsetMinutes?: number;
+      userAgent?: string;
+    }
+  ): Promise<void> {
+    if (!this.isEnabled() || !payload.token) {
+      return;
+    }
+
+    await this.upsertEndpoint({
+      userId,
+      channel: 'fcm_web',
+      provider: 'fcm',
+      platform: 'web',
+      token: payload.token,
+      locale: payload.locale,
+      timezoneOffsetMinutes: payload.timezoneOffsetMinutes,
+      userAgent: payload.userAgent
+    });
   }
 
   async removeDeviceToken(userId: string, token: string): Promise<void> {
     if (!token) return;
-    await UserProfile.updateOne({ userId: this.toObjectId(userId) }, { $pull: { deviceTokens: token } });
+    await Promise.all([
+      UserProfile.updateOne({ userId: this.toObjectId(userId) }, { $pull: { deviceTokens: token } }),
+      NotificationEndpointModel.updateMany(
+        { userId: this.toObjectId(userId), token, channel: 'expo' },
+        { $set: { isActive: false } }
+      )
+    ]);
+  }
+
+  async removeWebDeviceToken(userId: string, token: string): Promise<void> {
+    if (!token) return;
+
+    await NotificationEndpointModel.updateMany(
+      {
+        userId: this.toObjectId(userId),
+        token,
+        channel: 'fcm_web'
+      },
+      {
+        $set: { isActive: false }
+      }
+    );
   }
 
   async getNotificationSettings(userId: string): Promise<NotificationSettings> {
@@ -146,8 +559,12 @@ export class NotificationService {
     return this.mergeSettings(profile?.notificationSettings);
   }
 
-  async updateNotificationSettings(userId: string, payload: NotificationSettings): Promise<NotificationSettings> {
-    const merged = this.mergeSettings(undefined, payload);
+  async updateNotificationSettings(
+    userId: string,
+    payload: Partial<NotificationSettings>
+  ): Promise<NotificationSettings> {
+    const current = await this.getNotificationSettings(userId);
+    const merged = this.mergeSettings(current, payload);
     await UserProfile.updateOne(
       { userId: this.toObjectId(userId) },
       { $set: { notificationSettings: merged } },
@@ -156,32 +573,189 @@ export class NotificationService {
     return merged;
   }
 
-  private async getEligibleProfiles(userIds: string[], preferenceKey: keyof NotificationSettings) {
-    if (userIds.length === 0) {
+  private async buildRecipients(userIds: string[], preferenceKey: keyof NotificationSettings): Promise<UserRecipient[]> {
+    const normalizedIds = this.normalizeUserIds(userIds);
+    if (normalizedIds.length === 0) {
       return [];
     }
 
-    const profiles = await UserProfile.find({
-      userId: { $in: userIds.map(id => this.toObjectId(id)) },
-      deviceTokens: { $exists: true, $ne: [] }
-    }).select('userId deviceTokens notificationSettings notificationState username');
+    const objectIds = this.toObjectIds(normalizedIds);
+    const [profiles, endpoints] = await Promise.all([
+      UserProfile.find({
+        userId: { $in: objectIds }
+      }).select('userId deviceTokens notificationSettings'),
+      NotificationEndpointModel.find({
+        userId: { $in: objectIds },
+        isActive: true
+      }).select('userId channel token')
+    ]);
 
-    return profiles.filter(profile => {
-      const settings = this.mergeSettings(profile.notificationSettings);
-      return settings[preferenceKey] !== false;
+    const profileMap = new Map<string, (typeof profiles)[number]>();
+    profiles.forEach(profile => profileMap.set(profile.userId.toString(), profile));
+
+    const endpointMap = new Map<
+      string,
+      {
+        expo: string[];
+        fcmWeb: string[];
+      }
+    >();
+
+    endpoints.forEach(endpoint => {
+      const key = endpoint.userId.toString();
+      if (!endpointMap.has(key)) {
+        endpointMap.set(key, { expo: [], fcmWeb: [] });
+      }
+
+      const entry = endpointMap.get(key)!;
+      if (endpoint.channel === 'expo') {
+        entry.expo.push(endpoint.token);
+      } else if (endpoint.channel === 'fcm_web') {
+        entry.fcmWeb.push(endpoint.token);
+      }
     });
+
+    const recipients: UserRecipient[] = [];
+    normalizedIds.forEach(userId => {
+      const profile = profileMap.get(userId);
+      const settings = this.mergeSettings(profile?.notificationSettings);
+      if (settings[preferenceKey] === false) {
+        return;
+      }
+
+      const endpointTokens = endpointMap.get(userId) || { expo: [], fcmWeb: [] };
+      const profileExpoTokens = profile?.deviceTokens || [];
+
+      recipients.push({
+        userId,
+        settings,
+        expoTokens: Array.from(new Set([...profileExpoTokens, ...endpointTokens.expo])),
+        webTokens: Array.from(new Set(endpointTokens.fcmWeb))
+      });
+    });
+
+    return recipients;
+  }
+
+  private withUserId<T extends DeliveryAttempt>(attempts: T[], userId: string): T[] {
+    return attempts.map(attempt => ({
+      ...attempt,
+      userId
+    }));
+  }
+
+  private resolveSystemPreferenceKey(payload: {
+    type: 'system' | 'offer';
+    data?: Record<string, unknown>;
+  }): keyof NotificationSettings {
+    if (payload.type === 'system') {
+      return 'systemAnnouncementsEnabled';
+    }
+
+    const isPartnerOffer = Boolean(payload.data?.[PARTNER_AUDIENCE_FLAG]);
+    return isPartnerOffer ? 'partnerOffersEnabled' : 'offersEnabled';
+  }
+
+  async sendCampaignMessage(input: CampaignSendInput): Promise<{
+    targetedUsers: number;
+    attempts: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+    deliveries: DeliveryAttempt[];
+  }> {
+    if (!this.isEnabled()) {
+      return {
+        targetedUsers: 0,
+        attempts: 0,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        deliveries: []
+      };
+    }
+
+    const preferenceKey = this.resolveSystemPreferenceKey({
+      type: input.type,
+      data: input.data
+    });
+
+    const channels = input.channels?.length ? input.channels : (['expo', 'fcm_web'] as NotificationChannel[]);
+    const recipients = await this.buildRecipients(input.userIds, preferenceKey);
+    const deliveries: DeliveryAttempt[] = [];
+
+    for (const recipient of recipients) {
+      if (channels.includes('expo')) {
+        if (recipient.expoTokens.length === 0) {
+          deliveries.push({
+            userId: recipient.userId,
+            channel: 'expo',
+            provider: 'expo',
+            status: 'skipped',
+            errorCode: 'no_active_tokens',
+            errorMessage: 'No active Expo token'
+          });
+        } else {
+          const expoResult = await this.sendExpoPushWithResults(recipient.expoTokens, {
+            title: input.title,
+            body: input.body,
+            data: {
+              type: input.type,
+              ...(input.data || {})
+            },
+            sound: 'default'
+          });
+
+          deliveries.push(...this.withUserId(expoResult, recipient.userId));
+        }
+      }
+
+      if (channels.includes('fcm_web')) {
+        if (recipient.webTokens.length === 0) {
+          deliveries.push({
+            userId: recipient.userId,
+            channel: 'fcm_web',
+            provider: 'fcm',
+            status: 'skipped',
+            errorCode: 'no_active_tokens',
+            errorMessage: 'No active web push token'
+          });
+        } else {
+          const fcmResult = await this.sendWebPushWithResults({
+            tokens: recipient.webTokens,
+            title: input.title,
+            body: input.body,
+            data: {
+              type: input.type,
+              ...(input.data || {})
+            }
+          });
+
+          deliveries.push(...this.withUserId(fcmResult, recipient.userId));
+        }
+      }
+    }
+
+    return {
+      targetedUsers: recipients.length,
+      attempts: deliveries.length,
+      sent: deliveries.filter(item => item.status === 'sent').length,
+      failed: deliveries.filter(item => item.status === 'failed').length,
+      skipped: deliveries.filter(item => item.status === 'skipped').length,
+      deliveries
+    };
   }
 
   async notifyDirectMessage(payload: DirectMessagePayload): Promise<void> {
     if (!this.isEnabled()) return;
 
-    const profiles = await this.getEligibleProfiles([payload.recipientId], 'directMessagesEnabled');
-    const profile = profiles[0];
-    if (!profile) return;
+    const recipients = await this.buildRecipients([payload.recipientId], 'directMessagesEnabled');
+    const recipient = recipients[0];
+    if (!recipient || recipient.expoTokens.length === 0) return;
 
     const senderName = await this.getUserDisplayName(payload.senderId);
 
-    await this.sendPush(profile.deviceTokens || [], {
+    await this.sendExpoPushWithResults(recipient.expoTokens, {
       title: `${senderName} sent you a message`,
       body: this.truncateMessage(payload.message),
       data: {
@@ -200,8 +774,8 @@ export class NotificationService {
     const uniqueRecipients = Array.from(new Set(payload.recipientIds.filter(id => id !== payload.senderId)));
     if (uniqueRecipients.length === 0) return;
 
-    const profiles = await this.getEligibleProfiles(uniqueRecipients, 'groupMessagesEnabled');
-    if (profiles.length === 0) return;
+    const recipients = await this.buildRecipients(uniqueRecipients, 'groupMessagesEnabled');
+    if (recipients.length === 0) return;
 
     const senderName = await this.getUserDisplayName(payload.senderId);
     const baseData = {
@@ -211,8 +785,9 @@ export class NotificationService {
     };
 
     await Promise.all(
-      profiles.map(profile =>
-        this.sendPush(profile.deviceTokens || [], {
+      recipients.map(recipient => {
+        if (recipient.expoTokens.length === 0) return Promise.resolve();
+        return this.sendExpoPushWithResults(recipient.expoTokens, {
           title: payload.groupName
             ? `${payload.groupName}: new message from ${senderName}`
             : `${senderName} in your study group`,
@@ -220,38 +795,68 @@ export class NotificationService {
           data: baseData,
           sound: 'default',
           priority: 'high'
-        })
-      )
+        }).then(() => undefined);
+      })
     );
+  }
+
+  async notifyFriendRequest(payload: FriendRequestPayload): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    const recipients = await this.buildRecipients([payload.recipientId], 'friendRequestsEnabled');
+    const recipient = recipients[0];
+    if (!recipient || recipient.expoTokens.length === 0) return;
+
+    const senderName = await this.getUserDisplayName(payload.senderId);
+    await this.sendExpoPushWithResults(recipient.expoTokens, {
+      title: `${senderName} sent you a friend request`,
+      body: 'Open Social to accept or decline.',
+      data: {
+        type: 'friend_request',
+        senderId: payload.senderId,
+        requestId: payload.requestId
+      },
+      sound: 'default',
+      priority: 'high'
+    });
+  }
+
+  async notifyFriendAccepted(payload: FriendAcceptedPayload): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    const recipients = await this.buildRecipients([payload.recipientId], 'friendAcceptancesEnabled');
+    const recipient = recipients[0];
+    if (!recipient || recipient.expoTokens.length === 0) return;
+
+    const accepterName = await this.getUserDisplayName(payload.accepterId);
+    await this.sendExpoPushWithResults(recipient.expoTokens, {
+      title: `${accepterName} accepted your friend request`,
+      body: 'You can now chat and compare progress together.',
+      data: {
+        type: 'friend_accepted',
+        accepterId: payload.accepterId,
+        requestId: payload.requestId
+      },
+      sound: 'default',
+      priority: 'high'
+    });
   }
 
   async notifySystemMessage(payload: SystemMessagePayload): Promise<void> {
     if (!this.isEnabled()) return;
 
-    const preferenceKey =
-      payload.type === 'offer' ? ('offersEnabled' as const) : ('systemAnnouncementsEnabled' as const);
-
-    let profiles;
-    if (payload.userIds?.length) {
-      profiles = await this.getEligibleProfiles(payload.userIds, preferenceKey);
-    } else {
-      profiles = await UserProfile.find({
-        [`notificationSettings.${preferenceKey}`]: { $ne: false },
-        deviceTokens: { $exists: true, $ne: [] }
-      }).select('deviceTokens');
+    let userIds = payload.userIds || [];
+    if (!userIds.length) {
+      const profiles = await UserProfile.find({}).select('userId');
+      userIds = profiles.map(profile => profile.userId.toString());
     }
 
-    if (!profiles || profiles.length === 0) return;
-
-    const tokens = profiles.flatMap(profile => profile.deviceTokens || []);
-    await this.sendPush(tokens, {
+    await this.sendCampaignMessage({
+      userIds,
       title: payload.title,
       body: payload.body,
-      data: {
-        type: payload.type,
-        ...payload.data
-      },
-      sound: 'default'
+      type: payload.type,
+      data: payload.data || {}
     });
   }
 
@@ -317,30 +922,34 @@ export class NotificationService {
     if (!this.isEnabled()) return;
 
     const profile = await UserProfile.findOne({
-      userId: this.toObjectId(userId),
-      deviceTokens: { $exists: true, $ne: [] }
-    }).select('deviceTokens notificationSettings notificationState');
+      userId: this.toObjectId(userId)
+    }).select('notificationSettings notificationState deviceTokens');
 
     if (!profile) return;
     const settings = this.mergeSettings(profile.notificationSettings);
     if (!settings.inactivityRemindersEnabled) return;
     if (this.shouldThrottleNotification(profile.notificationState)) return;
 
-    await this.sendPush(profile.deviceTokens || [], {
-      title: "Let's keep your streak alive!",
-      body:
-        daysInactive === 1
-          ? 'You missed practice yesterday. Jump back in for a quick session?'
-          : `It's been ${daysInactive} days since your last practice. Ready for a quick speaking warm-up?`,
-      data: {
-        type: 'inactivity_reminder',
-        daysInactive
-      },
-      sound: 'default'
-    });
+    const recipient = (await this.buildRecipients([userId], 'inactivityRemindersEnabled'))[0];
+    if (!recipient) return;
+
+    if (recipient.expoTokens.length > 0) {
+      await this.sendExpoPushWithResults(recipient.expoTokens, {
+        title: "Let's keep your streak alive!",
+        body:
+          daysInactive === 1
+            ? 'You missed practice yesterday. Jump back in for a quick session?'
+            : `It's been ${daysInactive} days since your last practice. Ready for a quick speaking warm-up?`,
+        data: {
+          type: 'inactivity_reminder',
+          daysInactive
+        },
+        sound: 'default'
+      });
+    }
 
     await UserProfile.updateOne(
-      { _id: profile._id },
+      { userId: this.toObjectId(userId) },
       { $set: { 'notificationState.lastInactivityNotificationAt': new Date() } }
     );
   }

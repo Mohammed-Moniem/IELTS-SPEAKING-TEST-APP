@@ -26,6 +26,7 @@ type TimePeriod = "7" | "30" | "90" | "all";
 export const AnalyticsScreen = () => {
   const { user, initializing: authInitializing } = useAuth();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("30");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const userId = user?._id ?? null;
@@ -40,7 +41,7 @@ export const AnalyticsScreen = () => {
               styles.criteriaBarFill,
               {
                 width: `${percentage}%`,
-                backgroundColor: getBandColor(score),
+                backgroundColor: getBandColor(score, colors),
               },
             ]}
           />
@@ -137,6 +138,12 @@ export const AnalyticsScreen = () => {
               timePeriod === period && styles.periodButtonActive,
             ]}
             onPress={() => setTimePeriod(period)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: timePeriod === period }}
+            accessibilityLabel={
+              period === "all" ? "Select all-time analytics" : `Select ${period} day analytics`
+            }
+            accessibilityHint="Update analytics to this time period"
           >
             <Text
               style={[
@@ -160,7 +167,7 @@ export const AnalyticsScreen = () => {
           <Text
             style={[
               styles.statValue,
-              { color: getBandColor(stats.averageBand) },
+              { color: getBandColor(stats.averageBand, colors) },
             ]}
           >
             {stats.averageBand.toFixed(1)}
@@ -211,7 +218,7 @@ export const AnalyticsScreen = () => {
                     styles.bar,
                     {
                       height: `${item.percentage}%`,
-                      backgroundColor: getBandColor(item.band),
+                      backgroundColor: getBandColor(item.band, colors),
                     },
                   ]}
                 >
@@ -247,127 +254,151 @@ export const AnalyticsScreen = () => {
         )}
       </Card>
 
-      {/* Monthly Progress */}
-      {stats.monthlyProgress && stats.monthlyProgress.length > 0 && (
+      <TouchableOpacity
+        style={styles.advancedToggle}
+        onPress={() => setShowAdvanced((prev) => !prev)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showAdvanced }}
+        accessibilityLabel={showAdvanced ? "Hide analytics details" : "Show analytics details"}
+        accessibilityHint="Toggle advanced analytics breakdown"
+      >
+        <Text style={styles.advancedToggleText}>
+          {showAdvanced ? "Hide details" : "See details"}
+        </Text>
+        <Ionicons
+          name={showAdvanced ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={colors.primary}
+        />
+      </TouchableOpacity>
+
+      {showAdvanced && (
         <>
-          <SectionHeading title="Monthly Progress" />
-          <Card>
-            <View style={styles.monthlyChart}>
-              {stats.monthlyProgress.map((month) => (
-                <View key={month.month} style={styles.monthColumn}>
-                  <View style={styles.monthBar}>
-                    <View
-                      style={[
-                        styles.monthBarFill,
-                        {
-                          height: `${(month.averageBand / 9) * 100}%`,
-                          backgroundColor: getBandColor(month.averageBand),
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.monthScore}>
-                    {month.averageBand.toFixed(1)}
-                  </Text>
-                  <Text style={styles.monthLabel} numberOfLines={1}>
-                    {month.month}
-                  </Text>
-                  <Text style={styles.monthTests}>{month.testCount} tests</Text>
+          {/* Monthly Progress */}
+          {stats.monthlyProgress && stats.monthlyProgress.length > 0 && (
+            <>
+              <SectionHeading title="Monthly Progress" />
+              <Card>
+                <View style={styles.monthlyChart}>
+                  {stats.monthlyProgress.map((month) => (
+                    <View key={month.month} style={styles.monthColumn}>
+                      <View style={styles.monthBar}>
+                        <View
+                          style={[
+                            styles.monthBarFill,
+                            {
+                              height: `${(month.averageBand / 9) * 100}%`,
+                              backgroundColor: getBandColor(month.averageBand, colors),
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.monthScore}>
+                        {month.averageBand.toFixed(1)}
+                      </Text>
+                      <Text style={styles.monthLabel} numberOfLines={1}>
+                        {month.month}
+                      </Text>
+                      <Text style={styles.monthTests}>{month.testCount} tests</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
+              </Card>
+            </>
+          )}
+
+          {/* Strengths & Weaknesses */}
+          <View style={styles.twoColumn}>
+            <View style={styles.column}>
+              <SectionHeading title="Strengths" />
+              <Card>
+                {stats.strengths.length > 0 ? (
+                  stats.strengths.map((strength, idx) => (
+                    <View key={idx} style={styles.listItem}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={18}
+                        color={colors.success}
+                      />
+                      <Text style={styles.listItemText}>{strength}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noDataText}>
+                    Keep practicing to discover strengths
+                  </Text>
+                )}
+              </Card>
+            </View>
+
+            <View style={styles.column}>
+              <SectionHeading title="Areas to Improve" />
+              <Card>
+                {stats.weaknesses.length > 0 ? (
+                  stats.weaknesses.map((weakness, idx) => (
+                    <View key={idx} style={styles.listItem}>
+                      <Ionicons
+                        name="alert-circle"
+                        size={18}
+                        color={colors.warning}
+                      />
+                      <Text style={styles.listItemText}>{weakness}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noDataText}>
+                    Doing great! No major weaknesses
+                  </Text>
+                )}
+              </Card>
+            </View>
+          </View>
+
+          {/* Test Type Breakdown */}
+          <SectionHeading title="Test Type Breakdown" />
+          <Card>
+            <View style={styles.breakdown}>
+              <View style={styles.breakdownItem}>
+                <View style={styles.breakdownIcon}>
+                  <Ionicons name="book" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.breakdownInfo}>
+                  <Text style={styles.breakdownValue}>{stats.practiceTests}</Text>
+                  <Text style={styles.breakdownLabel}>Practice Sessions</Text>
+                </View>
+                <Text style={styles.breakdownPercentage}>
+                  {((stats.practiceTests / stats.totalTests) * 100).toFixed(0)}%
+                </Text>
+              </View>
+
+              <View style={styles.breakdownItem}>
+                <View style={styles.breakdownIcon}>
+                  <Ionicons name="trophy" size={24} color={colors.warning} />
+                </View>
+                <View style={styles.breakdownInfo}>
+                  <Text style={styles.breakdownValue}>
+                    {stats.simulationTests}
+                  </Text>
+                  <Text style={styles.breakdownLabel}>Full Simulations</Text>
+                </View>
+                <Text style={styles.breakdownPercentage}>
+                  {((stats.simulationTests / stats.totalTests) * 100).toFixed(0)}%
+                </Text>
+              </View>
             </View>
           </Card>
         </>
       )}
-
-      {/* Strengths & Weaknesses */}
-      <View style={styles.twoColumn}>
-        <View style={styles.column}>
-          <SectionHeading title="Strengths" />
-          <Card>
-            {stats.strengths.length > 0 ? (
-              stats.strengths.map((strength, idx) => (
-                <View key={idx} style={styles.listItem}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color={colors.success}
-                  />
-                  <Text style={styles.listItemText}>{strength}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noDataText}>
-                Keep practicing to discover strengths
-              </Text>
-            )}
-          </Card>
-        </View>
-
-        <View style={styles.column}>
-          <SectionHeading title="Areas to Improve" />
-          <Card>
-            {stats.weaknesses.length > 0 ? (
-              stats.weaknesses.map((weakness, idx) => (
-                <View key={idx} style={styles.listItem}>
-                  <Ionicons
-                    name="alert-circle"
-                    size={18}
-                    color={colors.warning}
-                  />
-                  <Text style={styles.listItemText}>{weakness}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noDataText}>
-                Doing great! No major weaknesses
-              </Text>
-            )}
-          </Card>
-        </View>
-      </View>
-
-      {/* Test Type Breakdown */}
-      <SectionHeading title="Test Type Breakdown" />
-      <Card>
-        <View style={styles.breakdown}>
-          <View style={styles.breakdownItem}>
-            <View style={styles.breakdownIcon}>
-              <Ionicons name="book" size={24} color={colors.primary} />
-            </View>
-            <View style={styles.breakdownInfo}>
-              <Text style={styles.breakdownValue}>{stats.practiceTests}</Text>
-              <Text style={styles.breakdownLabel}>Practice Sessions</Text>
-            </View>
-            <Text style={styles.breakdownPercentage}>
-              {((stats.practiceTests / stats.totalTests) * 100).toFixed(0)}%
-            </Text>
-          </View>
-
-          <View style={styles.breakdownItem}>
-            <View style={styles.breakdownIcon}>
-              <Ionicons name="trophy" size={24} color={colors.warning} />
-            </View>
-            <View style={styles.breakdownInfo}>
-              <Text style={styles.breakdownValue}>{stats.simulationTests}</Text>
-              <Text style={styles.breakdownLabel}>Full Simulations</Text>
-            </View>
-            <Text style={styles.breakdownPercentage}>
-              {((stats.simulationTests / stats.totalTests) * 100).toFixed(0)}%
-            </Text>
-          </View>
-        </View>
-      </Card>
     </ScreenContainer>
   );
 };
 
-const getBandColor = (band: number): string => {
-  if (band >= 8) return "#10B981"; // Green
-  if (band >= 7) return "#3B82F6"; // Blue
-  if (band >= 6) return "#F59E0B"; // Orange
-  if (band >= 5) return "#EF4444"; // Red
-  return "#6B7280"; // Gray
+const getBandColor = (band: number, colors: ColorTokens): string => {
+  if (band >= 8) return colors.success;
+  if (band >= 7) return colors.primary;
+  if (band >= 6) return colors.warning;
+  if (band >= 5) return colors.danger;
+  return colors.textMuted;
 };
 
 const capitalizeFirst = (str: string): string =>
@@ -414,6 +445,23 @@ const createStyles = (colors: ColorTokens) =>
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
+  advancedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceSubtle,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+    alignSelf: "center",
+  },
+  advancedToggleText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
   periodButton: {
     flex: 1,
     paddingVertical: spacing.sm,
@@ -429,7 +477,7 @@ const createStyles = (colors: ColorTokens) =>
     color: colors.textSecondary,
   },
   periodButtonTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
   statsGrid: {
     flexDirection: "row",
@@ -481,7 +529,7 @@ const createStyles = (colors: ColorTokens) =>
   barLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
   barAxisLabel: {
     marginTop: spacing.xs,

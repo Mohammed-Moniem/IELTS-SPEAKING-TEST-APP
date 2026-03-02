@@ -62,7 +62,7 @@ describe('homeLoader', () => {
     homeLoader();
 
     expect(express).toHaveBeenCalled();
-    expect(mockGet).toHaveBeenCalledWith(env.app.routePrefix, expect.any(Function));
+    expect(mockGet).toHaveBeenCalledWith('/', expect.any(Function));
   });
 
   it('should respond with the app name, version, and description', () => {

@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from "./client";
+import { logger } from "../utils/logger";
 
 export interface CriteriaScore {
   band: number;
@@ -125,11 +126,11 @@ export async function saveTestResult(
       console.log("✅ Test result saved:", response.data.data.testId);
       return response.data.data.testId;
     } else {
-      console.error("❌ Failed to save test result:", response.data.error);
+      logger.warn("❌ Failed to save test result:", response.data.error);
       return null;
     }
   } catch (error) {
-    console.error("❌ Save test result error:", error);
+    logger.warn("❌ Save test result error:", error);
     return null;
   }
 }
@@ -164,11 +165,11 @@ export async function getProgressStats(
       console.log("✅ Progress stats fetched");
       return response.data.data;
     } else {
-      console.error("❌ Failed to fetch progress stats:", response.data.error);
+      logger.warn("❌ Failed to fetch progress stats:", response.data.error);
       return null;
     }
   } catch (error) {
-    console.error("❌ Get progress stats error:", error);
+    logger.warn("❌ Get progress stats error:", error);
     return null;
   }
 }
@@ -190,14 +191,14 @@ export async function getBandDistribution(
       console.log("✅ Band distribution fetched");
       return response.data.data.distribution;
     } else {
-      console.error(
+      logger.warn(
         "❌ Failed to fetch band distribution:",
         response.data.error
       );
       return [];
     }
   } catch (error) {
-    console.error("❌ Get band distribution error:", error);
+    logger.warn("❌ Get band distribution error:", error);
     return [];
   }
 }
@@ -220,14 +221,14 @@ export async function getTopicPerformance(
       console.log("✅ Topic performance fetched");
       return response.data.data.topics;
     } else {
-      console.error(
+      logger.warn(
         "❌ Failed to fetch topic performance:",
         response.data.error
       );
       return [];
     }
   } catch (error) {
-    console.error("❌ Get topic performance error:", error);
+    logger.warn("❌ Get topic performance error:", error);
     return [];
   }
 }
@@ -250,14 +251,14 @@ export async function compareCriteriaPerformance(
       console.log("✅ Criteria comparison fetched");
       return response.data.data.comparison;
     } else {
-      console.error(
+      logger.warn(
         "❌ Failed to fetch criteria comparison:",
         response.data.error
       );
       return [];
     }
   } catch (error) {
-    console.error("❌ Get criteria comparison error:", error);
+    logger.warn("❌ Get criteria comparison error:", error);
     return [];
   }
 }
@@ -295,11 +296,11 @@ export async function getTestHistory(
         total: response.data.data.total,
       };
     } else {
-      console.error("❌ Failed to fetch test history:", response.data.error);
+      logger.warn("❌ Failed to fetch test history:", response.data.error);
       return { tests: [], total: 0 };
     }
   } catch (error) {
-    console.error("❌ Get test history error:", error);
+    logger.warn("❌ Get test history error:", error);
     return { tests: [], total: 0 };
   }
 }
@@ -319,11 +320,11 @@ export async function getTestDetails(
       console.log("✅ Test details fetched");
       return response.data.data;
     } else {
-      console.error("❌ Failed to fetch test details:", response.data.error);
+      logger.warn("❌ Failed to fetch test details:", response.data.error);
       return null;
     }
   } catch (error) {
-    console.error("❌ Get test details error:", error);
+    logger.warn("❌ Get test details error:", error);
     return null;
   }
 }
@@ -341,11 +342,11 @@ export async function deleteTest(testId: string): Promise<boolean> {
       console.log("✅ Test deleted successfully");
       return true;
     } else {
-      console.error("❌ Failed to delete test:", response.data.error);
+      logger.warn("❌ Failed to delete test:", response.data.error);
       return false;
     }
   } catch (error) {
-    console.error("❌ Delete test error:", error);
+    logger.warn("❌ Delete test error:", error);
     return false;
   }
 }

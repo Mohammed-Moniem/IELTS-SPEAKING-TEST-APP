@@ -14,6 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -33,13 +36,17 @@ interface FeatureCard {
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onNavigate,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const headerGradientColors = [colors.primaryStrong, colors.primary] as const;
+
   const features: FeatureCard[] = [
     {
       id: "practice",
       title: "Practice Mode",
       subtitle: "Improve your speaking skills",
       icon: "school",
-      colors: ["#3b82f6", "#2563eb"],
+      colors: [colors.primary, colors.primaryStrong],
       screen: "VoiceTest",
     },
     {
@@ -47,7 +54,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       title: "Full Test Simulation",
       subtitle: "Complete 3-part IELTS test",
       icon: "trophy",
-      colors: ["#d4a745", "#b8902f"],
+      colors: [colors.warning, colors.warning],
       screen: "Simulation",
     },
     {
@@ -55,7 +62,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       title: "My Recordings",
       subtitle: "Listen to past recordings",
       icon: "musical-notes",
-      colors: ["#8b5cf6", "#7c3aed"],
+      colors: [colors.info, colors.primary],
       screen: "MyRecordings",
     },
     {
@@ -63,7 +70,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       title: "Progress Dashboard",
       subtitle: "Track your improvement",
       icon: "analytics",
-      colors: ["#10b981", "#059669"],
+      colors: [colors.success, colors.success],
       screen: "ProgressDashboard",
     },
     {
@@ -71,7 +78,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       title: "Test History",
       subtitle: "Review all past tests",
       icon: "document-text",
-      colors: ["#f59e0b", "#d97706"],
+      colors: [colors.warning, colors.primaryStrong],
       screen: "TestHistory",
     },
   ];
@@ -85,13 +92,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     >
       <LinearGradient colors={feature.colors} style={styles.card}>
         <View style={styles.iconContainer}>
-          <Ionicons name={feature.icon} size={32} color="#ffffff" />
+          <Ionicons name={feature.icon} size={32} color={colors.primaryOn} />
         </View>
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>{feature.title}</Text>
           <Text style={styles.cardSubtitle}>{feature.subtitle}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+        <Ionicons name="chevron-forward" size={24} color={colors.primaryOn} />
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -99,7 +106,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={["#1a365d", "#2d5a8f"]} style={styles.header}>
+      <LinearGradient colors={headerGradientColors} style={styles.header}>
         <Text style={styles.headerTitle}>IELTS Speaking Test</Text>
         <Text style={styles.headerSubtitle}>
           Your AI-Powered Practice Partner
@@ -120,15 +127,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Ionicons name="trophy-outline" size={24} color="#d4a745" />
+              <Ionicons name="trophy-outline" size={24} color={colors.warning} />
               <Text style={styles.statLabel}>Track Progress</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="mic-outline" size={24} color="#3b82f6" />
+              <Ionicons name="mic-outline" size={24} color={colors.primary} />
               <Text style={styles.statLabel}>Voice AI</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="analytics-outline" size={24} color="#10b981" />
+              <Ionicons name="analytics-outline" size={24} color={colors.success} />
               <Text style={styles.statLabel}>Real Feedback</Text>
             </View>
           </View>
@@ -143,7 +150,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         {/* Info Section */}
         <View style={styles.infoCard}>
           <View style={styles.infoHeader}>
-            <Ionicons name="information-circle" size={20} color="#3b82f6" />
+            <Ionicons name="information-circle" size={20} color={colors.primary} />
             <Text style={styles.infoTitle}>How It Works</Text>
           </View>
           <View style={styles.infoItem}>
@@ -174,142 +181,147 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
         </View>
 
-        <View style={{ height: 40 }} />
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#d4a745",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  statsCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: "#2d2d2d",
-  },
-  statsTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 8,
-  },
-  statsSubtitle: {
-    fontSize: 14,
-    color: "#9ca3af",
-    marginBottom: 20,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  statItem: {
-    alignItems: "center",
-    gap: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#d1d5db",
-  },
-  featuresContainer: {
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 15,
-  },
-  cardContainer: {
-    marginBottom: 12,
-  },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
-    borderRadius: 16,
-    gap: 15,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardContent: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#ffffff",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  infoCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#2d2d2d",
-  },
-  infoHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 15,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  infoItem: {
-    flexDirection: "row",
-    marginBottom: 12,
-    gap: 10,
-  },
-  infoBullet: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3b82f6",
-    width: 20,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#d1d5db",
-    lineHeight: 20,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingTop: 60,
+      paddingBottom: 30,
+      paddingHorizontal: 20,
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: colors.primaryOn,
+      marginBottom: 8,
+    },
+    headerSubtitle: {
+      fontSize: 16,
+      color: colors.warning,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    statsCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 30,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    statsTitle: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    statsSubtitle: {
+      fontSize: 14,
+      color: colors.textMuted,
+      marginBottom: 20,
+    },
+    statsRow: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+    },
+    statItem: {
+      alignItems: "center",
+      gap: 8,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    featuresContainer: {
+      marginBottom: 30,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginBottom: 15,
+    },
+    cardContainer: {
+      marginBottom: 12,
+    },
+    card: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 20,
+      borderRadius: 16,
+      gap: 15,
+    },
+    iconContainer: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cardContent: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.primaryOn,
+      marginBottom: 4,
+    },
+    cardSubtitle: {
+      fontSize: 13,
+      color: colors.primaryOn,
+      opacity: 0.8,
+    },
+    infoCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    infoHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 15,
+    },
+    infoTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    infoItem: {
+      flexDirection: "row",
+      marginBottom: 12,
+      gap: 10,
+    },
+    infoBullet: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.primary,
+      width: 20,
+    },
+    infoText: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    bottomSpacing: {
+      height: 40,
+    },
+  });

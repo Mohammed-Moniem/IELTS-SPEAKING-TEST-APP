@@ -130,6 +130,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         <TouchableOpacity
           onPress={() => navigation.navigate("Register")}
           style={styles.switchContainer}
+          accessibilityRole="button"
+          accessibilityLabel="Create an account"
+          accessibilityHint="Open the registration screen"
         >
           <Text style={styles.switchText}>New here? Create an account</Text>
         </TouchableOpacity>

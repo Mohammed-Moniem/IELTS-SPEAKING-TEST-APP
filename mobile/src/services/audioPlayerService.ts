@@ -5,6 +5,7 @@
 
 import { Audio, AVPlaybackStatus } from "expo-av";
 import { Sound } from "expo-av/build/Audio";
+import { logger } from "../utils/logger";
 
 interface PlaybackState {
   isPlaying: boolean;
@@ -45,7 +46,7 @@ class AudioPlayerService {
       });
       console.log("✅ Audio mode configured for playback");
     } catch (error) {
-      console.error("❌ Failed to setup audio mode:", error);
+      logger.warn("❌ Failed to setup audio mode:", error);
     }
   }
 
@@ -87,7 +88,7 @@ class AudioPlayerService {
       console.log("✅ Audio loaded:", uri);
       return true;
     } catch (error) {
-      console.error("❌ Failed to load audio:", error);
+      logger.warn("❌ Failed to load audio:", error);
       this.updateState({ isLoading: false });
       return false;
     }
@@ -107,7 +108,7 @@ class AudioPlayerService {
       this.updateState({ isPlaying: true });
       console.log("▶️ Playing audio");
     } catch (error) {
-      console.error("❌ Failed to play audio:", error);
+      logger.warn("❌ Failed to play audio:", error);
     }
   }
 
@@ -125,7 +126,7 @@ class AudioPlayerService {
       this.updateState({ isPlaying: false });
       console.log("⏸️ Audio paused");
     } catch (error) {
-      console.error("❌ Failed to pause audio:", error);
+      logger.warn("❌ Failed to pause audio:", error);
     }
   }
 
@@ -143,7 +144,7 @@ class AudioPlayerService {
       this.updateState({ isPlaying: false, position: 0 });
       console.log("⏹️ Audio stopped");
     } catch (error) {
-      console.error("❌ Failed to stop audio:", error);
+      logger.warn("❌ Failed to stop audio:", error);
     }
   }
 
@@ -161,7 +162,7 @@ class AudioPlayerService {
       this.updateState({ position: positionMillis });
       console.log("⏩ Seeked to:", positionMillis);
     } catch (error) {
-      console.error("❌ Failed to seek:", error);
+      logger.warn("❌ Failed to seek:", error);
     }
   }
 
@@ -178,7 +179,7 @@ class AudioPlayerService {
       await this.sound.setRateAsync(rate, true);
       console.log("🎚️ Playback rate set to:", rate);
     } catch (error) {
-      console.error("❌ Failed to set rate:", error);
+      logger.warn("❌ Failed to set rate:", error);
     }
   }
 
@@ -196,7 +197,7 @@ class AudioPlayerService {
       await this.sound.setVolumeAsync(clampedVolume);
       console.log("🔊 Volume set to:", clampedVolume);
     } catch (error) {
-      console.error("❌ Failed to set volume:", error);
+      logger.warn("❌ Failed to set volume:", error);
     }
   }
 
@@ -219,7 +220,7 @@ class AudioPlayerService {
         console.log("🗑️ Audio unloaded");
       }
     } catch (error) {
-      console.error("❌ Failed to unload audio:", error);
+      logger.warn("❌ Failed to unload audio:", error);
     }
   }
 
@@ -233,7 +234,7 @@ class AudioPlayerService {
       }
       return await this.sound.getStatusAsync();
     } catch (error) {
-      console.error("❌ Failed to get status:", error);
+      logger.warn("❌ Failed to get status:", error);
       return null;
     }
   }
@@ -300,7 +301,7 @@ class AudioPlayerService {
         console.log("✅ Playback finished");
       }
     } else if (status.error) {
-      console.error("❌ Playback error:", status.error);
+      logger.warn("❌ Playback error:", status.error);
       this.updateState({ isPlaying: false });
     }
   };

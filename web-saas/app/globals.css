@@ -118,28 +118,6 @@ ul {
   }
 }
 
-@keyframes float-soft-wide {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -10px, 0);
-  }
-}
-
-@keyframes gradient-drift {
-  0%,
-  100% {
-    transform: translate3d(0, -4%, 0) rotate(12deg);
-    opacity: 0.45;
-  }
-  50% {
-    transform: translate3d(0, 6%, 0) rotate(12deg);
-    opacity: 0.9;
-  }
-}
-
 .motion-reveal {
   opacity: 0;
   transform: translateY(20px);
@@ -155,18 +133,6 @@ ul {
 
 .motion-float-delayed {
   animation: float-soft 6.5s ease-in-out infinite;
-}
-
-.motion-float-soft {
-  animation: float-soft-wide 6.2s ease-in-out infinite;
-}
-
-.motion-float-slow {
-  animation: float-soft-wide 8.8s ease-in-out infinite;
-}
-
-.motion-gradient-drift {
-  animation: gradient-drift 7.5s ease-in-out infinite;
 }
 
 .motion-tilt-card {

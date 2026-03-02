@@ -16,6 +16,9 @@ import {
 } from "react-native";
 import { practiceApi } from "../../api/services";
 import { AudioPlayer } from "../../components/AudioPlayer";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 interface Recording {
   id: string;
@@ -31,6 +34,8 @@ interface Recording {
 }
 
 export const RecordingsScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(
     null
   );
@@ -40,7 +45,6 @@ export const RecordingsScreen: React.FC = () => {
     data: recordings,
     isLoading,
     error,
-    refetch,
   } = useQuery({
     queryKey: ["recordings"],
     queryFn: async () => {
@@ -86,7 +90,10 @@ export const RecordingsScreen: React.FC = () => {
             try {
               // Note: Backend would need a delete endpoint
               // await practiceApi.deleteSession(recordingId);
-              Alert.alert("Info", "Delete functionality coming soon");
+              Alert.alert(
+                "Delete unavailable",
+                "Recording deletion is not enabled yet. You can still play and review all recordings."
+              );
               // refetch(); // Refresh list
             } catch (error) {
               Alert.alert("Error", "Failed to delete recording");
@@ -136,23 +143,27 @@ export const RecordingsScreen: React.FC = () => {
             onPress={() => handleDeleteRecording(item.id)}
             style={styles.deleteButton}
           >
-            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.recordingMeta}>
           <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+            <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
           </View>
 
           <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
+            <Ionicons name="time-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metaText}>{formatDuration(item.duration)}</Text>
           </View>
 
           <View style={styles.metaItem}>
-            <Ionicons name="document-text-outline" size={14} color="#6B7280" />
+            <Ionicons
+              name="document-text-outline"
+              size={14}
+              color={colors.textMuted}
+            />
             <Text style={styles.metaText}>
               Part {item.partNumber} Q{item.questionNumber}
             </Text>
@@ -160,7 +171,7 @@ export const RecordingsScreen: React.FC = () => {
 
           {item.score && (
             <View style={styles.metaItem}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Ionicons name="star" size={14} color={colors.warning} />
               <Text style={styles.scoreText}>{item.score}/9</Text>
             </View>
           )}
@@ -185,7 +196,7 @@ export const RecordingsScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Ionicons name="alert-circle-outline" size={48} color={colors.danger} />
           <Text style={styles.errorText}>Failed to load recordings</Text>
           <Text style={styles.errorSubtext}>
             {error instanceof Error ? error.message : "Unknown error"}
@@ -200,7 +211,7 @@ export const RecordingsScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <View style={styles.centerContent}>
-          <Ionicons name="mic-off-outline" size={64} color="#9CA3AF" />
+          <Ionicons name="mic-off-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>No Recordings Yet</Text>
           <Text style={styles.emptyText}>
             Your recorded practice sessions will appear here
@@ -220,7 +231,7 @@ export const RecordingsScreen: React.FC = () => {
               {selectedRecording.topicTitle}
             </Text>
             <TouchableOpacity onPress={() => setSelectedRecording(null)}>
-              <Ionicons name="close" size={24} color="#6B7280" />
+              <Ionicons name="close" size={24} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
           <AudioPlayer uri={selectedRecording.audioUrl} />
@@ -247,10 +258,11 @@ export const RecordingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.background,
   },
   centerContent: {
     flex: 1,
@@ -260,39 +272,39 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 16,
   },
   errorText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#1F2937",
+    color: colors.textPrimary,
     marginTop: 16,
   },
   errorSubtext: {
     fontSize: 14,
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 8,
     textAlign: "center",
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#1F2937",
+    color: colors.textPrimary,
     marginTop: 16,
   },
   emptyText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 8,
     textAlign: "center",
   },
   playerContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: colors.borderMuted,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -308,7 +320,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
-    color: "#1F2937",
+    color: colors.textPrimary,
     marginRight: 12,
   },
   listContent: {
@@ -320,23 +332,23 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#1F2937",
+    color: colors.textPrimary,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#6B7280",
+    color: colors.textMuted,
     marginTop: 4,
   },
   recordingCard: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.borderMuted,
   },
   recordingCardActive: {
-    backgroundColor: "#EEF2FF",
-    borderColor: "#6366F1",
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   recordingHeader: {
     flexDirection: "row",
@@ -350,12 +362,12 @@ const styles = StyleSheet.create({
   topicTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1F2937",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   questionText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: colors.textMuted,
     lineHeight: 20,
   },
   deleteButton: {
@@ -373,11 +385,11 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: "#6B7280",
+    color: colors.textMuted,
   },
   scoreText: {
     fontSize: 12,
-    color: "#F59E0B",
+    color: colors.warning,
     fontWeight: "600",
   },
   separator: {

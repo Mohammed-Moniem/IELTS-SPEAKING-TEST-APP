@@ -1,0 +1,64 @@
+{
+  "scenarios": [
+    {
+      "name": "speaking-topics-practice",
+      "method": "GET",
+      "url": "{{BASE_URL}}/topics/practice?limit=10&offset=0&excludeCompleted=true&category=part1",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    },
+    {
+      "name": "speaking-practice-history",
+      "method": "GET",
+      "url": "{{BASE_URL}}/practice/sessions?limit=10&offset=0",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    },
+    {
+      "name": "speaking-simulation-history",
+      "method": "GET",
+      "url": "{{BASE_URL}}/test-simulations?limit=10&offset=0",
+      "headers": {
+        "Authorization": "Bearer {{AUTH_TOKEN}}"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 10,
+      "warmup_requests": 1,
+      "timeout": 20
+    }
+  ]
+}

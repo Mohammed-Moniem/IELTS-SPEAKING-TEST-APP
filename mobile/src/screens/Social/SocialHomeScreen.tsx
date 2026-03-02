@@ -18,6 +18,7 @@ import {
   useChat,
   useFriends,
   useProfile,
+  useStudyGroups,
   useThemedStyles,
 } from "../../hooks";
 import type { ColorTokens } from "../../theme/tokens";
@@ -29,38 +30,80 @@ export const SocialHomeScreen: React.FC = () => {
   const { unreadCount, loadUnreadCount } = useChat();
   const { unlockedAchievements, loadUnlockedAchievements } = useAchievements();
   const { profile, loadMyProfile } = useProfile();
+  const { invites, loadInvites } = useStudyGroups();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([
+  const loadData = useCallback(async (blocking: boolean = false) => {
+    if (blocking) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
+    await Promise.allSettled([
       loadFriends(),
       loadPendingRequests(),
       loadUnreadCount(),
       loadUnlockedAchievements(),
       loadMyProfile(),
+      loadInvites(),
     ]);
-    setLoading(false);
+
+    if (blocking) {
+      setLoading(false);
+    } else {
+      setRefreshing(false);
+    }
   }, [
     loadFriends,
     loadPendingRequests,
     loadUnreadCount,
     loadUnlockedAchievements,
     loadMyProfile,
+    loadInvites,
   ]);
 
   useEffect(() => {
-    loadData();
+    void loadData(true);
   }, []);
 
   // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      void loadData(false);
     }, [loadData])
   );
+
+  const primaryAction = pendingRequests.length
+    ? {
+        title: `Review ${pendingRequests.length} request${
+          pendingRequests.length === 1 ? "" : "s"
+        }`,
+        subtitle: "Respond quickly to keep your network active.",
+        onPress: () => navigation.navigate("FriendRequests"),
+      }
+    : unreadCount > 0
+    ? {
+        title: `Open ${unreadCount} unread message${unreadCount === 1 ? "" : "s"}`,
+        subtitle: "Continue your latest IELTS conversations.",
+        onPress: () => navigation.navigate("Conversations"),
+      }
+    : invites.length > 0
+    ? {
+        title: `Review ${invites.length} study invite${
+          invites.length === 1 ? "" : "s"
+        }`,
+        subtitle: "Join active groups that match your test goals.",
+        onPress: () => navigation.navigate("StudyGroups"),
+      }
+    : {
+        title: "Find a study partner",
+        subtitle: "Discover learners with a similar target band.",
+        onPress: () => navigation.navigate("FindFriends"),
+      };
 
   if (loading) {
     return (
@@ -88,11 +131,66 @@ export const SocialHomeScreen: React.FC = () => {
         </View>
       </View>
 
+      {refreshing ? (
+        <Text style={styles.refreshingText}>Updating social activity...</Text>
+      ) : null}
+
+      <View style={styles.hubCard}>
+        <Text style={styles.hubTitle}>Action hub</Text>
+        <Text style={styles.hubSubtitle}>{primaryAction.subtitle}</Text>
+        <TouchableOpacity
+          style={styles.hubPrimaryAction}
+          onPress={primaryAction.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={primaryAction.title}
+          accessibilityHint={primaryAction.subtitle}
+        >
+          <Text style={styles.hubPrimaryActionText}>{primaryAction.title}</Text>
+          <Ionicons name="arrow-forward" size={16} color={colors.primaryOn} />
+        </TouchableOpacity>
+        <View style={styles.hubChipRow}>
+          <TouchableOpacity
+            style={styles.hubChip}
+            onPress={() => navigation.navigate("Conversations")}
+            accessibilityRole="button"
+            accessibilityLabel={`Unread messages ${unreadCount}`}
+            accessibilityHint="Open conversations and review unread messages"
+          >
+            <Text style={styles.hubChipText}>
+              Unread: {unreadCount}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.hubChip}
+            onPress={() => navigation.navigate("FriendRequests")}
+            accessibilityRole="button"
+            accessibilityLabel={`Pending friend requests ${pendingRequests.length}`}
+            accessibilityHint="Open pending friend requests"
+          >
+            <Text style={styles.hubChipText}>
+              Pending: {pendingRequests.length}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.hubChip}
+            onPress={() => navigation.navigate("StudyGroups")}
+            accessibilityRole="button"
+            accessibilityLabel={`Study group invites ${invites.length}`}
+            accessibilityHint="Open study groups and review invites"
+          >
+            <Text style={styles.hubChipText}>Invites: {invites.length}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Stats Cards */}
       <View style={styles.statsRow}>
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate("FriendsList")}
+          accessibilityRole="button"
+          accessibilityLabel={`Friends ${friends.length}`}
+          accessibilityHint="Open your friends list"
         >
           <Ionicons name="people" size={24} color={colors.primary} />
           <Text style={styles.statNumber}>{friends.length}</Text>
@@ -102,6 +200,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate("Conversations")}
+          accessibilityRole="button"
+          accessibilityLabel={`Messages ${unreadCount}`}
+          accessibilityHint="Open chat conversations"
         >
           <Ionicons name="chatbubbles" size={24} color={colors.success} />
           <Text style={styles.statNumber}>{unreadCount}</Text>
@@ -111,6 +212,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.statCard}
           onPress={() => navigation.navigate("Achievements")}
+          accessibilityRole="button"
+          accessibilityLabel={`Achievements ${unlockedAchievements.length}`}
+          accessibilityHint="Open your achievements"
         >
           <Ionicons name="trophy" size={24} color={colors.warning} />
           <Text style={styles.statNumber}>{unlockedAchievements.length}</Text>
@@ -125,6 +229,9 @@ export const SocialHomeScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Friend Requests</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate("FriendRequests")}
+              accessibilityRole="button"
+              accessibilityLabel="See all friend requests"
+              accessibilityHint="Open the full friend requests list"
             >
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -140,11 +247,14 @@ export const SocialHomeScreen: React.FC = () => {
 
       {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={styles.sectionTitle}>Top Actions</Text>
         <View style={styles.actionGrid}>
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("FindFriends")}
+            accessibilityRole="button"
+            accessibilityLabel="Find friends"
+            accessibilityHint="Search for new friends to practice with"
           >
             <Ionicons name="person-add" size={28} color={colors.primary} />
             <Text style={styles.actionText}>Find Friends</Text>
@@ -153,25 +263,12 @@ export const SocialHomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => navigation.navigate("StudyGroups")}
+            accessibilityRole="button"
+            accessibilityLabel="Study groups"
+            accessibilityHint="Browse and join IELTS study groups"
           >
             <Ionicons name="people-circle" size={28} color={colors.info} />
             <Text style={styles.actionText}>Study Groups</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate("Leaderboard")}
-          >
-            <Ionicons name="podium" size={28} color={colors.secondary} />
-            <Text style={styles.actionText}>Leaderboard</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate("Referrals")}
-          >
-            <Ionicons name="gift" size={28} color={colors.secondary} />
-            <Text style={styles.actionText}>Referrals</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -183,6 +280,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.featureItem}
           onPress={() => navigation.navigate("Conversations")}
+          accessibilityRole="button"
+          accessibilityLabel="Messages"
+          accessibilityHint="Open chat with friends and study groups"
         >
           <View style={styles.featureIcon}>
             <Ionicons name="chatbubbles" size={24} color={colors.success} />
@@ -204,6 +304,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.featureItem}
           onPress={() => navigation.navigate("Achievements")}
+          accessibilityRole="button"
+          accessibilityLabel="Achievements"
+          accessibilityHint="Open achievements and progress rewards"
         >
           <View style={styles.featureIcon}>
             <Ionicons name="trophy" size={24} color={colors.warning} />
@@ -220,6 +323,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.featureItem}
           onPress={() => navigation.navigate("QRCodeScanner")}
+          accessibilityRole="button"
+          accessibilityLabel="Scan QR code"
+          accessibilityHint="Open camera scanner to add friends"
         >
           <View style={styles.featureIcon}>
             <Ionicons name="qr-code" size={24} color={colors.primary} />
@@ -236,6 +342,9 @@ export const SocialHomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.featureItem}
           onPress={() => navigation.navigate("QRCode")}
+          accessibilityRole="button"
+          accessibilityLabel="My QR code"
+          accessibilityHint="Show your QR code to share with others"
         >
           <View style={styles.featureIcon}>
             <Ionicons name="person-add" size={24} color={colors.success} />
@@ -280,20 +389,77 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.textSecondary,
       marginTop: 4,
     },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  profileMenuButton: {
-    marginRight: 0,
-    paddingLeft: 0,
-  },
-  statsRow: {
-    flexDirection: "row",
-    padding: 16,
-    gap: 12,
-  },
+    headerRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    profileMenuButton: {
+      marginRight: 0,
+      paddingLeft: 0,
+    },
+    refreshingText: {
+      color: colors.textMuted,
+      fontSize: 12,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+    },
+    hubCard: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+      padding: 14,
+      gap: 10,
+    },
+    hubTitle: {
+      color: colors.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    hubSubtitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    hubPrimaryAction: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    hubPrimaryActionText: {
+      color: colors.primaryOn,
+      fontWeight: "700",
+      fontSize: 14,
+    },
+    hubChipRow: {
+      flexDirection: "row",
+      gap: 8,
+      flexWrap: "wrap",
+    },
+    hubChip: {
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    hubChipText: {
+      color: colors.textMutedStrong,
+      fontWeight: "600",
+      fontSize: 12,
+    },
+    statsRow: {
+      flexDirection: "row",
+      padding: 16,
+      gap: 12,
+    },
     statCard: {
       flex: 1,
       backgroundColor: colors.surface,
@@ -317,16 +483,16 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.textSecondary,
       marginTop: 4,
     },
-  section: {
-    padding: 16,
-    paddingTop: 8,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
+    section: {
+      padding: 16,
+      paddingTop: 8,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
     sectionTitle: {
       fontSize: 22,
       fontWeight: "600",
@@ -348,11 +514,11 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: 14,
       fontWeight: "600",
     },
-  actionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
+    actionGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
     actionCard: {
       width: "48%",
       backgroundColor: colors.surface,
@@ -394,9 +560,9 @@ const createStyles = (colors: ColorTokens) =>
       justifyContent: "center",
       marginRight: 12,
     },
-  featureContent: {
-    flex: 1,
-  },
+    featureContent: {
+      flex: 1,
+    },
     featureTitle: {
       fontSize: 16,
       fontWeight: "600",

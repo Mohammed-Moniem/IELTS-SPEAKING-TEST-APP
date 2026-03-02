@@ -1,0 +1,76 @@
+{
+  "scenarios": [
+    {
+      "name": "writing-task-generate",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/writing/tasks/generate",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general",
+        "taskType": "task2"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    },
+    {
+      "name": "reading-start",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/reading/tests/start",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    },
+    {
+      "name": "listening-start",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/listening/tests/start",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJlbWFpbCI6InBlcmZAZXhhbXBsZS5jb20iLCJwbGFuIjoicHJvIiwicm9sZXMiOlsic3VwZXJhZG1pbiJdLCJpYXQiOjE3NzE3Njc2MzEsImV4cCI6MTc3MTc2ODUzMSwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.Xn71x816GJZX1W08GBN61rj3ude5LzScN4kHLps0ty4",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 8,
+      "warmup_requests": 1,
+      "timeout": 45
+    }
+  ]
+}

@@ -4,12 +4,18 @@ import * as FileSystem from "expo-file-system/legacy";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
+import { logger } from "../utils/logger";
 
 interface AudioRecorderProps {
   onRecordingComplete: (uri: string, duration: number) => void;
@@ -26,6 +32,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   disabled = false,
   testMode = "practice",
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<
     "idle" | "recording" | "paused" | "completed"
@@ -62,7 +70,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       const { status } = await Audio.requestPermissionsAsync();
       setHasPermission(status === "granted");
     } catch (error) {
-      console.error("Failed to get audio permissions:", error);
+      logger.warn("Failed to get audio permissions:", error);
     }
   };
 
@@ -166,8 +174,11 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       // Store interval for cleanup
       (newRecording as any)._updateInterval = interval;
     } catch (error) {
-      console.error("Failed to start recording:", error);
-      alert("Failed to start recording. Please check permissions.");
+      logger.warn("Failed to start recording:", error);
+      Alert.alert(
+        "Recording unavailable",
+        "Unable to start recording right now. Please check microphone permission and try again."
+      );
     }
   };
 
@@ -205,7 +216,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setRecording(null);
       setIsProcessing(false);
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording:", error);
       setIsProcessing(false);
     }
   };
@@ -231,7 +242,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
       setRecordingStatus("idle");
       setDuration(0);
     } catch (error) {
-      console.error("Failed to cancel recording:", error);
+      logger.warn("Failed to cancel recording:", error);
     }
   };
 
@@ -257,6 +268,9 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
           <TouchableOpacity
             style={styles.permissionButton}
             onPress={requestPermissions}
+            accessibilityRole="button"
+            accessibilityLabel="Grant microphone permission"
+            accessibilityHint="Requests access to your microphone for recording"
           >
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
@@ -325,6 +339,9 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
             style={[styles.recordButton, disabled && styles.disabledButton]}
             onPress={startRecording}
             disabled={disabled || isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel="Start recording"
+            accessibilityHint="Starts capturing your answer audio"
           >
             <Animated.View
               style={[
@@ -333,7 +350,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               ]}
             >
               {isProcessing ? (
-                <ActivityIndicator size="large" color="#fff" />
+                <ActivityIndicator size="large" color={colors.primaryOn} />
               ) : (
                 <View style={styles.micIcon}>
                   <Text style={styles.micIconText}>🎤</Text>
@@ -347,6 +364,9 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               style={styles.cancelButton}
               onPress={cancelRecording}
               disabled={isProcessing}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel recording"
+              accessibilityHint="Stops and discards the current recording"
             >
               <Text style={styles.cancelButtonText}>✕</Text>
             </TouchableOpacity>
@@ -355,9 +375,12 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
               style={[styles.stopButton, isProcessing && styles.disabledButton]}
               onPress={stopRecording}
               disabled={isProcessing}
+              accessibilityRole="button"
+              accessibilityLabel="Stop recording"
+              accessibilityHint="Stops recording and keeps this answer"
             >
               {isProcessing ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.primaryOn} />
               ) : (
                 <View style={styles.stopIcon} />
               )}
@@ -384,174 +407,175 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-    minHeight: 300,
-  },
-  statusContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  recordingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  recordingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: "#ef4444",
-    marginRight: 8,
-  },
-  recordingText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ef4444",
-  },
-  timerText: {
-    fontSize: 48,
-    fontWeight: "700",
-    color: "#1f2937",
-    fontVariant: ["tabular-nums"],
-  },
-  maxTimeText: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-  progressContainer: {
-    width: "100%",
-    height: 4,
-    backgroundColor: "#e5e7eb",
-    borderRadius: 2,
-    overflow: "hidden",
-    marginBottom: 30,
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#3b82f6",
-    borderRadius: 2,
-  },
-  waveformContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 60,
-    marginBottom: 30,
-    gap: 8,
-  },
-  waveformBar: {
-    width: 6,
-    height: 50,
-    backgroundColor: "#3b82f6",
-    borderRadius: 3,
-  },
-  buttonContainer: {
-    marginBottom: 20,
-  },
-  recordButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#3b82f6",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  recordButtonInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#2563eb",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  micIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  micIconText: {
-    fontSize: 48,
-  },
-  actionButtonsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 30,
-  },
-  cancelButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#ef4444",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#ef4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cancelButtonText: {
-    fontSize: 28,
-    color: "#fff",
-    fontWeight: "700",
-  },
-  stopButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#10b981",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#10b981",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  stopIcon: {
-    width: 24,
-    height: 24,
-    backgroundColor: "#fff",
-    borderRadius: 4,
-  },
-  instructionText: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
-    maxWidth: 280,
-    lineHeight: 22,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  permissionContainer: {
-    alignItems: "center",
-    padding: 30,
-  },
-  permissionText: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  permissionButton: {
-    backgroundColor: "#3b82f6",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  permissionButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+      minHeight: 300,
+    },
+    statusContainer: {
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    recordingIndicator: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    recordingDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.danger,
+      marginRight: 8,
+    },
+    recordingText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.danger,
+    },
+    timerText: {
+      fontSize: 48,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      fontVariant: ["tabular-nums"],
+    },
+    maxTimeText: {
+      fontSize: 14,
+      color: colors.textMuted,
+      marginTop: 4,
+    },
+    progressContainer: {
+      width: "100%",
+      height: 4,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 2,
+      overflow: "hidden",
+      marginBottom: 30,
+    },
+    progressBar: {
+      height: "100%",
+      backgroundColor: colors.primary,
+      borderRadius: 2,
+    },
+    waveformContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      height: 60,
+      marginBottom: 30,
+      gap: 8,
+    },
+    waveformBar: {
+      width: 6,
+      height: 50,
+      backgroundColor: colors.primary,
+      borderRadius: 3,
+    },
+    buttonContainer: {
+      marginBottom: 20,
+    },
+    recordButton: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    recordButtonInner: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.primaryStrong,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    micIcon: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    micIconText: {
+      fontSize: 48,
+    },
+    actionButtonsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 30,
+    },
+    cancelButton: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: colors.danger,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    cancelButtonText: {
+      fontSize: 28,
+      color: colors.primaryOn,
+      fontWeight: "700",
+    },
+    stopButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.success,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: colors.success,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    stopIcon: {
+      width: 24,
+      height: 24,
+      backgroundColor: colors.primaryOn,
+      borderRadius: 4,
+    },
+    instructionText: {
+      fontSize: 16,
+      color: colors.textMuted,
+      textAlign: "center",
+      maxWidth: 280,
+      lineHeight: 22,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    permissionContainer: {
+      alignItems: "center",
+      padding: 30,
+    },
+    permissionText: {
+      fontSize: 16,
+      color: colors.textMuted,
+      textAlign: "center",
+      marginBottom: 20,
+    },
+    permissionButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    permissionButtonText: {
+      color: colors.primaryOn,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import { Get, HttpCode, JsonController, QueryParam, Req, Res, UseBefore } from 'routing-controllers';
+import { Get, HttpCode, JsonController, QueryParams, Req, Res, UseBefore } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
+import { AdminAIUsageQuery } from '@dto/AdminDto';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
@@ -19,17 +20,19 @@ export class AdminAIUsageController {
 
   @Get('/')
   @HttpCode(HTTP_STATUS_CODES.SUCCESS)
-  public async getAIUsage(
-    @QueryParam('limit') limit: number = 100,
-    @Req() req: Request,
-    @Res() res: Response
-  ) {
+  public async getAIUsage(@QueryParams() query: AdminAIUsageQuery, @Req() req: Request, @Res() res: Response) {
     const headers: IRequestHeaders = buildRequestHeaders(req, 'admin-ai-usage');
     ensureResponseHeaders(res, headers);
 
     try {
       this.adminAccessService.assertHasRole(req.currentUser, ['superadmin']);
-      const result = await this.adminService.getAIUsageSummary(Math.min(Math.max(limit || 100, 1), 500));
+      const limit = Math.min(Math.max(query.limit || 100, 1), 500);
+      const result = await this.adminService.getAIUsageSummary(limit, {
+        module: query.module,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        status: query.status
+      });
       return StandardResponse.success(res, result, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);

@@ -2,6 +2,7 @@ import { Audio, AVPlaybackStatus } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { API_KEY, apiClient, getAuthToken } from "../../api/client";
 import type { UploadProgress, UploadResult } from "./mediaUploadService";
+import { logger } from "../../utils/logger";
 
 /**
  * Recording state
@@ -43,7 +44,7 @@ class AudioRecordingService {
       }
       return true;
     } catch (error) {
-      console.error("Error requesting audio permissions:", error);
+      logger.warn("Error requesting audio permissions:", error);
       return false;
     }
   }
@@ -80,7 +81,7 @@ class AudioRecordingService {
 
       console.log("Recording started");
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording:", error);
       throw error;
     }
   }
@@ -116,7 +117,7 @@ class AudioRecordingService {
       console.log("Recording stopped, URI:", uri);
       return uri;
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording:", error);
       throw error;
     }
   }
@@ -142,7 +143,7 @@ class AudioRecordingService {
         console.log("Recording cancelled");
       }
     } catch (error) {
-      console.error("Failed to cancel recording:", error);
+      logger.warn("Failed to cancel recording:", error);
       throw error;
     }
   }
@@ -241,11 +242,11 @@ class AudioRecordingService {
           response.statusText
         );
       } catch (fetchError) {
-        console.error("❌ Fetch failed:", fetchError);
-        console.error("📍 URL was:", uploadUrl);
-        console.error("📋 FormData parts:", (formData as any)._parts);
-        console.error("🔍 Fetch error type:", fetchError?.constructor?.name);
-        console.error(
+        logger.warn("❌ Fetch failed:", fetchError);
+        logger.warn("📍 URL was:", uploadUrl);
+        logger.warn("📋 FormData parts:", (formData as any)._parts);
+        logger.warn("🔍 Fetch error type:", fetchError?.constructor?.name);
+        logger.warn(
           "🔍 Fetch error message:",
           fetchError instanceof Error ? fetchError.message : String(fetchError)
         );
@@ -258,7 +259,7 @@ class AudioRecordingService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("❌ Upload failed:", response.status, errorText);
+        logger.warn("❌ Upload failed:", response.status, errorText);
         throw new Error(`Upload failed: ${response.status} ${errorText}`);
       }
 
@@ -267,9 +268,9 @@ class AudioRecordingService {
         responseData = await response.json();
         console.log("✅ Upload successful:", responseData);
       } catch (jsonError) {
-        console.error("❌ Failed to parse response JSON:", jsonError);
+        logger.warn("❌ Failed to parse response JSON:", jsonError);
         const responseText = await response.text();
-        console.error("📄 Response text:", responseText);
+        logger.warn("📄 Response text:", responseText);
         throw new Error(
           `Invalid JSON response: ${
             jsonError instanceof Error ? jsonError.message : "Unknown error"
@@ -280,15 +281,15 @@ class AudioRecordingService {
       // Return data in expected UploadResult format
       return responseData.data;
     } catch (error) {
-      console.error("❌ Upload error details:", error);
+      logger.warn("❌ Upload error details:", error);
       if (
         error instanceof Error &&
         error.message.includes("Network request failed")
       ) {
-        console.error("💡 This usually means:");
-        console.error("  1. ngrok URL is incorrect or expired");
-        console.error("  2. Backend is not accessible from mobile");
-        console.error("  3. CORS or network connectivity issue");
+        logger.warn("💡 This usually means:");
+        logger.warn("  1. ngrok URL is incorrect or expired");
+        logger.warn("  2. Backend is not accessible from mobile");
+        logger.warn("  3. CORS or network connectivity issue");
       }
       throw error;
     }
@@ -312,7 +313,7 @@ class AudioRecordingService {
       );
       return uploadResult;
     } catch (error) {
-      console.error("Error sending audio message:", error);
+      logger.warn("Error sending audio message:", error);
       throw error;
     }
   }
@@ -347,7 +348,7 @@ class AudioRecordingService {
       this.sound = sound;
       await sound.playAsync();
     } catch (error) {
-      console.error("Error playing audio:", error);
+      logger.warn("Error playing audio:", error);
       throw error;
     }
   }
@@ -361,7 +362,7 @@ class AudioRecordingService {
         await this.sound.pauseAsync();
       }
     } catch (error) {
-      console.error("Error pausing audio:", error);
+      logger.warn("Error pausing audio:", error);
       throw error;
     }
   }
@@ -375,7 +376,7 @@ class AudioRecordingService {
         await this.sound.playAsync();
       }
     } catch (error) {
-      console.error("Error resuming audio:", error);
+      logger.warn("Error resuming audio:", error);
       throw error;
     }
   }
@@ -391,7 +392,7 @@ class AudioRecordingService {
         this.sound = null;
       }
     } catch (error) {
-      console.error("Error stopping audio:", error);
+      logger.warn("Error stopping audio:", error);
       throw error;
     }
   }
@@ -405,7 +406,7 @@ class AudioRecordingService {
         await this.sound.setPositionAsync(positionMillis);
       }
     } catch (error) {
-      console.error("Error seeking audio:", error);
+      logger.warn("Error seeking audio:", error);
       throw error;
     }
   }
@@ -420,7 +421,7 @@ class AudioRecordingService {
       }
       return null;
     } catch (error) {
-      console.error("Error getting playback status:", error);
+      logger.warn("Error getting playback status:", error);
       return null;
     }
   }
@@ -447,7 +448,7 @@ class AudioRecordingService {
         await this.stopAudio();
       }
     } catch (error) {
-      console.error("Error during cleanup:", error);
+      logger.warn("Error during cleanup:", error);
     }
   }
 }

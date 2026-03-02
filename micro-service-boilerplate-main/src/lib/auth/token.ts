@@ -13,7 +13,7 @@ export interface TokenPayload {
 
 const signToken = (payload: TokenPayload, secret: string, expiresIn: string) => {
   return jwt.sign(payload, secret, {
-    expiresIn,
+    expiresIn: expiresIn as any,
     issuer: env.app.name
   });
 };

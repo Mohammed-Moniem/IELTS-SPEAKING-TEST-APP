@@ -130,7 +130,7 @@ class TextToSpeechService {
       }
 
       if (playbackError && !this.stopRequested) {
-        console.error("❌ Speech playback error:", playbackError);
+        console.warn("⚠️ Speech playback warning:", playbackError);
       }
     } finally {
       const wasStopped = this.stopRequested;
@@ -180,7 +180,7 @@ class TextToSpeechService {
         onDone: onComplete,
       });
     } catch (error) {
-      console.error("Failed to speak introduction and question:", error);
+      console.warn("⚠️ Introduction speech warning:", error);
       throw error;
     }
   }
@@ -205,7 +205,7 @@ class TextToSpeechService {
     try {
       await this.currentSound.stopAsync();
     } catch (error) {
-      console.error("Failed to stop speech playback:", error);
+      console.warn("⚠️ Stop speech warning:", error);
     } finally {
       this.playbackCompletion?.resolve();
     }

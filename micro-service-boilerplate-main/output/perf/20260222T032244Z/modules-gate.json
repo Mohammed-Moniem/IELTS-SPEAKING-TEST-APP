@@ -1,0 +1,119 @@
+{
+  "source_report": "/Users/mohammedosman/Downloads/IELTS-SPEAKING-TEST-APP/micro-service-boilerplate-main/output/perf/20260222T032244Z/modules-current.json",
+  "targets": {
+    "target_p95_ms": 120000.0,
+    "target_p99_ms": null,
+    "target_error_rate": 0.99,
+    "min_throughput_rps": 0.0,
+    "max_timeouts": 0,
+    "gate_mode": "best",
+    "scenario_filter": [],
+    "profile_filter": []
+  },
+  "summary": {
+    "group_count": 3,
+    "failing_groups": 0,
+    "passed": true
+  },
+  "groups": [
+    {
+      "scenario": "listening-start",
+      "profile": "sweep",
+      "gate_mode": "best",
+      "runs_evaluated": 3,
+      "passed": true,
+      "selected_run": {
+        "run_id": "scenario=listening-start, profile=sweep, phase=sweep, c=1",
+        "p95_ms": 1322.609,
+        "p99_ms": 1571.51,
+        "error_rate": 0.875,
+        "throughput_rps": 1.383
+      },
+      "failing_runs": [],
+      "all_runs": [
+        {
+          "run_id": "scenario=listening-start, profile=sweep, phase=sweep, c=1",
+          "passed": true,
+          "reasons": []
+        },
+        {
+          "run_id": "scenario=listening-start, profile=sweep, phase=sweep, c=2",
+          "passed": false,
+          "reasons": [
+            "error rate 100.00% > 99.00%"
+          ]
+        },
+        {
+          "run_id": "scenario=listening-start, profile=sweep, phase=sweep, c=4",
+          "passed": false,
+          "reasons": [
+            "error rate 100.00% > 99.00%"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "reading-start",
+      "profile": "sweep",
+      "gate_mode": "best",
+      "runs_evaluated": 3,
+      "passed": true,
+      "selected_run": {
+        "run_id": "scenario=reading-start, profile=sweep, phase=sweep, c=1",
+        "p95_ms": 1679.179,
+        "p99_ms": 2030.861,
+        "error_rate": 0.875,
+        "throughput_rps": 1.104
+      },
+      "failing_runs": [],
+      "all_runs": [
+        {
+          "run_id": "scenario=reading-start, profile=sweep, phase=sweep, c=1",
+          "passed": true,
+          "reasons": []
+        },
+        {
+          "run_id": "scenario=reading-start, profile=sweep, phase=sweep, c=2",
+          "passed": false,
+          "reasons": [
+            "error rate 100.00% > 99.00%"
+          ]
+        },
+        {
+          "run_id": "scenario=reading-start, profile=sweep, phase=sweep, c=4",
+          "passed": false,
+          "reasons": [
+            "error rate 100.00% > 99.00%"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "writing-task-generate",
+      "profile": "sweep",
+      "gate_mode": "best",
+      "runs_evaluated": 2,
+      "passed": true,
+      "selected_run": {
+        "run_id": "scenario=writing-task-generate, profile=sweep, phase=sweep, c=2",
+        "p95_ms": 303.187,
+        "p99_ms": 303.524,
+        "error_rate": 0.0,
+        "throughput_rps": 8.336
+      },
+      "failing_runs": [],
+      "all_runs": [
+        {
+          "run_id": "scenario=writing-task-generate, profile=sweep, phase=sweep, c=1",
+          "passed": true,
+          "reasons": []
+        },
+        {
+          "run_id": "scenario=writing-task-generate, profile=sweep, phase=sweep, c=2",
+          "passed": true,
+          "reasons": []
+        }
+      ]
+    }
+  ]
+}

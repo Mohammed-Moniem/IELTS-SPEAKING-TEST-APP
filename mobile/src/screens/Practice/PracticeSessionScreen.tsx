@@ -22,7 +22,6 @@ import { practiceApi } from "../../api/services";
 import { AudioRecorder } from "../../components/AudioRecorder";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { OfflineBanner } from "../../components/OfflineBanner";
 import { ProfileMenu } from "../../components/ProfileMenu";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { Tag } from "../../components/Tag";
@@ -224,7 +223,6 @@ export const PracticeSessionScreen: React.FC<PracticeSessionScreenProps> = ({
 
   return (
     <ScreenContainer scrollable>
-      <OfflineBanner showQueueCount />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={80}
@@ -419,13 +417,13 @@ const createStyles = (colors: ColorTokens) =>
     color: colors.primary,
   },
   recordingInfo: {
-    backgroundColor: "#d1fae5",
+    backgroundColor: colors.successSoft,
     padding: spacing.sm,
     borderRadius: radii.md,
     marginVertical: spacing.md,
   },
   recordingInfoText: {
-    color: "#059669",
+    color: colors.success,
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",

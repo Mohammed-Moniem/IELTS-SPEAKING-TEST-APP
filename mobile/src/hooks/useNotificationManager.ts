@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "../constants/notifications";
 import notificationService from "../services/notificationService";
 import { NotificationSettings } from "../types/api";
+import { logger } from "../utils/logger";
 
 interface UserActivity {
   lastPracticeDate: string | null;
@@ -70,7 +71,7 @@ export const useNotificationManager = () => {
         };
       }
     } catch (error) {
-      console.error("Failed to get notification settings:", error);
+      logger.warn("Failed to get notification settings:", error);
     }
 
     return DEFAULT_NOTIFICATION_SETTINGS;
@@ -83,7 +84,7 @@ export const useNotificationManager = () => {
         return JSON.parse(stored);
       }
     } catch (error) {
-      console.error("Failed to get user activity:", error);
+      logger.warn("Failed to get user activity:", error);
     }
 
     return {
@@ -133,7 +134,7 @@ export const useNotificationManager = () => {
         await notificationService.sendInactivityReminder(daysSinceLastPractice);
       }
     } catch (error) {
-      console.error("Failed to check user activity:", error);
+      logger.warn("Failed to check user activity:", error);
     }
   };
 
@@ -172,7 +173,7 @@ export const useNotificationManager = () => {
       // Check for milestone achievements
       await checkMilestones(newActivity);
     } catch (error) {
-      console.error("Failed to track practice session:", error);
+      logger.warn("Failed to track practice session:", error);
     }
   };
 

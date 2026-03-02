@@ -15,6 +15,7 @@ import {
 import { useTheme } from "../../context";
 import { useReferrals, useThemedStyles } from "../../hooks";
 import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 export const ReferralsScreen: React.FC = () => {
   const { referralStats, loading, error, loadReferralCode, loadStats } =
@@ -66,7 +67,7 @@ export const ReferralsScreen: React.FC = () => {
         title: "Invite a friend",
       });
     } catch (error) {
-      console.error("Failed to share referral link", error);
+      logger.warn("Failed to share referral link", error);
     }
   };
 
@@ -285,7 +286,7 @@ const createStyles = (colors: ColorTokens) =>
     maxWidth: 230,
   },
   codeWrapper: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: colors.primarySoft,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 18,

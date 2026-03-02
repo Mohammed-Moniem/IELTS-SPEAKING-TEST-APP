@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import React from "react";
+import React, { useState } from "react";
 import {
+  Alert,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,37 +18,110 @@ import { SectionHeading } from "../../components/SectionHeading";
 import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context/ThemeContext";
 import { AppRootStackParamList } from "../../navigation/AppNavigator";
+import { partnerService } from "../../services/api";
 import { spacing } from "../../theme/tokens";
 
 export const SettingsScreen: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
+  const [partnerLoading, setPartnerLoading] = useState(false);
 
-  const settingsOptions = [
-    {
-      icon: "notifications" as const,
-      title: "Notifications",
-      description: "Manage notification preferences",
-      status: "coming_soon" as const,
-    },
-    {
-      icon: "language" as const,
-      title: "Language",
-      description: "Change app language",
-      status: "coming_soon" as const,
-    },
-    {
-      icon: "volume-high" as const,
-      title: "Audio Settings",
-      description: "Adjust voice and sound settings",
-      status: "coming_soon" as const,
-    },
+  const openPartnerPortal = async () => {
+    setPartnerLoading(true);
+    try {
+      const portal = await partnerService.getMe();
+
+      if (!portal.enabled) {
+        Alert.alert(
+          "Partner Program",
+          "The partner program is currently disabled. Please try again later."
+        );
+        return;
+      }
+
+      const destination = portal.isPartner
+        ? portal.dashboardUrl || portal.registrationUrl
+        : portal.registrationUrl;
+
+      if (!destination) {
+        Alert.alert(
+          "Partner Program",
+          "No partner portal link is available right now."
+        );
+        return;
+      }
+
+      const supported = await Linking.canOpenURL(destination);
+      if (supported) {
+        await Linking.openURL(destination);
+      } else {
+        Alert.alert("Partner Program", destination);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to open the partner portal right now.";
+      Alert.alert("Partner Program", message);
+    } finally {
+      setPartnerLoading(false);
+    }
+  };
+
+  const quickActions = [
     {
       icon: "shield-checkmark" as const,
-      title: "Privacy",
-      description: "Control your data and privacy",
-      status: "available" as const,
-      onPress: () => navigation.navigate("Profile" satisfies keyof AppRootStackParamList),
+      title: "Privacy & Account",
+      description: "Control your data, profile details, and account settings",
+      onPress: () =>
+        navigation.navigate("Profile" satisfies keyof AppRootStackParamList),
+    },
+    {
+      icon: "card" as const,
+      title: "Subscription",
+      description: "See plan details, limits, and upgrade options",
+      onPress: () =>
+        navigation.navigate("Subscription" satisfies keyof AppRootStackParamList),
+    },
+    {
+      icon: "bar-chart" as const,
+      title: "Usage",
+      description: "Understand practice and test limits for your current plan",
+      onPress: () =>
+        navigation.navigate("Usage" satisfies keyof AppRootStackParamList),
+    },
+    {
+      icon: "gift" as const,
+      title: "Points & Rewards",
+      description: "Review points activity and redeem discount coupons",
+      onPress: () =>
+        navigation.navigate("PointsDetail" satisfies keyof AppRootStackParamList),
+    },
+    {
+      icon: "megaphone" as const,
+      title: "Partner Program",
+      description: partnerLoading
+        ? "Opening your portal..."
+        : "Apply or manage influencer/institute codes and earnings",
+      onPress: openPartnerPortal,
+    },
+  ];
+
+  const roadmapItems = [
+    {
+      icon: "notifications-outline" as const,
+      title: "Notification Preferences",
+      description: "Granular reminders, social alerts, and quiet hours.",
+    },
+    {
+      icon: "language-outline" as const,
+      title: "Language Support",
+      description: "Localized UI and region-specific exam guidance.",
+    },
+    {
+      icon: "volume-high-outline" as const,
+      title: "Audio Preferences",
+      description: "Voice speed, pronunciation profiles, and playback tuning.",
     },
   ];
 
@@ -85,18 +160,23 @@ export const SettingsScreen: React.FC = () => {
             <TouchableOpacity
               style={[styles.replayButton, { backgroundColor: colors.primary }]}
               onPress={() => navigation.navigate("OnboardingReplay")}
+              accessibilityRole="button"
+              accessibilityLabel="Replay onboarding"
+              accessibilityHint="Shows the onboarding introduction slides again"
             >
-              <Text style={styles.replayButtonText}>Replay</Text>
+              <Text style={[styles.replayButtonText, { color: colors.primaryOn }]}>
+                Replay
+              </Text>
             </TouchableOpacity>
           </View>
         </Card>
 
         {/* App Settings Section */}
-        <SectionHeading title="App Settings">
-          Configure your experience
+        <SectionHeading title="Quick Access">
+          Open the most-used account and control surfaces.
         </SectionHeading>
         <Card style={{ backgroundColor: colors.surface }}>
-          {settingsOptions.map((option, index) => (
+          {quickActions.map((option, index) => (
             <TouchableOpacity
               key={index}
               style={[
@@ -104,8 +184,10 @@ export const SettingsScreen: React.FC = () => {
                 index > 0 && styles.optionCardWithBorder,
                 { borderTopColor: colors.divider },
               ]}
-              disabled={option.status !== "available"}
               onPress={option.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={option.title}
+              accessibilityHint={option.description}
             >
               <View
                 style={[
@@ -130,20 +212,41 @@ export const SettingsScreen: React.FC = () => {
                   {option.description}
                 </Text>
               </View>
-              {option.status === "available" ? (
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={colors.textMuted}
-                />
-              ) : (
-                <View style={[styles.badge, { backgroundColor: colors.surfaceSubtle }]}>
-                  <Text style={[styles.badgeText, { color: colors.textMutedStrong }]}>
-                    Coming soon
-                  </Text>
-                </View>
-              )}
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </TouchableOpacity>
+          ))}
+        </Card>
+
+        <SectionHeading title="Roadmap">
+          These settings are planned and not yet exposed as controls.
+        </SectionHeading>
+        <Card style={{ backgroundColor: colors.surface }}>
+          {roadmapItems.map((item, index) => (
+            <View
+              key={item.title}
+              style={[
+                styles.optionCard,
+                index > 0 && styles.optionCardWithBorder,
+                { borderTopColor: colors.divider },
+              ]}
+            >
+              <View
+                style={[
+                  styles.optionIcon,
+                  { backgroundColor: `${colors.info}15` },
+                ]}
+              >
+                <Ionicons name={item.icon} size={22} color={colors.info} />
+              </View>
+              <View style={styles.optionInfo}>
+                <Text style={[styles.optionTitle, { color: colors.textPrimary }]}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.optionDescription, { color: colors.textMuted }]}>
+                  {item.description}
+                </Text>
+              </View>
+            </View>
           ))}
         </Card>
 
@@ -278,7 +381,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   replayButtonText: {
-    color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 13,
   },
@@ -327,14 +429,5 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 15,
-  },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
   },
 });

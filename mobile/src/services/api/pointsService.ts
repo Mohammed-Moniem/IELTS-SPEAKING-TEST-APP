@@ -70,9 +70,13 @@ class PointsService {
   private basePath = "/points";
 
   private isUnauthorizedError(error: unknown): boolean {
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
-    return status === 401;
+    const status =
+      (error as { response?: { status?: number; data?: { status?: number } } })
+        ?.response?.status ??
+      (error as { response?: { data?: { status?: number } } })?.response?.data
+        ?.status ??
+      (error as { status?: number })?.status;
+    return status === 401 || status === 403;
   }
 
   private normalizeTierLabel(
@@ -195,7 +199,7 @@ class PointsService {
         logger.warn("⚠️ Points summary unauthorized");
         throw error;
       }
-      logger.error("❌ Failed to fetch points summary:", error);
+      logger.warn("⚠️ Failed to fetch points summary:", error);
       throw error;
     }
   }
@@ -219,7 +223,7 @@ class PointsService {
         logger.warn("⚠️ Points transactions unauthorized");
         throw error;
       }
-      logger.error("❌ Failed to fetch transactions:", error);
+      logger.warn("⚠️ Failed to fetch transactions:", error);
       throw error;
     }
   }
@@ -260,7 +264,7 @@ class PointsService {
       }
       return response.data.data;
     } catch (error) {
-      logger.error("❌ Failed to redeem discount:", error);
+      logger.warn("⚠️ Failed to redeem discount:", error);
       try {
         monitoringService.trackEvent("discount_redeem_failed", { tier });
         void firebaseAnalyticsService.trackEvent("discount_redeem_failed", {

@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { siteConfig } from '@/lib/seo/site';
 
 export const metadata: Metadata = {
@@ -33,10 +30,7 @@ const reviewStandards = [
   { icon: 'history', text: 'Inaccuracies are corrected and timestamped in the next content revision cycle.' }
 ];
 
-export default async function EditorialPolicyPage() {
-  const marketingVariant = await getServerMarketingVariant();
-  const isMotionVariant = marketingVariant === 'motion';
-
+export default function EditorialPolicyPage() {
   const policySchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -50,31 +44,22 @@ export default async function EditorialPolicyPage() {
     <div className="space-y-10 lg:space-y-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(policySchema) }} />
 
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'verified', text: 'Trust and Quality' }}
-          title="Editorial Policy"
-          description="Spokio content is designed for exam readiness, updated regularly, and reviewed against practical IELTS scoring criteria and learner usability."
-        />
-      ) : (
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-          <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-cyan-400/15 rounded-full blur-[80px]" />
-          <div className="relative z-10 max-w-3xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-              <span className="material-symbols-outlined text-[14px]">verified</span>
-              Trust and Quality
-            </span>
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Editorial Policy</h1>
-            <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
-              Spokio content is designed for exam readiness, updated regularly, and reviewed against practical IELTS scoring
-              criteria and learner usability.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-cyan-400/15 rounded-full blur-[80px]" />
+        <div className="relative z-10 max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+            <span className="material-symbols-outlined text-[14px]">verified</span>
+            Trust and Quality
+          </span>
+          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Editorial Policy</h1>
+          <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
+            Spokio content is designed for exam readiness, updated regularly, and reviewed against practical IELTS scoring
+            criteria and learner usability.
+          </p>
+        </div>
+      </section>
 
       {/* ── Content Creation ── */}
       <section className="rounded-2xl border border-gray-200/80 bg-white/50 backdrop-blur-sm p-8 dark:border-gray-800/80 dark:bg-gray-900/50 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)]">
@@ -92,10 +77,9 @@ export default async function EditorialPolicyPage() {
       </section>
 
       {/* ── Review Standards ── */}
-      <section className="relative isolate overflow-hidden rounded-2xl border border-gray-200/80 bg-white/50 backdrop-blur-sm p-8 dark:border-gray-800/80 dark:bg-gray-900/50 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)]">
-        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-        <h3 className="relative z-10 text-lg font-bold text-gray-900 dark:text-white mb-5">Review and Update Standards</h3>
-        <div className="relative z-10 space-y-4">
+      <section className="rounded-2xl border border-gray-200/80 bg-white/50 backdrop-blur-sm p-8 dark:border-gray-800/80 dark:bg-gray-900/50 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)]">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-5">Review and Update Standards</h3>
+        <div className="space-y-4">
           {reviewStandards.map(item => (
             <div key={item.text} className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">

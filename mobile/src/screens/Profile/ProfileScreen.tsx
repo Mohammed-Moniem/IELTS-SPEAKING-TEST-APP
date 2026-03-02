@@ -272,7 +272,7 @@ const createDropdownStyles = (colors: ColorTokens) =>
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      backgroundColor: colors.overlayBackdrop,
       justifyContent: "center",
       alignItems: "center",
       padding: spacing.lg,
@@ -284,7 +284,7 @@ const createDropdownStyles = (colors: ColorTokens) =>
       maxWidth: 400,
       maxHeight: "70%",
       overflow: "hidden",
-      shadowColor: "#000",
+      shadowColor: colors.textPrimary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 12,
@@ -1121,7 +1121,7 @@ const createStyles = (colors: ColorTokens) =>
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -1295,7 +1295,7 @@ const createCountryCodeModalStyles = (colors: ColorTokens) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backgroundColor: colors.overlayBackdrop,
       justifyContent: "center",
       alignItems: "center",
       padding: spacing.lg,

@@ -2,13 +2,35 @@ import Constants from "expo-constants";
 
 import type { User } from "../types/api";
 
-type SentryExpoModule = typeof import("sentry-expo");
+type SentryLikeModule = {
+  init?: (options: Record<string, unknown>) => void;
+  setUser?: (user: Record<string, unknown> | null) => void;
+  setTag?: (key: string, value: string) => void;
+  configureScope?: (callback: (scope: any) => void) => void;
+  captureException?: (
+    error: Error,
+    context?: Record<string, unknown>
+  ) => void;
+  captureMessage?: (message: string, level?: SeverityLevel) => void;
+  addBreadcrumb?: (breadcrumb: Record<string, unknown>) => void;
+  setContext?: (key: string, context: Record<string, unknown>) => void;
+  Native?: SentryLikeModule;
+};
 
-let cachedSentryModule: SentryExpoModule | null = null;
-const loadSentryModule = (): SentryExpoModule | null => {
+let cachedSentryModule: SentryLikeModule | null = null;
+const loadSentryModule = (): SentryLikeModule | null => {
   if (cachedSentryModule) {
     return cachedSentryModule;
   }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    cachedSentryModule = require("@sentry/react-native");
+    return cachedSentryModule;
+  } catch (_error) {
+    // Fallback kept for local environments that may still have sentry-expo.
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     cachedSentryModule = require("sentry-expo");
@@ -24,6 +46,12 @@ const loadSentryModule = (): SentryExpoModule | null => {
 type EventPayload = Record<string, unknown>;
 
 type SeverityLevel = "fatal" | "error" | "warning" | "log" | "info" | "debug";
+
+const getSentryClient = (): SentryLikeModule | null => {
+  const module = loadSentryModule();
+  if (!module) return null;
+  return module.Native || module;
+};
 
 class MonitoringService {
   private initialized = false;
@@ -52,8 +80,8 @@ class MonitoringService {
       return;
     }
 
-    const Sentry = loadSentryModule();
-    if (!Sentry) {
+    const sentryModule = loadSentryModule();
+    if (!sentryModule || !sentryModule.init) {
       if (__DEV__) {
         console.log("📡 Monitoring", "Sentry package missing, skipping init");
       }
@@ -61,7 +89,7 @@ class MonitoringService {
       return;
     }
 
-    Sentry.init({
+    sentryModule.init({
       dsn,
       enableInExpoDevelopment: false,
       debug: __DEV__,
@@ -85,24 +113,21 @@ class MonitoringService {
       return;
     }
 
+    const sentryClient = getSentryClient();
+    if (!sentryClient || !sentryClient.setUser) {
+      return;
+    }
+
     if (user) {
-      const Sentry = loadSentryModule();
-      if (!Sentry) {
-        return;
-      }
-      Sentry.Native.setUser({
+      sentryClient.setUser({
         id: user._id,
         email: user.email,
         username: `${user.firstName} ${user.lastName}`.trim(),
       });
-      Sentry.Native.setTag("subscription_plan", user.subscriptionPlan);
+      sentryClient.setTag?.("subscription_plan", user.subscriptionPlan);
     } else {
-      const Sentry = loadSentryModule();
-      if (!Sentry) {
-        return;
-      }
-      Sentry.Native.setUser(null);
-      Sentry.Native.configureScope((scope) => {
+      sentryClient.setUser(null);
+      sentryClient.configureScope?.((scope) => {
         scope.setTag("subscription_plan", "none");
       });
     }
@@ -113,15 +138,15 @@ class MonitoringService {
       return;
     }
 
-    const Sentry = loadSentryModule();
-    if (!Sentry) {
+    const sentryClient = getSentryClient();
+    if (!sentryClient?.captureException) {
       return;
     }
 
     const normalizedError =
       error instanceof Error ? error : new Error(String(error));
 
-    Sentry.Native.captureException(normalizedError, {
+    sentryClient.captureException(normalizedError, {
       extra: context,
     });
   }
@@ -131,12 +156,12 @@ class MonitoringService {
       return;
     }
 
-    const Sentry = loadSentryModule();
-    if (!Sentry) {
+    const sentryClient = getSentryClient();
+    if (!sentryClient?.captureMessage) {
       return;
     }
 
-    Sentry.Native.captureMessage(message, level);
+    sentryClient.captureMessage(message, level);
   }
 
   addBreadcrumb(message: string, data?: EventPayload): void {
@@ -144,12 +169,12 @@ class MonitoringService {
       return;
     }
 
-    const Sentry = loadSentryModule();
-    if (!Sentry) {
+    const sentryClient = getSentryClient();
+    if (!sentryClient?.addBreadcrumb) {
       return;
     }
 
-    Sentry.Native.addBreadcrumb({
+    sentryClient.addBreadcrumb({
       category: "event",
       message,
       data,
@@ -170,9 +195,9 @@ class MonitoringService {
     this.addBreadcrumb("screen_view", { screen: name, ...safeProperties });
 
     if (this.sentryEnabled) {
-      const Sentry = loadSentryModule();
-      if (Sentry) {
-        Sentry.Native.setContext("last_screen", { name, ...safeProperties });
+      const sentryClient = getSentryClient();
+      if (sentryClient?.setContext) {
+        sentryClient.setContext("last_screen", { name, ...safeProperties });
       }
     }
 

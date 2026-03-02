@@ -17,6 +17,7 @@ import { VoiceOrb } from "../../components/VoiceOrb";
 import { resultsStorage } from "../../services/resultsStorage";
 import { ttsService } from "../../services/textToSpeechService";
 import { colors, spacing } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 type TestState =
   | "intro"
@@ -197,7 +198,7 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
       // Start the test
       startIntroduction();
     } catch (error) {
-      console.error("Failed to initialize test:", error);
+      logger.warn("Failed to initialize test:", error);
       Alert.alert("Error", "Failed to load test questions. Please try again.", [
         { text: "OK", onPress: onExit },
       ]);
@@ -301,7 +302,7 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
         }
       }, timeLimit * 1000);
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording:", error);
     }
   };
 
@@ -342,7 +343,7 @@ export const FullTestScreen: React.FC<FullTestScreenProps> = ({
         }
       }
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording:", error);
     }
   };
 
@@ -729,7 +730,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#ef4444",
+    backgroundColor: colors.danger,
     marginRight: spacing.xs,
   },
   timerText: {
@@ -743,7 +744,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -789,7 +790,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: 24,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,

@@ -13,13 +13,18 @@ import {
   View,
 } from "react-native";
 
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import friendService from "../../services/api/friendService";
 import { ResolvedQRCode } from "../../services/api/profileService";
 import { useProfile } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 export const QRCodeScannerScreen: React.FC = () => {
   const navigation = useNavigation();
   const { resolveQRCode } = useProfile();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -131,7 +136,7 @@ export const QRCodeScannerScreen: React.FC = () => {
   if (!permission) {
     return (
       <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -139,7 +144,7 @@ export const QRCodeScannerScreen: React.FC = () => {
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
-        <Ionicons name="camera" size={48} color="#007AFF" />
+        <Ionicons name="camera" size={48} color={colors.primary} />
         <Text style={styles.permissionTitle}>Camera Access Needed</Text>
         <Text style={styles.permissionDescription}>
           We use your camera to scan QR codes for friends and referrals.
@@ -170,7 +175,7 @@ export const QRCodeScannerScreen: React.FC = () => {
               </Text>
               {processing && (
                 <View style={styles.cameraProcessing}>
-                  <ActivityIndicator size="large" color="#FFFFFF" />
+                  <ActivityIndicator size="large" color={colors.primaryOn} />
                   <Text style={styles.cameraProcessingText}>Processing…</Text>
                 </View>
               )}
@@ -178,7 +183,7 @@ export const QRCodeScannerScreen: React.FC = () => {
           </CameraView>
           {error && (
             <View style={styles.errorBanner}>
-              <Ionicons name="warning" size={18} color="#FF3B30" />
+              <Ionicons name="warning" size={18} color={colors.danger} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
@@ -189,7 +194,7 @@ export const QRCodeScannerScreen: React.FC = () => {
             style={styles.closeButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="close" size={24} color="#1C1C1E" />
+            <Ionicons name="close" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
 
           {resolved.type === "friend_invite" ? (
@@ -197,7 +202,7 @@ export const QRCodeScannerScreen: React.FC = () => {
               <Ionicons
                 name="person-add"
                 size={44}
-                color="#007AFF"
+                color={colors.primary}
                 style={styles.resultIcon}
               />
               <Text style={styles.resultTitle}>
@@ -221,13 +226,13 @@ export const QRCodeScannerScreen: React.FC = () => {
                     disabled={actionLoading}
                   >
                     {actionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <ActivityIndicator size="small" color={colors.primaryOn} />
                     ) : (
                       <>
                         <Ionicons
                           name="paper-plane"
                           size={18}
-                          color="#FFFFFF"
+                          color={colors.primaryOn}
                         />
                         <Text style={styles.primaryActionText}>
                           Send Friend Request
@@ -249,7 +254,7 @@ export const QRCodeScannerScreen: React.FC = () => {
               <Ionicons
                 name="gift"
                 size={44}
-                color="#FF9500"
+                color={colors.warning}
                 style={styles.resultIcon}
               />
               <Text style={styles.resultTitle}>
@@ -269,7 +274,7 @@ export const QRCodeScannerScreen: React.FC = () => {
                   style={styles.primaryAction}
                   onPress={handleOpenReferralLink}
                 >
-                  <Ionicons name="link" size={18} color="#FFFFFF" />
+                  <Ionicons name="link" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionText}>Open Referral Link</Text>
                 </TouchableOpacity>
               )}
@@ -278,7 +283,7 @@ export const QRCodeScannerScreen: React.FC = () => {
                 style={styles.secondaryAction}
                 onPress={handleCopyReferral}
               >
-                <Ionicons name="copy" size={16} color="#007AFF" />
+                <Ionicons name="copy" size={16} color={colors.primary} />
                 <Text style={styles.secondaryActionText}>Copy Code</Text>
               </TouchableOpacity>
 
@@ -305,10 +310,11 @@ export const QRCodeScannerScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: colors.background,
   },
   camera: {
     flex: 1,
@@ -319,10 +325,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     paddingBottom: 80,
-    backgroundColor: "rgba(0,0,0,0.2)",
+    backgroundColor: colors.overlayBackdrop,
   },
   cameraInstruction: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 16,
     marginBottom: 12,
   },
@@ -331,11 +337,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cameraProcessingText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 14,
   },
   errorBanner: {
-    backgroundColor: "#FEE2E2",
+    backgroundColor: colors.dangerSoft,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -343,13 +349,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorText: {
-    color: "#B91C1C",
+    color: colors.danger,
     fontSize: 14,
     fontWeight: "600",
   },
   permissionContainer: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: colors.backgroundMuted,
     alignItems: "center",
     justifyContent: "center",
     padding: 32,
@@ -358,28 +364,28 @@ const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#000000",
+    color: colors.textPrimary,
     textAlign: "center",
   },
   permissionDescription: {
     fontSize: 16,
-    color: "#6B7280",
+    color: colors.textMuted,
     textAlign: "center",
   },
   permissionButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 12,
   },
   permissionButtonText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 16,
     fontWeight: "600",
   },
   resultContainer: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: colors.backgroundMuted,
     padding: 24,
   },
   closeButton: {
@@ -392,18 +398,18 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   resultIcon: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 32,
   },
   resultTitle: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#000000",
+    color: colors.textPrimary,
   },
   resultSubtitle: {
     fontSize: 16,
-    color: "#6B7280",
+    color: colors.textMuted,
     textAlign: "center",
     paddingHorizontal: 24,
   },
@@ -412,14 +418,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#007AFF",
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 14,
     minWidth: 220,
   },
   primaryActionText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -432,16 +438,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: colors.primary,
     minWidth: 200,
   },
   secondaryActionText: {
-    color: "#007AFF",
+    color: colors.primary,
     fontSize: 15,
     fontWeight: "600",
   },
   referralBox: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 14,
     alignItems: "center",
@@ -450,12 +456,12 @@ const styles = StyleSheet.create({
   },
   referralLabel: {
     fontSize: 14,
-    color: "#6B7280",
+    color: colors.textMuted,
   },
   referralCode: {
     fontSize: 24,
     fontWeight: "700",
     letterSpacing: 2,
-    color: "#111827",
+    color: colors.textPrimary,
   },
-});
+  });

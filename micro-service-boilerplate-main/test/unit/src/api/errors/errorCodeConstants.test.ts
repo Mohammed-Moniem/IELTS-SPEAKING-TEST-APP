@@ -9,6 +9,7 @@ describe('errorCodeConstants', () => {
       UNAUTHORIZED: 401,
       FORBIDDEN: 403,
       NOT_FOUND: 404,
+      CONFLICT: 409,
       TOO_MANY_REQUEST: 429,
       TOO_MANY_REQUESTS: 429,
       PAYMENT_REQUIRED: 402,
@@ -28,6 +29,7 @@ describe('errorCodeConstants', () => {
       GenericErrorMessage: 'GenericErrorMessage',
       InvalidBody: 'InvalidBody',
       InvalidContentType: 'InvalidContentType',
+      InvalidCredentials: 'InvalidCredentials',
       InvalidField: 'InvalidField',
       InvalidGeospatialQuery: 'InvalidGeospatialQuery',
       InvalidQuery: 'InvalidQuery',
@@ -37,10 +39,16 @@ describe('errorCodeConstants', () => {
       MissingUserId: 'MissingUserId',
       NotAuthorized: 'NotAuthorized',
       NotFound: 'NotFound',
+      NotImplemented: 'NotImplemented',
       OpenAIError: 'OpenAIError',
       OpenAIInvalidRequest: 'OpenAIInvalidRequest',
       OpenAIQuotaExceeded: 'OpenAIQuotaExceeded',
-      OpenAIRateLimit: 'OpenAIRateLimit'
+      OpenAIRateLimit: 'OpenAIRateLimit',
+      PremiumRequired: 'PremiumRequired',
+      RefreshTokenRevoked: 'RefreshTokenRevoked',
+      StripeError: 'StripeError',
+      UsageLimitReached: 'UsageLimitReached',
+      UserAlreadyExists: 'UserAlreadyExists'
     };
     expect(CODES).toEqual(expectedCodes);
   });

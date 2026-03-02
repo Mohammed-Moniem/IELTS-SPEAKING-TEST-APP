@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { siteConfig } from '@/lib/seo/site';
 
 export const metadata: Metadata = {
@@ -57,10 +54,7 @@ const guardrails = [
   }
 ];
 
-export default async function MethodologyPage() {
-  const marketingVariant = await getServerMarketingVariant();
-  const isMotionVariant = marketingVariant === 'motion';
-
+export default function MethodologyPage() {
   const methodologySchema = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -73,39 +67,27 @@ export default async function MethodologyPage() {
     <div className="space-y-10 lg:space-y-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(methodologySchema) }} />
 
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'science', text: 'Scoring Framework' }}
-          title="How Spokio Evaluates IELTS Performance"
-          description="Spokio combines rule-based checks with AI-assisted analysis and module-specific rubrics to produce feedback designed for practical score improvement."
-        />
-      ) : (
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-          <div className="absolute top-0 left-1/2 w-[350px] h-[350px] bg-fuchsia-500/15 rounded-full blur-[100px]" />
-          <div className="relative z-10 max-w-3xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-              <span className="material-symbols-outlined text-[14px]">science</span>
-              Scoring Framework
-            </span>
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">How Spokio Evaluates IELTS Performance</h1>
-            <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
-              Spokio combines rule-based checks with AI-assisted analysis and module-specific rubrics to produce feedback
-              designed for practical score improvement.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+        <div className="absolute top-0 left-1/2 w-[350px] h-[350px] bg-fuchsia-500/15 rounded-full blur-[100px]" />
+        <div className="relative z-10 max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+            <span className="material-symbols-outlined text-[14px]">science</span>
+            Scoring Framework
+          </span>
+          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">How Spokio Evaluates IELTS Performance</h1>
+          <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
+            Spokio combines rule-based checks with AI-assisted analysis and module-specific rubrics to produce feedback
+            designed for practical score improvement.
+          </p>
+        </div>
+      </section>
 
       {/* ── Module Evaluation ── */}
-      <section className={`relative isolate overflow-hidden rounded-3xl ${isMotionVariant ? 'p-5 sm:p-6' : ''}`}>
-        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-        <h2 className="relative z-10 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
-          Module Evaluation Principles
-        </h2>
-        <div className="relative z-10 grid gap-5 sm:grid-cols-3">
+      <section>
+        <h2 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">Module Evaluation Principles</h2>
+        <div className="grid gap-5 sm:grid-cols-3">
           {evaluationPrinciples.map(item => (
             <article
               key={item.module}

@@ -20,6 +20,7 @@ import {
 } from "../api/topicApi";
 import { ttsService } from "../services/textToSpeechService";
 import { colors, spacing } from "../theme/tokens";
+import { logger } from "../utils/logger";
 
 /**
  * SIMPLIFIED IELTS Full Test - V2
@@ -168,7 +169,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         }
       })
       .catch((error) => {
-        console.error("❌ Transcription failed:", error);
+        logger.warn("❌ Transcription failed:", error);
         if (record.transcript === undefined) {
           record.transcript = "";
         }
@@ -420,7 +421,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
       console.log("🔐 Requesting microphone permissions...");
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== "granted") {
-        console.error("❌ Microphone permission denied");
+        logger.warn("❌ Microphone permission denied");
         Alert.alert(
           "Permission Required",
           "Microphone access is needed for this test.",
@@ -494,8 +495,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
       // Set flag to trigger useEffect that will start test
       setQuestionsReady(true);
     } catch (error) {
-      console.error("❌ Failed to initialize test:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
+      logger.warn("❌ Failed to initialize test:", error);
+      logger.warn("Error details:", JSON.stringify(error, null, 2));
       Alert.alert(
         "Error",
         `Failed to load test: ${
@@ -622,8 +623,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     // Validate questions loaded
     if (!part1Questions || part1Questions.length === 0) {
-      console.error("❌ No Part 1 questions available!");
-      console.error("❌ State check: part1Questions is", part1Questions);
+      logger.warn("❌ No Part 1 questions available!");
+      logger.warn("❌ State check: part1Questions is", part1Questions);
       Alert.alert(
         "Error",
         "Failed to load Part 1 questions. Cannot start test.",
@@ -658,8 +659,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     const question = part1Questions[index];
     if (!question || !question.question) {
-      console.error("❌ Invalid question at index", index);
-      console.error("Question object:", question);
+      logger.warn("❌ Invalid question at index", index);
+      logger.warn("Question object:", question);
       Alert.alert(
         "Error",
         "Failed to load question. Moving to next question.",
@@ -731,7 +732,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     console.log("part2Topic:", part2Topic);
 
     if (!part2Topic) {
-      console.error("❌ No Part 2 topic!");
+      logger.warn("❌ No Part 2 topic!");
       Alert.alert("Error", "Failed to load Part 2 topic. Skipping to Part 3.", [
         { text: "OK", onPress: () => startPart3() },
       ]);
@@ -739,8 +740,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     }
 
     if (!part2Topic.question) {
-      console.error("❌ Part 2 topic has no question!");
-      console.error("Topic object:", part2Topic);
+      logger.warn("❌ Part 2 topic has no question!");
+      logger.warn("Topic object:", part2Topic);
       Alert.alert(
         "Error",
         "Failed to load Part 2 question. Skipping to Part 3.",
@@ -839,7 +840,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     // Validate questions loaded
     if (!part3Questions || part3Questions.length === 0) {
-      console.error("❌ No Part 3 questions available!");
+      logger.warn("❌ No Part 3 questions available!");
       Alert.alert("Error", "Failed to load Part 3 questions. Ending test.", [
         { text: "Finish", onPress: completeTest },
       ]);
@@ -868,8 +869,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     const question = part3Questions[index];
     if (!question || !question.question) {
-      console.error("❌ Invalid question at index", index);
-      console.error("Question object:", question);
+      logger.warn("❌ Invalid question at index", index);
+      logger.warn("Question object:", question);
       Alert.alert(
         "Error",
         "Failed to load question. Moving to next question.",
@@ -964,7 +965,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     try {
       await Promise.all(transcriptionPromisesRef.current);
     } catch (error) {
-      console.error("❌ Error waiting for transcriptions:", error);
+      logger.warn("❌ Error waiting for transcriptions:", error);
     }
 
     orderedResponses.forEach((record) => {
@@ -1086,7 +1087,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         testSessionId: testSessionIdRef.current,
       });
     } catch (error) {
-      console.error("❌ Full test evaluation failed:", error);
+      logger.warn("❌ Full test evaluation failed:", error);
       setIsExaminerSpeaking(false);
       setWelcomePrompt(null);
       setIsEvaluating(false);
@@ -1147,7 +1148,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
       console.log("🔴 Recording started");
     } catch (error) {
-      console.error("❌ Failed to start recording:", error);
+      logger.warn("❌ Failed to start recording:", error);
       Alert.alert("Error", "Failed to start recording. Please try again.");
     }
   };
@@ -1265,7 +1266,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         }, 1500);
       }
     } catch (error) {
-      console.error("❌ Failed to stop recording:", error);
+      logger.warn("❌ Failed to stop recording:", error);
       Alert.alert("Error", "Failed to save recording. Please try again.");
       setIsRecording(false);
     }
@@ -1291,7 +1292,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
           resolve();
         },
         onError: (error) => {
-          console.error("❌ TTS error:", error);
+          logger.warn("❌ TTS error:", error);
           resolve(); // Continue anyway
         },
       });
@@ -1619,7 +1620,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: 16,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1702,7 +1703,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

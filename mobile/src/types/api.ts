@@ -210,8 +210,11 @@ export interface NotificationSettings {
   feedbackNotificationsEnabled: boolean;
   directMessagesEnabled: boolean;
   groupMessagesEnabled: boolean;
+  friendRequestsEnabled: boolean;
+  friendAcceptancesEnabled: boolean;
   systemAnnouncementsEnabled: boolean;
   offersEnabled: boolean;
+  partnerOffersEnabled: boolean;
 }
 
 export interface Preferences {

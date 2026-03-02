@@ -312,7 +312,7 @@ const createStyles = (colors: ColorTokens) =>
       padding: spacing.lg,
       backgroundColor: colors.surface,
       marginBottom: spacing.lg,
-      shadowColor: "#000",
+      shadowColor: colors.textPrimary,
       shadowOpacity: 0.05,
       shadowOffset: { width: 0, height: 4 },
       shadowRadius: 12,
@@ -419,4 +419,3 @@ const createStyles = (colors: ColorTokens) =>
       fontWeight: "600",
     },
   });
-

@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../context";
+import { useThemedStyles } from "../hooks";
+import type { ColorTokens } from "../theme/tokens";
 
 interface AchievementProgressCardProps {
   achievement: {
@@ -34,6 +37,8 @@ interface AchievementProgressCardProps {
 export const AchievementProgressCard: React.FC<
   AchievementProgressCardProps
 > = ({ achievement, onPress }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -74,17 +79,17 @@ export const AchievementProgressCard: React.FC<
   const getCategoryColor = (category: string) => {
     switch (category.toUpperCase()) {
       case "PRACTICE":
-        return "#007AFF";
+        return colors.primary;
       case "IMPROVEMENT":
-        return "#34C759";
+        return colors.success;
       case "STREAK":
-        return "#FF9500";
+        return colors.warning;
       case "SOCIAL":
-        return "#AF52DE";
+        return colors.info;
       case "MILESTONE":
-        return "#FF2D55";
+        return colors.secondary;
       default:
-        return "#8E8E93";
+        return colors.textMuted;
     }
   };
 
@@ -120,7 +125,11 @@ export const AchievementProgressCard: React.FC<
               <Text style={styles.iconText}>{achievement.icon}</Text>
               {!isUnlocked && (
                 <View style={styles.lockOverlay}>
-                  <Ionicons name="lock-closed" size={20} color="#8E8E93" />
+                  <Ionicons
+                    name="lock-closed"
+                    size={20}
+                    color={colors.textMutedStrong}
+                  />
                 </View>
               )}
             </View>
@@ -168,20 +177,20 @@ export const AchievementProgressCard: React.FC<
             {/* Footer */}
             <View style={styles.footer}>
               <View style={styles.pointsBadge}>
-                <Ionicons name="star" size={14} color="#FFD60A" />
+                <Ionicons name="star" size={14} color={colors.warning} />
                 <Text style={styles.pointsText}>{achievement.points} pts</Text>
               </View>
 
               {achievement.isPremium && (
                 <View style={styles.premiumBadge}>
-                  <Ionicons name="diamond" size={10} color="#FFFFFF" />
+                  <Ionicons name="diamond" size={10} color={colors.primaryOn} />
                   <Text style={styles.premiumText}>PREMIUM</Text>
                 </View>
               )}
 
               {isUnlocked && (
                 <View style={styles.unlockedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
                   <Text style={styles.unlockedText}>Unlocked</Text>
                 </View>
               )}
@@ -193,12 +202,13 @@ export const AchievementProgressCard: React.FC<
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     marginBottom: 12,
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -219,7 +229,7 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     textTransform: "uppercase",
   },
   content: {
@@ -234,21 +244,22 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: colors.surfaceSubtle,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     position: "relative",
   },
   unlockedIconBackground: {
-    backgroundColor: "#E8F5E9",
+    backgroundColor: colors.successSoft,
   },
   iconText: {
     fontSize: 32,
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.85)",
+    backgroundColor: colors.overlay,
+    opacity: 0.85,
     borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
@@ -259,15 +270,15 @@ const styles = StyleSheet.create({
   achievementName: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#000000",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   lockedText: {
-    color: "#8E8E93",
+    color: colors.textMutedStrong,
   },
   achievementDescription: {
     fontSize: 14,
-    color: "#8E8E93",
+    color: colors.textSecondary,
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -276,7 +287,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: "#E5E5EA",
+    backgroundColor: colors.borderMuted,
     borderRadius: 4,
     overflow: "hidden",
     marginBottom: 6,
@@ -287,7 +298,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: "#8E8E93",
+    color: colors.textMuted,
     fontWeight: "600",
   },
   footer: {
@@ -300,7 +311,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#FFF9E5",
+    backgroundColor: colors.warningSoft,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -308,27 +319,29 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#FFB800",
+    color: colors.warning,
   },
   premiumBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#5856D6",
+    backgroundColor: colors.badgePremiumBackground,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.badgePremiumBorder,
   },
   premiumText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.badgePremiumText,
   },
   unlockedBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#E8F5E9",
+    backgroundColor: colors.successSoft,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -336,6 +349,6 @@ const styles = StyleSheet.create({
   unlockedText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#34C759",
+    color: colors.success,
   },
 });

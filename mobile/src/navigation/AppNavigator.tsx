@@ -115,8 +115,6 @@ const AppTabs = () => {
         headerRight: () => <ProfileMenu />,
         headerStyle: {
           backgroundColor: colors.surface,
-          elevation: 0,
-          shadowOpacity: 0,
         },
         headerShadowVisible: false,
         headerTitleStyle: {
@@ -328,8 +326,6 @@ const AuthenticatedNavigator = () => {
       screenOptions={{
         headerStyle: {
           backgroundColor: colors.surface,
-          elevation: 0,
-          shadowOpacity: 0,
         },
         headerShadowVisible: false,
         headerTintColor: colors.textPrimary,

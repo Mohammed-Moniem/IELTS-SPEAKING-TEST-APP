@@ -13,6 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -34,6 +38,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onClose,
   headers,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +90,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
     } catch (error) {
-      console.error("Error toggling play/pause:", error);
+      logger.warn("Error toggling play/pause", error);
     }
   };
 
@@ -96,7 +102,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsMuted(!isMuted);
       resetControlsTimeout();
     } catch (error) {
-      console.error("Error toggling mute:", error);
+      logger.warn("Error toggling mute", error);
     }
   };
 
@@ -108,7 +114,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       await videoRef.current.setPositionAsync(positionMillis);
       resetControlsTimeout();
     } catch (error) {
-      console.error("Error seeking:", error);
+      logger.warn("Error seeking video", error);
     }
   };
 
@@ -119,7 +125,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       await videoRef.current.replayAsync();
       resetControlsTimeout();
     } catch (error) {
-      console.error("Error replaying:", error);
+      logger.warn("Error replaying video", error);
     }
   };
 
@@ -163,14 +169,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {/* Top bar with close button */}
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={32} color="#FFFFFF" />
+            <Ionicons name="close" size={32} color={colors.primaryOn} />
           </TouchableOpacity>
         </View>
 
         {/* Center play/pause button */}
         <View style={styles.centerControls}>
           {isLoading ? (
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.primaryOn} />
           ) : (
             <TouchableOpacity
               onPress={hasFinished ? handleReplay : handlePlayPause}
@@ -179,7 +185,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <Ionicons
                 name={hasFinished ? "reload" : isPlaying ? "pause" : "play"}
                 size={64}
-                color="#FFFFFF"
+                color={colors.primaryOn}
               />
             </TouchableOpacity>
           )}
@@ -195,9 +201,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               value={progress}
               minimumValue={0}
               maximumValue={1}
-              minimumTrackTintColor="#FFFFFF"
-              maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-              thumbTintColor="#FFFFFF"
+              minimumTrackTintColor={colors.primaryOn}
+              maximumTrackTintColor={colors.textMuted}
+              thumbTintColor={colors.primaryOn}
               onSlidingComplete={handleSeek}
             />
             <Text style={styles.timeText}>{formatTime(durationMillis)}</Text>
@@ -212,7 +218,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <Ionicons
                 name={isMuted ? "volume-mute" : "volume-high"}
                 size={28}
-                color="#FFFFFF"
+                color={colors.primaryOn}
               />
             </TouchableOpacity>
           </View>
@@ -260,10 +266,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: colors.background,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -285,7 +292,7 @@ const styles = StyleSheet.create({
     height: 80,
     paddingTop: Platform.OS === "ios" ? 50 : 20,
     paddingHorizontal: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -306,7 +313,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -317,7 +324,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingBottom: Platform.OS === "ios" ? 40 : 20,
     paddingHorizontal: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
   },
   progressContainer: {
     flexDirection: "row",
@@ -330,7 +337,7 @@ const styles = StyleSheet.create({
     height: 40,
   },
   timeText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 12,
     fontWeight: "500",
     minWidth: 45,

@@ -15,7 +15,7 @@ export class ChatService {
     senderId: string,
     recipientId: string,
     content: string,
-    messageType: 'text' | 'image' | 'audio' | 'file' = 'text',
+    messageType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'gif' = 'text',
     metadata?: any
   ): Promise<IChatMessage> {
     // Check if users are friends
@@ -59,7 +59,7 @@ export class ChatService {
     groupId: string,
     content: string,
     memberIds: string[],
-    messageType: 'text' | 'image' | 'audio' | 'file' = 'text',
+    messageType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'gif' = 'text',
     metadata?: any
   ): Promise<IChatMessage> {
     // Encrypt message

@@ -5,6 +5,7 @@ import chatService, {
   Conversation,
 } from "../services/api/chatService";
 import socketService, { Message } from "../services/socketService";
+import { logger } from "../utils/logger";
 
 export const useChat = (conversationId?: string) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -252,7 +253,7 @@ export const useChat = (conversationId?: string) => {
       const count = await chatService.getUnreadCount();
       setUnreadCount(count);
     } catch (err: any) {
-      console.error("Failed to load unread count:", err);
+      logger.warn("Failed to load unread count", err);
     }
   }, []);
 
@@ -303,7 +304,7 @@ export const useChat = (conversationId?: string) => {
         socketService.sendGroupMessage(groupId, content, messageType);
         return true;
       } catch (err: any) {
-        console.error("❌ sendGroupMessage error:", err);
+        logger.warn("sendGroupMessage failed", err);
         setError(err.response?.data?.message || "Failed to send group message");
         return false;
       }
@@ -315,7 +316,7 @@ export const useChat = (conversationId?: string) => {
     try {
       await chatService.markMessageAsRead(messageId);
     } catch (err: any) {
-      console.error("Failed to mark message as read:", err);
+      logger.warn("Failed to mark message as read", err);
     }
   }, []);
 
@@ -325,7 +326,7 @@ export const useChat = (conversationId?: string) => {
         await chatService.markConversationAsRead(convId);
         await Promise.all([loadConversations(), loadUnreadCount()]);
       } catch (err: any) {
-        console.error("Failed to mark conversation as read:", err);
+        logger.warn("Failed to mark conversation as read", err);
       }
     },
     [loadConversations, loadUnreadCount]

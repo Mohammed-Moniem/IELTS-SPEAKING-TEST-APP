@@ -36,6 +36,26 @@ export class RegisterDeviceDto {
   timezoneOffsetMinutes?: number;
 }
 
+export class RegisterWebDeviceDto {
+  @IsString()
+  token!: string;
+
+  @IsIn(['fcm'])
+  provider!: 'fcm';
+
+  @IsOptional()
+  @IsString()
+  locale?: string;
+
+  @IsOptional()
+  @IsInt()
+  timezoneOffsetMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  userAgent?: string;
+}
+
 export class UnregisterDeviceDto {
   @IsString()
   token!: string;
@@ -73,11 +93,23 @@ export class UpdateNotificationSettingsDto {
   @IsBoolean()
   groupMessagesEnabled!: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  friendRequestsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  friendAcceptancesEnabled?: boolean;
+
   @IsBoolean()
   systemAnnouncementsEnabled!: boolean;
 
   @IsBoolean()
   offersEnabled!: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  partnerOffersEnabled?: boolean;
 }
 
 export class BroadcastNotificationDto {

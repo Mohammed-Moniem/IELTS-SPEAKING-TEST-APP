@@ -1,0 +1,77 @@
+{
+  "scenarios": [
+    {
+      "name": "writing-submit",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/writing/submissions",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDBmYjY2YzJhZGViMDkyNWExYWYzNDIiLCJlbWFpbCI6InBlcmYuMTc3MTczMDIyNkBleGFtcGxlLmNvbSIsInBsYW4iOiJmcmVlIiwicm9sZXMiOltdLCJpYXQiOjE3NzE3MzAyMjgsImV4cCI6MTc3MTczMTEyOCwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.4fliGR8Jahd4u_OpAN6sn6o4f8XvC4fHY1o8TfVHZMA",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "taskId": "dc130ea72ad3562630c519d4",
+        "responseText": "Some people believe universities should focus on practical skills, while others argue they should prioritize theoretical knowledge. I believe both are necessary because employers expect graduates to solve real-world problems while understanding underlying principles. Practical projects improve readiness for work, but theory helps learners adapt when technology and market needs change. A balanced curriculum should include internships, case studies, and critical reading so students can apply ideas and make better long-term decisions.",
+        "durationSeconds": 1300
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2
+      ],
+      "requests_per_level": 12,
+      "warmup_requests": 3,
+      "timeout": 120
+    },
+    {
+      "name": "reading-start",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/reading/tests/start",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDBmYjY2YzJhZGViMDkyNWExYWYzNDIiLCJlbWFpbCI6InBlcmYuMTc3MTczMDIyNkBleGFtcGxlLmNvbSIsInBsYW4iOiJmcmVlIiwicm9sZXMiOltdLCJpYXQiOjE3NzE3MzAyMjgsImV4cCI6MTc3MTczMTEyOCwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.4fliGR8Jahd4u_OpAN6sn6o4f8XvC4fHY1o8TfVHZMA",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 14,
+      "warmup_requests": 3,
+      "timeout": 90
+    },
+    {
+      "name": "listening-start",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/listening/tests/start",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDBmYjY2YzJhZGViMDkyNWExYWYzNDIiLCJlbWFpbCI6InBlcmYuMTc3MTczMDIyNkBleGFtcGxlLmNvbSIsInBsYW4iOiJmcmVlIiwicm9sZXMiOltdLCJpYXQiOjE3NzE3MzAyMjgsImV4cCI6MTc3MTczMTEyOCwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.4fliGR8Jahd4u_OpAN6sn6o4f8XvC4fHY1o8TfVHZMA",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "track": "general"
+      },
+      "expected_status": [
+        "201"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 14,
+      "warmup_requests": 3,
+      "timeout": 90
+    }
+  ]
+}

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Admin Content Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", // Violet-600
+              "primary-hover": "#6D28D9", // Violet-700
+              "background-light": "#F3F4F6", // Gray-100
+              "background-dark": "#0F1115", // Very dark navy/black
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#18181B", // Zinc-900
+              "surface-darker": "#131316", // Slightly darker surface
+              "text-light": "#1F2937", // Gray-800
+              "text-dark": "#F9FAFB", // Gray-50
+              "text-muted-light": "#6B7280", // Gray-500
+              "text-muted-dark": "#9CA3AF", // Gray-400
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", // 12px
+              'xl': "1rem", // 16px
+              '2xl': "1.5rem", // 24px
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-surface-light dark:bg-surface-darker border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-gray-100 dark:border-gray-800/50">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Spokio Admin</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<div class="pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+                Management
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-300 group" href="#">
+<span class="material-symbols-outlined text-xl fill">inventory_2</span>
+                Content Manager
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">group</span>
+                Users
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">analytics</span>
+                Analytics
+            </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+                Settings
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">settings</span>
+                Platform Config
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-symbols-outlined text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">security</span>
+                Roles &amp; Permissions
+            </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+<img alt="Admin Avatar" class="w-10 h-10 rounded-full border-2 border-white dark:border-gray-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Admin User</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Super Admin</p>
+</div>
+<span class="material-symbols-outlined ml-auto text-gray-400">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen">
+<header class="lg:hidden h-16 bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg dark:text-white">Spokio Admin</span>
+</div>
+<button class="p-2 text-gray-500 hover:text-primary">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-full mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<div>
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Content Manager</h1>
+<p class="text-text-muted-light dark:text-gray-400 max-w-xl">
+                        Manage IELTS topics, prompts, and test assets across all modules.
+                    </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary dark:hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hidden md:flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl transition-colors shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-xl">add</span>
+                        Create New Topic
+                    </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-xs font-medium text-text-muted-light dark:text-gray-400 uppercase tracking-wide">Total Topics</p>
+<h3 class="text-2xl font-bold text-gray-900 dark:text-white">142</h3>
+</div>
+<div class="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
+<span class="material-symbols-outlined">library_books</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-xs font-medium text-text-muted-light dark:text-gray-400 uppercase tracking-wide">Published</p>
+<h3 class="text-2xl font-bold text-gray-900 dark:text-white">118</h3>
+</div>
+<div class="w-10 h-10 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center text-green-600 dark:text-green-400">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-xs font-medium text-text-muted-light dark:text-gray-400 uppercase tracking-wide">Drafts</p>
+<h3 class="text-2xl font-bold text-gray-900 dark:text-white">24</h3>
+</div>
+<div class="w-10 h-10 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+<span class="material-symbols-outlined">edit_note</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-xs font-medium text-text-muted-light dark:text-gray-400 uppercase tracking-wide">Review Needed</p>
+<h3 class="text-2xl font-bold text-gray-900 dark:text-white">5</h3>
+</div>
+<div class="w-10 h-10 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center justify-center text-red-600 dark:text-red-400">
+<span class="material-symbols-outlined">priority_high</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-t-2xl border-b border-gray-100 dark:border-gray-800 flex flex-wrap gap-4 items-center justify-between">
+<div class="flex flex-wrap items-center gap-3">
+<div class="relative">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+<span class="material-symbols-outlined text-lg">search</span>
+</span>
+<input class="pl-10 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-surface-darker text-gray-900 dark:text-white focus:ring-primary focus:border-primary w-64" placeholder="Search topics..." type="text"/>
+</div>
+<div class="h-8 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+<div class="flex items-center gap-2">
+<select class="form-select py-2 pl-3 pr-8 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-surface-darker text-gray-700 dark:text-gray-300 focus:ring-primary focus:border-primary">
+<option>All Modules</option>
+<option>Speaking</option>
+<option>Writing</option>
+<option>Reading</option>
+<option>Listening</option>
+</select>
+<select class="form-select py-2 pl-3 pr-8 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-surface-darker text-gray-700 dark:text-gray-300 focus:ring-primary focus:border-primary">
+<option>All Statuses</option>
+<option>Published</option>
+<option>Draft</option>
+<option>Archived</option>
+</select>
+<select class="form-select py-2 pl-3 pr-8 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-surface-darker text-gray-700 dark:text-gray-300 focus:ring-primary focus:border-primary">
+<option>Difficulty: All</option>
+<option>Foundation</option>
+<option>Intermediate</option>
+<option>Advanced</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">view_column</span>
+</button>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-b-2xl border border-t-0 border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead class="bg-gray-50 dark:bg-surface-darker text-text-muted-light dark:text-gray-400 font-medium border-b border-gray-100 dark:border-gray-800">
+<tr>
+<th class="px-6 py-4 w-12">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-gray-50 dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</th>
+<th class="px-6 py-4">Title &amp; Description</th>
+<th class="px-6 py-4">Module</th>
+<th class="px-6 py-4">Type</th>
+<th class="px-6 py-4">Last Updated</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+<tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+<td class="px-6 py-4">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-bold text-gray-900 dark:text-white">Urbanization &amp; Society</span>
+<span class="text-xs text-text-muted-light dark:text-gray-500 truncate max-w-xs">Impact of city living on community relationships...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">mic</span>
+<span class="text-gray-700 dark:text-gray-300">Speaking</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                                        Part 3
+                                    </span>
+</td>
+<td class="px-6 py-4 text-text-muted-light dark:text-gray-500">
+                                    2 hours ago
+                                    <div class="text-xs text-gray-400">by Jane Doe</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                        Published
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Preview">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-lg">edit</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Archive">
+<span class="material-symbols-outlined text-lg">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+<td class="px-6 py-4">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-bold text-gray-900 dark:text-white">Academic Writing Task 1: Charts</span>
+<span class="text-xs text-text-muted-light dark:text-gray-500 truncate max-w-xs">Bar chart analysis of global energy consumption...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-orange-500 text-lg">edit_note</span>
+<span class="text-gray-700 dark:text-gray-300">Writing</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200">
+                                        Task 1
+                                    </span>
+</td>
+<td class="px-6 py-4 text-text-muted-light dark:text-gray-500">
+                                    Oct 24, 2023
+                                    <div class="text-xs text-gray-400">by System</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">
+<span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                        Draft
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Preview">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-lg">edit</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Archive">
+<span class="material-symbols-outlined text-lg">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+<td class="px-6 py-4">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-bold text-gray-900 dark:text-white">Reading: Climate Change</span>
+<span class="text-xs text-text-muted-light dark:text-gray-500 truncate max-w-xs">Passage 3: Advanced scientific vocabulary...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-blue-500 text-lg">article</span>
+<span class="text-gray-700 dark:text-gray-300">Reading</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
+                                        Academic
+                                    </span>
+</td>
+<td class="px-6 py-4 text-text-muted-light dark:text-gray-500">
+                                    Oct 22, 2023
+                                    <div class="text-xs text-gray-400">by Alex M.</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                        Published
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Preview">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-lg">edit</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Archive">
+<span class="material-symbols-outlined text-lg">archive</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+<td class="px-6 py-4">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-bold text-gray-900 dark:text-white">Listening Section 4: Lecture</span>
+<span class="text-xs text-text-muted-light dark:text-gray-500 truncate max-w-xs">University lecture on marine biology...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-500 text-lg">headphones</span>
+<span class="text-gray-700 dark:text-gray-300">Listening</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                        Section 4
+                                    </span>
+</td>
+<td class="px-6 py-4 text-text-muted-light dark:text-gray-500">
+                                    Oct 20, 2023
+                                    <div class="text-xs text-gray-400">by Sarah K.</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+<span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        Archived
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Preview">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-lg">edit</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Archive">
+<span class="material-symbols-outlined text-lg">unarchive</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+<td class="px-6 py-4">
+<input class="rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800 dark:border-gray-700" type="checkbox"/>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-bold text-gray-900 dark:text-white">Speaking Part 1: Hobbies</span>
+<span class="text-xs text-text-muted-light dark:text-gray-500 truncate max-w-xs">Introductory questions about leisure time...</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">mic</span>
+<span class="text-gray-700 dark:text-gray-300">Speaking</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                                        Part 1
+                                    </span>
+</td>
+<td class="px-6 py-4 text-text-muted-light dark:text-gray-500">
+                                    Oct 18, 2023
+                                    <div class="text-xs text-gray-400">by Jane Doe</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                        Published
+                                    </span>
+</td>
+<td class="px-6 py-4 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors" title="Preview">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-lg">edit</span>
+</button>
+<button class="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Archive">
+<span class="material-symbols-outlined text-lg">archive</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+<span class="text-sm text-text-muted-light dark:text-gray-500">
+                        Showing <span class="font-medium text-gray-900 dark:text-white">1</span> to <span class="font-medium text-gray-900 dark:text-white">5</span> of <span class="font-medium text-gray-900 dark:text-white">142</span> results
+                    </span>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 text-sm font-medium text-gray-500 bg-white dark:bg-surface-darker border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50" disabled="">
+                            Previous
+                        </button>
+<button class="px-3 py-1 text-sm font-medium text-gray-700 dark:text-white bg-white dark:bg-surface-darker border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+                            Next
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50">
+<button class="bg-surface-dark text-white dark:bg-white dark:text-gray-900 p-3 rounded-full shadow-lg hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined block dark:hidden">dark_mode</span>
+<span class="material-symbols-outlined hidden dark:block">light_mode</span>
+</button>
+</div>
+
+</body></html>

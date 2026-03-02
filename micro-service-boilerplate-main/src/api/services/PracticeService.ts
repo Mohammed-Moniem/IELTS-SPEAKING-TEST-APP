@@ -297,4 +297,17 @@ export class PracticeService {
 
     return sessions;
   }
+
+  public async getSessionDetail(userId: string, sessionId: string, _headers: IRequestHeaders) {
+    const session = await PracticeSessionModel.findOne({
+      _id: sessionId,
+      user: userId
+    });
+
+    if (!session) {
+      throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'Practice session not found');
+    }
+
+    return session;
+  }
 }

@@ -11,11 +11,21 @@ export interface IExamSectionState {
   submittedAt?: Date;
 }
 
+export interface IFullExamRuntimeState {
+  currentModule?: IELTSModule;
+  currentQuestionIndex?: number;
+  remainingSecondsByModule?: Partial<Record<IELTSModule, number>>;
+  interruptedAt?: Date;
+  lastHeartbeatAt?: Date;
+  resumeToken?: string;
+}
+
 export interface IFullExamSession {
   userId: Types.ObjectId;
   track: IELTSModuleTrack;
   status: 'in_progress' | 'completed';
   sections: IExamSectionState[];
+  runtime?: IFullExamRuntimeState;
   overallBand?: number;
   startedAt: Date;
   completedAt?: Date;
@@ -44,6 +54,26 @@ const ExamSectionStateSchema = new Schema<IExamSectionState>(
   { _id: false }
 );
 
+const FullExamRuntimeSchema = new Schema<IFullExamRuntimeState>(
+  {
+    currentModule: {
+      type: String,
+      enum: ['speaking', 'writing', 'reading', 'listening']
+    },
+    currentQuestionIndex: { type: Number, min: 0 },
+    remainingSecondsByModule: {
+      speaking: { type: Number, min: 0 },
+      writing: { type: Number, min: 0 },
+      reading: { type: Number, min: 0 },
+      listening: { type: Number, min: 0 }
+    },
+    interruptedAt: { type: Date },
+    lastHeartbeatAt: { type: Date },
+    resumeToken: { type: String }
+  },
+  { _id: false }
+);
+
 const FullExamSessionSchema = new Schema<IFullExamSession>(
   {
     userId: {
@@ -67,6 +97,10 @@ const FullExamSessionSchema = new Schema<IFullExamSession>(
     sections: {
       type: [ExamSectionStateSchema],
       default: []
+    },
+    runtime: {
+      type: FullExamRuntimeSchema,
+      default: {}
     },
     overallBand: {
       type: Number,

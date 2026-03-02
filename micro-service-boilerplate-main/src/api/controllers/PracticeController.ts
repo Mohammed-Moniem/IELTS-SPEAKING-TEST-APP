@@ -114,6 +114,24 @@ export class PracticeController {
     }
   }
 
+  @Get('/sessions/:sessionId')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async getSessionDetail(@Params() params: PracticeSessionParam, @Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'practice-detail');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const session = await this.practiceService.getSessionDetail(req.currentUser.id, params.sessionId, headers);
+      return StandardResponse.success(res, session, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
   /**
    * Upload audio recording for a practice session
    * Endpoint: POST /api/v1/practice/sessions/:sessionId/audio

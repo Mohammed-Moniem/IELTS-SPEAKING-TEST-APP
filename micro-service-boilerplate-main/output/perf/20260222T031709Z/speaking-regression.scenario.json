@@ -1,0 +1,54 @@
+{
+  "scenarios": [
+    {
+      "name": "speaking-evaluate",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/speech/evaluate",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDBmYjY2YzJhZGViMDkyNWExYWYzNDIiLCJlbWFpbCI6InBlcmYuMTc3MTczMDIyNkBleGFtcGxlLmNvbSIsInBsYW4iOiJmcmVlIiwicm9sZXMiOltdLCJpYXQiOjE3NzE3MzAyMjgsImV4cCI6MTc3MTczMTEyOCwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.4fliGR8Jahd4u_OpAN6sn6o4f8XvC4fHY1o8TfVHZMA",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "transcript": "I recently joined a weekend speaking club to improve my fluency and confidence in IELTS speaking tasks.",
+        "question": "Describe a skill you improved recently and explain why it matters.",
+        "testPart": 2
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2,
+        4
+      ],
+      "requests_per_level": 18,
+      "warmup_requests": 4,
+      "timeout": 90
+    },
+    {
+      "name": "speaking-synthesize",
+      "method": "POST",
+      "url": "http://127.0.0.1:4000/api/v1/speech/synthesize",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmNDBmYjY2YzJhZGViMDkyNWExYWYzNDIiLCJlbWFpbCI6InBlcmYuMTc3MTczMDIyNkBleGFtcGxlLmNvbSIsInBsYW4iOiJmcmVlIiwicm9sZXMiOltdLCJpYXQiOjE3NzE3MzAyMjgsImV4cCI6MTc3MTczMTEyOCwiaXNzIjoiaWVsdHMtc3BlYWtpbmctcHJhY3RpY2UtYXBpIn0.4fliGR8Jahd4u_OpAN6sn6o4f8XvC4fHY1o8TfVHZMA",
+        "Content-Type": "application/json"
+      },
+      "json": {
+        "text": "Please listen carefully and respond with clear examples.",
+        "voiceId": "alloy"
+      },
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "concurrency": [
+        1,
+        2
+      ],
+      "requests_per_level": 16,
+      "warmup_requests": 4,
+      "timeout": 60
+    }
+  ]
+}

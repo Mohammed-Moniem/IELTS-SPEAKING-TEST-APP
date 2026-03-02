@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { BlogIndexPage } from '@/components/blog/BlogIndexPage';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 
 export const metadata: Metadata = {
   title: 'IELTS Blog',
@@ -18,7 +17,6 @@ export const metadata: Metadata = {
   }
 };
 
-export default async function BlogPage() {
-  const marketingVariant = await getServerMarketingVariant();
-  return <BlogIndexPage isMotionVariant={marketingVariant === 'motion'} />;
+export default function BlogPage() {
+  return <BlogIndexPage />;
 }

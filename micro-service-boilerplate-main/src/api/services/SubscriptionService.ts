@@ -10,21 +10,116 @@ import { Logger } from '@lib/logger';
 import { SubscriptionDocument, SubscriptionModel, SubscriptionStatus } from '@models/SubscriptionModel';
 import { SubscriptionPlan, UserModel } from '@models/UserModel';
 
-import { StripeService } from './StripeService';
+import { PartnerProgramService } from './PartnerProgramService';
+import { BillingCycle, StripeService } from './StripeService';
 
-const PLAN_METADATA: Record<SubscriptionPlan, { label: string; features: string[] }> = {
+type PlanMetadata = {
+  label: string;
+  headline: string;
+  description: string;
+  features: string[];
+};
+
+type PlanCatalogEntry = {
+  tier: SubscriptionPlan;
+  name: string;
+  headline: string;
+  description: string;
+  audience: string;
+  recommended?: boolean;
+  features: string[];
+  pricing: {
+    currency: 'USD';
+    monthly: {
+      amount: number;
+      priceId?: string;
+    };
+    annual?: {
+      amount: number;
+      priceId?: string;
+      savingsPercent: number;
+    };
+  };
+  limits: {
+    practiceSessionsPerMonth: number;
+    simulationSessionsPerMonth: number;
+    writingSubmissionsPerMonth: number;
+    readingAttemptsPerMonth: number;
+    listeningAttemptsPerMonth: number;
+  };
+};
+
+const PLAN_METADATA: Record<SubscriptionPlan, PlanMetadata> = {
   free: {
     label: 'Free',
-    features: ['3 practice sessions / month', '1 test simulation / month']
+    headline: 'Build your IELTS baseline',
+    description: 'Start with structured practice and progress tracking before upgrading.',
+    features: [
+      '3 speaking practice sessions / month',
+      '1 speaking simulation / month',
+      '2 writing submissions / month',
+      '2 reading and 2 listening attempts / month'
+    ]
   },
   premium: {
     label: 'Premium',
-    features: ['Unlimited practice sessions', 'Unlimited test simulations', 'Enhanced AI feedback']
+    headline: 'Consistent learner momentum',
+    description: 'Best fit for daily solo prep across all IELTS modules with richer feedback depth.',
+    features: [
+      'Expanded usage across speaking, writing, reading, and listening',
+      'Detailed AI scoring with actionable feedback',
+      'Full progress history with cross-module tracking'
+    ]
   },
   pro: {
     label: 'Pro',
-    features: ['All premium features', 'Priority feedback queue', 'Early access to new topics']
+    headline: 'Serious exam acceleration',
+    description: 'For high-intensity prep with priority processing and deeper exam simulation cadence.',
+    features: [
+      'Everything in Premium',
+      'Priority scoring queue during peak usage',
+      'Advanced analytics and full mock readiness'
+    ]
+  },
+  team: {
+    label: 'Team',
+    headline: 'Small cohorts and coaching teams',
+    description: 'Shared operational plan for mentors or training cohorts with higher throughput.',
+    features: [
+      'Everything in Pro',
+      'Higher throughput for coach-assisted programs',
+      'Priority billing and operational support lane'
+    ]
   }
+};
+
+const PLAN_PRICE_BOOK: Record<Exclude<SubscriptionPlan, 'free'>, { monthly: number; annual: number }> = {
+  premium: { monthly: 14, annual: 140 },
+  pro: { monthly: 29, annual: 290 },
+  team: { monthly: 79, annual: 790 }
+};
+
+const PLAN_AUDIENCE: Record<SubscriptionPlan, string> = {
+  free: 'New learners evaluating the platform',
+  premium: 'Daily independent IELTS learners',
+  pro: 'High-frequency learners targeting faster band gains',
+  team: 'Coaches, institutions, and study cohorts'
+};
+
+const PLAN_LIMITS: PlanCatalogEntry['limits'] = {
+  practiceSessionsPerMonth: 3,
+  simulationSessionsPerMonth: 1,
+  writingSubmissionsPerMonth: 2,
+  readingAttemptsPerMonth: 2,
+  listeningAttemptsPerMonth: 2
+};
+
+const PAID_PLAN_LIMITS: PlanCatalogEntry['limits'] = {
+  practiceSessionsPerMonth: -1,
+  simulationSessionsPerMonth: -1,
+  writingSubmissionsPerMonth: -1,
+  readingAttemptsPerMonth: -1,
+  listeningAttemptsPerMonth: -1
 };
 
 type SubscriptionUpdateOptions = {
@@ -40,7 +135,10 @@ type SubscriptionUpdateOptions = {
 export class SubscriptionService {
   private log = new Logger(__filename);
 
-  constructor(private readonly stripeService: StripeService) {}
+  constructor(
+    private readonly stripeService: StripeService,
+    private readonly partnerProgramService: PartnerProgramService
+  ) {}
 
   private async getOrCreateSubscription(userId: string): Promise<SubscriptionDocument> {
     let subscription = (await SubscriptionModel.findOne({ user: userId })) as SubscriptionDocument | null;
@@ -56,14 +154,99 @@ export class SubscriptionService {
   }
 
   public getStripeConfiguration() {
-    return {
-      enabled: this.stripeService.isConfigured(),
-      publishableKey: this.stripeService.getPublishableKey(),
-      prices: {
-        premium: this.stripeService.getPriceId('premium'),
-        pro: this.stripeService.getPriceId('pro')
+    const enabled = this.stripeService.isConfigured();
+    const mode = this.stripeService.getMode();
+    const priceMatrix = {
+      premium: {
+        monthly: this.stripeService.getPriceId('premium', 'monthly'),
+        annual: this.stripeService.getPriceId('premium', 'annual')
+      },
+      pro: {
+        monthly: this.stripeService.getPriceId('pro', 'monthly'),
+        annual: this.stripeService.getPriceId('pro', 'annual')
+      },
+      team: {
+        monthly: this.stripeService.getPriceId('team', 'monthly'),
+        annual: this.stripeService.getPriceId('team', 'annual')
       }
     };
+
+    return {
+      enabled,
+      mode,
+      publishableKey: this.stripeService.getPublishableKey(),
+      portalEnabled: enabled && mode !== 'disabled',
+      billingPortalReturnUrl: env.payments?.stripe?.billingPortalReturnUrl,
+      prices: {
+        premium: priceMatrix.premium.monthly,
+        pro: priceMatrix.pro.monthly,
+        team: priceMatrix.team.monthly
+      },
+      priceMatrix,
+      plans: this.getPlansCatalog().map(plan => ({
+        tier: plan.tier,
+        name: plan.name,
+        price: plan.pricing.monthly.amount,
+        currency: plan.pricing.currency.toLowerCase(),
+        description: plan.description,
+        features: plan.features,
+        limits: {
+          practice: plan.limits.practiceSessionsPerMonth,
+          simulation: plan.limits.simulationSessionsPerMonth
+        }
+      }))
+    };
+  }
+
+  public getPlansCatalog(): PlanCatalogEntry[] {
+    return (Object.keys(PLAN_METADATA) as SubscriptionPlan[]).map(planType => {
+      const metadata = PLAN_METADATA[planType];
+      const isFree = planType === 'free';
+
+      if (isFree) {
+        return {
+          tier: planType,
+          name: metadata.label,
+          headline: metadata.headline,
+          description: metadata.description,
+          audience: PLAN_AUDIENCE[planType],
+          features: metadata.features,
+          pricing: {
+            currency: 'USD',
+            monthly: {
+              amount: 0
+            }
+          },
+          limits: PLAN_LIMITS
+        };
+      }
+
+      const priceBook = PLAN_PRICE_BOOK[planType];
+      const annualSavingsPercent = Math.max(0, Math.round((1 - priceBook.annual / (priceBook.monthly * 12)) * 100));
+
+      return {
+        tier: planType,
+        name: metadata.label,
+        headline: metadata.headline,
+        description: metadata.description,
+        audience: PLAN_AUDIENCE[planType],
+        recommended: planType === 'pro',
+        features: metadata.features,
+        pricing: {
+          currency: 'USD',
+          monthly: {
+            amount: priceBook.monthly,
+            priceId: this.stripeService.getPriceId(planType, 'monthly')
+          },
+          annual: {
+            amount: priceBook.annual,
+            priceId: this.stripeService.getPriceId(planType, 'annual'),
+            savingsPercent: annualSavingsPercent
+          }
+        },
+        limits: PAID_PLAN_LIMITS
+      };
+    });
   }
 
   public async getCurrentSubscription(userId: string, headers: IRequestHeaders) {
@@ -87,7 +270,13 @@ export class SubscriptionService {
     userId: string,
     planType: SubscriptionPlan,
     headers: IRequestHeaders,
-    urls?: { successUrl?: string; cancelUrl?: string }
+    options?: {
+      successUrl?: string;
+      cancelUrl?: string;
+      billingCycle?: BillingCycle;
+      partnerCode?: string;
+      couponCode?: string;
+    }
   ) {
     const logMessage = constructLogMessage(__filename, 'createCheckoutSession', headers);
 
@@ -113,30 +302,107 @@ export class SubscriptionService {
       throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'User not found');
     }
 
+    const billingCycle = options?.billingCycle || 'monthly';
     const successUrl =
-      urls?.successUrl ||
+      options?.successUrl ||
       env.payments?.stripe?.defaultSuccessUrl ||
       `${env.app.schema}://${env.app.host}/payments/success`;
     const cancelUrl =
-      urls?.cancelUrl ||
+      options?.cancelUrl ||
       env.payments?.stripe?.defaultCancelUrl ||
       `${env.app.schema}://${env.app.host}/payments/cancel`;
+    const idempotencyKey = `checkout:${userId}:${planType}:${billingCycle}:${headers.urc}`;
+
+    const partnerProgramEnabled = await this.partnerProgramService.isEnabled();
+    let attributionContext: Awaited<ReturnType<typeof this.partnerProgramService.getLatestAttributionForUser>> | null = null;
+
+    if (partnerProgramEnabled) {
+      if (options?.partnerCode) {
+        attributionContext = await this.partnerProgramService.recordAttributionTouch({
+          code: options.partnerCode,
+          source: 'checkout',
+          userId,
+          email: user.email,
+          strict: true
+        });
+      } else {
+        attributionContext = await this.partnerProgramService.getLatestAttributionForUser(userId);
+      }
+    } else if (options?.partnerCode) {
+      throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, 'Partner program is not available yet');
+    }
+
+    const promotionCodeId = partnerProgramEnabled
+      ? await this.partnerProgramService.resolvePromotionCodeIdForCheckout(this.stripeService, {
+          partnerCodeDoc: attributionContext?.partnerCode || undefined,
+          couponCode: options?.couponCode
+        })
+      : options?.couponCode
+        ? await this.stripeService.findPromotionCodeIdByCode(options.couponCode.trim().toUpperCase())
+        : undefined;
 
     const session = await this.stripeService.createCheckoutSession({
       userId,
       planType,
+      billingCycle,
       successUrl,
       cancelUrl,
       customerId: subscription.stripeCustomerId,
-      customerEmail: user.email
+      customerEmail: user.email,
+      idempotencyKey,
+      promotionCodeId,
+      couponCode: options?.couponCode?.trim().toUpperCase(),
+      partnerAttribution: attributionContext
+        ? {
+            partnerId: attributionContext.partner._id.toString(),
+            partnerCodeId: attributionContext.partnerCode._id.toString(),
+            partnerCode: attributionContext.partnerCode.code
+          }
+        : undefined
     });
 
-    this.log.info(`${logMessage} :: Created Stripe checkout session ${session.id} for plan ${planType}`);
+    this.log.info(`${logMessage} :: Created Stripe checkout session ${session.id} for plan ${planType}/${billingCycle}`);
 
     return {
       sessionId: session.id,
       checkoutUrl: session.url,
-      publishableKey: this.stripeService.getPublishableKey()
+      publishableKey: this.stripeService.getPublishableKey(),
+      billingCycle
+    };
+  }
+
+  public async createPortalSession(userId: string, headers: IRequestHeaders, returnUrl?: string) {
+    const logMessage = constructLogMessage(__filename, 'createPortalSession', headers);
+
+    if (!this.stripeService.isConfigured()) {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.StripeError,
+        'Stripe integration is not configured'
+      );
+    }
+
+    const subscription = await this.getOrCreateSubscription(userId);
+    if (!subscription.stripeCustomerId) {
+      throw new CSError(
+        HTTP_STATUS_CODES.BAD_REQUEST,
+        CODES.InvalidBody,
+        'No Stripe customer is linked to this account yet'
+      );
+    }
+
+    const resolvedReturnUrl =
+      returnUrl || env.payments?.stripe?.billingPortalReturnUrl || `${env.app.schema}://${env.app.host}/app/billing`;
+
+    const portalSession = await this.stripeService.createBillingPortalSession({
+      customerId: subscription.stripeCustomerId,
+      returnUrl: resolvedReturnUrl
+    });
+
+    this.log.info(`${logMessage} :: Created Stripe billing portal session for user ${userId}`);
+
+    return {
+      portalUrl: portalSession.url
     };
   }
 
@@ -211,6 +477,55 @@ export class SubscriptionService {
           isTrialActive: false,
           trialEndsAt: undefined
         });
+        break;
+      }
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice;
+        if (invoice.billing_reason !== 'subscription_create') {
+          this.log.debug(`${logMessage} :: Ignoring invoice.paid event ${invoice.id} with reason ${invoice.billing_reason}`);
+          break;
+        }
+
+        if (!(await this.partnerProgramService.isEnabled())) {
+          break;
+        }
+
+        try {
+          const rawInvoice = invoice as unknown as { subscription?: string | { id?: string } };
+          const subscriptionId =
+            typeof rawInvoice.subscription === 'string' ? rawInvoice.subscription : rawInvoice.subscription?.id;
+
+          let metadata: {
+            userId?: string;
+            partnerId?: string;
+            partnerCodeId?: string;
+            partnerCode?: string;
+          } = {
+            userId: invoice.metadata?.userId,
+            partnerId: invoice.metadata?.partnerId,
+            partnerCodeId: invoice.metadata?.partnerCodeId,
+            partnerCode: invoice.metadata?.partnerCode
+          };
+
+          if (subscriptionId) {
+            const stripeSubscription = await this.stripeService.getSubscription(subscriptionId);
+            metadata = {
+              userId: stripeSubscription.metadata?.userId || metadata.userId,
+              partnerId: stripeSubscription.metadata?.partnerId || metadata.partnerId,
+              partnerCodeId: stripeSubscription.metadata?.partnerCodeId || metadata.partnerCodeId,
+              partnerCode: stripeSubscription.metadata?.partnerCode || metadata.partnerCode
+            };
+          }
+
+          await this.partnerProgramService.recordConversionFromInvoice({
+            eventId: event.id,
+            eventType: event.type,
+            invoice,
+            metadata
+          });
+        } catch (error) {
+          this.log.error(`${logMessage} :: Failed to process partner conversion from invoice.paid`, { error });
+        }
         break;
       }
       default:

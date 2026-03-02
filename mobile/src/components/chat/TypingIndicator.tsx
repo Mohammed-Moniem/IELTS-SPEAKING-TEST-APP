@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import {
   typingIndicatorService,
   TypingUser,
 } from "../../services/typingIndicatorService";
+import type { ColorTokens } from "../../theme/tokens";
 
 interface TypingIndicatorProps {
   conversationId: string;
@@ -20,6 +23,8 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   currentUserId,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [typingText, setTypingText] = useState<string>("");
 
@@ -130,37 +135,38 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    marginHorizontal: 16,
-    marginVertical: 4,
-  },
-  bubble: {
-    backgroundColor: "#E5E5EA",
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 50,
-  },
-  dotsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#8E8E93",
-  },
-  typingText: {
-    fontSize: 12,
-    color: "#8E8E93",
-    marginTop: 4,
-    marginLeft: 12,
-    fontStyle: "italic",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+      marginHorizontal: 16,
+      marginVertical: 4,
+    },
+    bubble: {
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      minWidth: 50,
+    },
+    dotsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.textMuted,
+    },
+    typingText: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 4,
+      marginLeft: 12,
+      fontStyle: "italic",
+    },
+  });

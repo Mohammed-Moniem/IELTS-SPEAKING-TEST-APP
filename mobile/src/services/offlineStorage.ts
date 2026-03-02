@@ -5,6 +5,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import { logger } from "../utils/logger";
 
 interface QueuedEvaluation {
   id: string;
@@ -63,7 +64,7 @@ class OfflineStorageService {
       );
       console.log("✅ Queued evaluation:", data.id);
     } catch (error) {
-      console.error("❌ Failed to queue evaluation:", error);
+      logger.warn("❌ Failed to queue evaluation:", error);
       throw error;
     }
   }
@@ -76,7 +77,7 @@ class OfflineStorageService {
       const data = await AsyncStorage.getItem(this.KEYS.QUEUED_EVALUATIONS);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error("❌ Failed to get queued evaluations:", error);
+      logger.warn("❌ Failed to get queued evaluations:", error);
       return [];
     }
   }
@@ -94,7 +95,7 @@ class OfflineStorageService {
       );
       console.log("✅ Removed from queue:", id);
     } catch (error) {
-      console.error("❌ Failed to remove from queue:", error);
+      logger.warn("❌ Failed to remove from queue:", error);
     }
   }
 
@@ -114,7 +115,7 @@ class OfflineStorageService {
       );
       console.log(`✅ Cached ${topics.length} topics`);
     } catch (error) {
-      console.error("❌ Failed to cache topics:", error);
+      logger.warn("❌ Failed to cache topics:", error);
     }
   }
 
@@ -144,7 +145,7 @@ class OfflineStorageService {
 
       return validTopics;
     } catch (error) {
-      console.error("❌ Failed to get cached topics:", error);
+      logger.warn("❌ Failed to get cached topics:", error);
       return [];
     }
   }
@@ -162,7 +163,7 @@ class OfflineStorageService {
       );
       console.log("✅ Saved offline recording:", recording.id);
     } catch (error) {
-      console.error("❌ Failed to save offline recording:", error);
+      logger.warn("❌ Failed to save offline recording:", error);
       throw error;
     }
   }
@@ -175,7 +176,7 @@ class OfflineStorageService {
       const data = await AsyncStorage.getItem(this.KEYS.OFFLINE_RECORDINGS);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error("❌ Failed to get offline recordings:", error);
+      logger.warn("❌ Failed to get offline recordings:", error);
       return [];
     }
   }
@@ -193,7 +194,7 @@ class OfflineStorageService {
       );
       console.log("✅ Removed offline recording:", id);
     } catch (error) {
-      console.error("❌ Failed to remove offline recording:", error);
+      logger.warn("❌ Failed to remove offline recording:", error);
     }
   }
 
@@ -232,7 +233,7 @@ class OfflineStorageService {
         console.log(`✅ Processed queued item: ${item.id}`);
       } catch (error) {
         failedCount++;
-        console.error(`❌ Failed to process queued item: ${item.id}`, error);
+        logger.warn(`❌ Failed to process queued item: ${item.id}`, error);
         // Keep in queue for retry later
       }
     }
@@ -252,7 +253,7 @@ class OfflineStorageService {
     try {
       await AsyncStorage.setItem(this.KEYS.LAST_SYNC, Date.now().toString());
     } catch (error) {
-      console.error("❌ Failed to update last sync:", error);
+      logger.warn("❌ Failed to update last sync:", error);
     }
   }
 
@@ -264,7 +265,7 @@ class OfflineStorageService {
       const timestamp = await AsyncStorage.getItem(this.KEYS.LAST_SYNC);
       return timestamp ? parseInt(timestamp, 10) : null;
     } catch (error) {
-      console.error("❌ Failed to get last sync:", error);
+      logger.warn("❌ Failed to get last sync:", error);
       return null;
     }
   }
@@ -280,7 +281,7 @@ class OfflineStorageService {
       ]);
       console.log("✅ Cleared cache");
     } catch (error) {
-      console.error("❌ Failed to clear cache:", error);
+      logger.warn("❌ Failed to clear cache:", error);
     }
   }
 
@@ -297,7 +298,7 @@ class OfflineStorageService {
       ]);
       console.log("✅ Cleared all offline data");
     } catch (error) {
-      console.error("❌ Failed to clear all data:", error);
+      logger.warn("❌ Failed to clear all data:", error);
     }
   }
 

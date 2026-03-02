@@ -19,6 +19,8 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -28,6 +30,8 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   loading,
   style,
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -36,6 +40,12 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{
+        disabled: Boolean(isDisabled),
+        busy: Boolean(loading),
+      }}
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [
@@ -52,6 +62,8 @@ export const Button: React.FC<ButtonProps> = ({
         />
       ) : (
         <Text
+          allowFontScaling
+          maxFontSizeMultiplier={1.3}
           style={[
             styles.label,
             variant === "ghost" ? styles.ghostLabel : undefined,
@@ -67,6 +79,7 @@ export const Button: React.FC<ButtonProps> = ({
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
     base: {
+      minHeight: 44,
       paddingVertical: spacing.sm + 2,
       paddingHorizontal: spacing.md,
       borderRadius: radii.xxl,
