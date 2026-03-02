@@ -1,0 +1,30 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="panel" x1="160" y1="40" x2="1480" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B21B6"/>
+      <stop offset="0.52" stop-color="#4C1D95"/>
+      <stop offset="1" stop-color="#34176D"/>
+    </linearGradient>
+    <linearGradient id="lineH" x1="0" y1="0" x2="1600" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDD6FE"/>
+    </linearGradient>
+    <linearGradient id="lineV" x1="0" y1="0" x2="0" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F3FF"/>
+      <stop offset="1" stop-color="#C4B5FD"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#panel)"/>
+  <path d="M0 150H1600" stroke="url(#lineH)" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M0 300H1600" stroke="url(#lineH)" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M0 450H1600" stroke="url(#lineH)" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M0 600H1600" stroke="url(#lineH)" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M0 750H1600" stroke="url(#lineH)" stroke-opacity="0.28" stroke-width="1"/>
+  <path d="M200 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M400 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M600 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M800 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M1000 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M1200 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+  <path d="M1400 0V900" stroke="url(#lineV)" stroke-opacity="0.24" stroke-width="1"/>
+</svg>

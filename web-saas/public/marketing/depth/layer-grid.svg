@@ -1,0 +1,15 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#F8FAFC"/>
+  <path d="M0 150H1600" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M0 300H1600" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M0 450H1600" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M0 600H1600" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M0 750H1600" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M200 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M400 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M600 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M800 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M1000 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M1200 0V900" stroke="#E2E8F0" stroke-width="1"/>
+  <path d="M1400 0V900" stroke="#E2E8F0" stroke-width="1"/>
+</svg>

@@ -80,6 +80,8 @@ dist
 # Gatsby files
 .cache/
 public
+!web-saas/public/
+!web-saas/public/**
 
 # Storybook build outputs
 .out
