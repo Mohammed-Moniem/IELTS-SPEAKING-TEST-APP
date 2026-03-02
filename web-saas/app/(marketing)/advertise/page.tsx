@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
+import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
+import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
+
 export const metadata: Metadata = {
   title: 'Advertise with Spokio',
   description:
@@ -71,31 +75,43 @@ const packages = [
   }
 ];
 
-export default function AdvertisePage() {
+export default async function AdvertisePage() {
+  const marketingVariant = await getServerMarketingVariant();
+  const isMotionVariant = marketingVariant === 'motion';
+
   return (
     <div className="space-y-10 lg:space-y-14" data-testid="marketing-advertise-page">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-10 lg:p-16 text-white">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-        <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-fuchsia-300/25 rounded-full blur-[110px]" />
-        <div className="absolute bottom-0 left-0 w-[320px] h-[320px] bg-violet-300/20 rounded-full blur-[100px]" />
-        <div className="relative z-10 max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-            <span className="material-symbols-outlined text-[14px]">campaign</span>
-            Sponsorship + Affiliate
-          </span>
-          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Advertise with Spokio</h1>
-          <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
-            Reach IELTS learners with policy-reviewed placements, measurable delivery, and attribution aligned with our
-            affiliate engine. We support monthly, quarterly, and annual sponsorship programs.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">110K+ monthly page views</span>
-            <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">38K+ active learners</span>
-            <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">4 core IELTS modules</span>
+      {isMotionVariant ? (
+        <MarketingPageHero
+          variant="full"
+          animated
+          badge={{ icon: 'campaign', text: 'Sponsorship + Affiliate' }}
+          title="Advertise with Spokio"
+          description="Reach IELTS learners with policy-reviewed placements, measurable delivery, and attribution aligned with our affiliate engine. We support monthly, quarterly, and annual sponsorship programs."
+        />
+      ) : (
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-10 lg:p-16 text-white">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+          <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-fuchsia-300/25 rounded-full blur-[110px]" />
+          <div className="absolute bottom-0 left-0 w-[320px] h-[320px] bg-violet-300/20 rounded-full blur-[100px]" />
+          <div className="relative z-10 max-w-3xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+              <span className="material-symbols-outlined text-[14px]">campaign</span>
+              Sponsorship + Affiliate
+            </span>
+            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Advertise with Spokio</h1>
+            <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
+              Reach IELTS learners with policy-reviewed placements, measurable delivery, and attribution aligned with our
+              affiliate engine. We support monthly, quarterly, and annual sponsorship programs.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">110K+ monthly page views</span>
+              <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">38K+ active learners</span>
+              <span className="rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5 font-semibold">4 core IELTS modules</span>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-violet-900/50 dark:bg-[#12082e]/90">
@@ -111,9 +127,10 @@ export default function AdvertisePage() {
           </ul>
         </article>
 
-        <article className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-violet-900/50 dark:bg-[#12082e]/90">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Package Catalog</h2>
-          <div className="mt-3 space-y-3">
+        <article className="relative isolate overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-violet-900/50 dark:bg-[#12082e]/90">
+          {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
+          <h2 className="relative z-10 text-lg font-bold text-gray-900 dark:text-white">Package Catalog</h2>
+          <div className="relative z-10 mt-3 space-y-3">
             {packages.map(pkg => (
               <div key={pkg.name} className="rounded-xl border border-gray-200 p-3 dark:border-violet-900/50">
                 <div className="flex items-center justify-between gap-2">

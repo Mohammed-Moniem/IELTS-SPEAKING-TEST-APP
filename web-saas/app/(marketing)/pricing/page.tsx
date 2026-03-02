@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
+import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
 import { PricingMotionCallout } from '@/components/marketing/PricingMotionCallout';
 import { TrackedMarketingLink } from '@/components/marketing/TrackedMarketingLink';
 import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
@@ -100,44 +102,55 @@ export default async function PricingPage() {
     <div className="space-y-10 lg:space-y-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }} />
 
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-10 lg:p-16 text-white text-center">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-        <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/15 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-violet-300/25 rounded-full blur-[100px]" />
-        <div className="relative z-10 mx-auto max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-            <span className="material-symbols-outlined text-[14px]">payments</span>
-            Flexible Plans
-          </span>
-          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Simple Pricing for Every IELTS Preparation Stage</h1>
-          <p className="mt-4 text-lg text-white/80 leading-relaxed">
-            Start with a free full test, then upgrade when you need higher usage, deeper feedback, and faster progress.
-          </p>
-        </div>
-      </section>
+      {isMotionVariant ? (
+        <MarketingPageHero
+          variant="full"
+          animated
+          badge={{ icon: 'payments', text: 'Flexible Plans' }}
+          title="Simple Pricing for Every IELTS Preparation Stage"
+          description="Start with a free full test, then upgrade when you need higher usage, deeper feedback, and faster progress."
+        />
+      ) : (
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] p-10 lg:p-16 text-white text-center">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+          <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/15 rounded-full blur-[120px]" />
+          <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-violet-300/25 rounded-full blur-[100px]" />
+          <div className="relative z-10 mx-auto max-w-3xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+              <span className="material-symbols-outlined text-[14px]">payments</span>
+              Flexible Plans
+            </span>
+            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Simple Pricing for Every IELTS Preparation Stage</h1>
+            <p className="mt-4 text-lg text-white/80 leading-relaxed">
+              Start with a free full test, then upgrade when you need higher usage, deeper feedback, and faster progress.
+            </p>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map(plan => (
           <article
             key={plan.name}
-            className={`group relative overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 p-7 space-y-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl motion-tilt-card ${plan.tier === 'premium'
+            className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white dark:bg-gray-900 p-7 space-y-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl motion-tilt-card ${
+              plan.tier === 'pro'
                 ? 'border-violet-400 dark:border-violet-500 ring-2 ring-violet-600/30 shadow-lg shadow-violet-500/10 hover:shadow-violet-500/20'
-                : plan.tier === 'pro'
-                  ? 'border-violet-300 dark:border-violet-500/40 hover:shadow-violet-500/20'
-                  : 'border-gray-200 dark:border-gray-800 hover:shadow-violet-500/10'
-              }`}
+                : 'border-gray-200 dark:border-gray-800 hover:shadow-violet-500/10'
+            }`}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-violet-50/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-violet-500/5" />
-            {plan.tier === 'premium' ? <span className="absolute -top-3 left-4 rounded-full bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/25">Most Popular</span> : null}
-            {plan.tier === 'pro' ? <span className="absolute -top-3 left-4 rounded-full bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white flex items-center gap-1 shadow-lg shadow-violet-500/25"><span className="material-symbols-outlined text-[14px]">verified</span>Guarantee</span> : null}
+            {plan.tier === 'pro' ? (
+              <span className="absolute -top-3 left-4 rounded-full bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/25">
+                Most Popular
+              </span>
+            ) : null}
             <div className="relative z-10">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
               <p className="text-4xl font-extrabold text-gray-900 dark:text-white mt-2">{plan.priceMonthly}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Annual: {plan.priceAnnual}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{plan.note}</p>
             </div>
-            <ul className="relative z-10 space-y-2.5 text-sm text-gray-700 dark:text-gray-300">
+            <ul className="relative z-10 flex-1 space-y-2.5 text-sm text-gray-700 dark:text-gray-300">
               {plan.bullets.map(item => (
                 <li key={item} className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-[16px] text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0">check_circle</span>
@@ -151,7 +164,7 @@ export default async function PricingPage() {
               section="pricing-plans"
               trackPricingSelect
               planTier={plan.tier}
-              className="relative z-10 inline-flex items-center justify-center w-full rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all shadow-lg shadow-violet-500/25 hover:-translate-y-0.5"
+              className="relative z-10 mt-auto inline-flex items-center justify-center w-full rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all shadow-lg shadow-violet-500/25 hover:-translate-y-0.5"
             >
               {plan.tier === 'pro' ? 'Choose Pro (Recommended)' : `Choose ${plan.name}`}
             </TrackedMarketingLink>
@@ -161,16 +174,17 @@ export default async function PricingPage() {
 
       {isMotionVariant ? <PricingMotionCallout /> : null}
 
-      <article className="rounded-2xl border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-50 to-white dark:from-violet-500/10 dark:to-[#12082e] p-6 space-y-4">
-        <div className="flex items-center gap-3">
+      <article className="relative isolate overflow-hidden rounded-2xl border border-violet-200 dark:border-violet-800/50 bg-gradient-to-br from-violet-50 to-white dark:from-violet-500/10 dark:to-[#12082e] p-6 space-y-4">
+        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
+        <div className="relative z-10 flex items-center gap-3">
           <span className="material-symbols-outlined text-[24px] text-violet-600 dark:text-violet-300">verified</span>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">Band Score Improvement Guarantee</h3>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 max-w-3xl">
+        <p className="relative z-10 text-sm text-gray-600 dark:text-gray-400 max-w-3xl">
           Pro subscribers who follow their study plan for 90 days (at least 3 sessions per week) are guaranteed a minimum
           0.5 band improvement. If you don&apos;t improve, we extend your Pro subscription free for another 90 days &mdash; no questions asked.
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="relative z-10 flex flex-wrap gap-3">
           <TrackedMarketingLink
             href="/register"
             ctaId="pricing_guarantee_start_pro"

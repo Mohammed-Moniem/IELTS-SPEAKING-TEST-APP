@@ -5,7 +5,25 @@ export const MARKETING_VARIANT_QUERY_PARAM = 'mkt_variant';
 export const MARKETING_VARIANT_REQUEST_HEADER = 'x-spokio-mkt-motion-variant';
 export const MARKETING_VARIANT_AUDIENCE = 'individual_learner';
 
-const MARKETING_ROUTES = new Set(['/', '/pricing', '/register']);
+const MARKETING_STATIC_ROUTES = new Set([
+  '/',
+  '/about',
+  '/advertise',
+  '/blog',
+  '/contact',
+  '/editorial-policy',
+  '/features',
+  '/forgot-password',
+  '/guarantee',
+  '/ielts',
+  '/login',
+  '/methodology',
+  '/pricing',
+  '/register',
+  '/reset-password',
+  '/verify-email'
+]);
+const MARKETING_DYNAMIC_ROUTE_PREFIXES = ['/blog/', '/ielts/'];
 const FALLBACK_VARIANT: MarketingMotionVariant = 'control';
 
 export function normalizeMarketingVariant(
@@ -19,7 +37,11 @@ export function normalizeMarketingVariant(
 export function isMarketingExperimentPath(pathname: string): boolean {
   if (!pathname) return false;
   const normalized = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
-  return MARKETING_ROUTES.has(normalized);
+  if (MARKETING_STATIC_ROUTES.has(normalized)) {
+    return true;
+  }
+
+  return MARKETING_DYNAMIC_ROUTE_PREFIXES.some(prefix => normalized.startsWith(prefix));
 }
 
 export function getMarketingVariantOverride(

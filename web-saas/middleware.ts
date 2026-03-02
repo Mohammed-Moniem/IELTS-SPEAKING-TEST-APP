@@ -65,5 +65,24 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/pricing', '/register']
+  matcher: [
+    '/',
+    '/about',
+    '/advertise',
+    '/blog',
+    '/blog/:path*',
+    '/contact',
+    '/editorial-policy',
+    '/features',
+    '/forgot-password',
+    '/guarantee',
+    '/ielts',
+    '/ielts/:path*',
+    '/login',
+    '/methodology',
+    '/pricing',
+    '/register',
+    '/reset-password',
+    '/verify-email'
+  ]
 };
