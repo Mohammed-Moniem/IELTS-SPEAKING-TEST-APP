@@ -55,13 +55,13 @@ const TierCard: React.FC<TierCardProps> = ({
   const getTierColor = () => {
     switch (tier) {
       case DiscountTier.BRONZE:
-        return "#CD7F32";
+        return colors.tierBronze;
       case DiscountTier.SILVER:
-        return "#C0C0C0";
+        return colors.tierSilver;
       case DiscountTier.GOLD:
-        return "#FFD700";
+        return colors.tierGold;
       case DiscountTier.PLATINUM:
-        return "#E5E4E2";
+        return colors.tierPlatinum;
       default:
         return colors.primary;
     }
@@ -83,7 +83,7 @@ const TierCard: React.FC<TierCardProps> = ({
           <Ionicons
             name={isLocked ? "lock-closed" : "star"}
             size={24}
-            color="#fff"
+            color={colors.primaryOn}
           />
         </View>
         <View style={styles.tierInfo}>
@@ -289,10 +289,10 @@ export const RedeemDiscountScreen: React.FC<{ navigation: any }> = ({
           activeOpacity={0.8}
         >
           {isRedeeming ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.primaryOn} />
           ) : (
             <>
-              <Ionicons name="gift" size={20} color="#fff" />
+              <Ionicons name="gift" size={20} color={colors.primaryOn} />
               <Text style={styles.redeemButtonText}>Redeem Discount</Text>
             </>
           )}
@@ -545,7 +545,7 @@ const createStyles = (colors: ColorTokens) =>
   redeemButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.primaryOn,
   },
   earnMoreCard: {
     backgroundColor: colors.surface,
@@ -575,7 +575,7 @@ const createStyles = (colors: ColorTokens) =>
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.xl,
@@ -651,7 +651,7 @@ const createStyles = (colors: ColorTokens) =>
   closeModalButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.primaryOn,
     textAlign: "center",
   },
   });

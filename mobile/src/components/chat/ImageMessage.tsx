@@ -9,6 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const MAX_IMAGE_WIDTH = SCREEN_WIDTH * 0.65; // 65% of screen width
@@ -37,6 +40,8 @@ export const ImageMessage: React.FC<ImageMessageProps> = ({
   isOwnMessage,
   headers,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
@@ -98,7 +103,7 @@ export const ImageMessage: React.FC<ImageMessageProps> = ({
       {/* Loading overlay */}
       {imageLoading && !hasError && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
+          <ActivityIndicator size="large" color={colors.primaryOn} />
         </View>
       )}
 
@@ -106,7 +111,7 @@ export const ImageMessage: React.FC<ImageMessageProps> = ({
       {isUploading && (
         <View style={styles.uploadOverlay}>
           <View style={styles.uploadProgressContainer}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={colors.primaryOn} />
             <Text style={styles.uploadProgressText}>{uploadProgress}%</Text>
           </View>
         </View>
@@ -123,7 +128,7 @@ export const ImageMessage: React.FC<ImageMessageProps> = ({
               : styles.errorContainerOther,
           ]}
         >
-          <Ionicons name="alert-circle" size={40} color="#FF3B30" />
+          <Ionicons name="alert-circle" size={40} color={colors.danger} />
           <Text style={styles.errorText}>
             {uploadError || "Failed to load image"}
           </Text>
@@ -133,18 +138,19 @@ export const ImageMessage: React.FC<ImageMessageProps> = ({
       {/* Tap to view indicator (bottom right) */}
       {!isUploading && !hasError && !imageLoading && (
         <View style={styles.tapIndicator}>
-          <Ionicons name="expand" size={16} color="#FFFFFF" />
+          <Ionicons name="expand" size={16} color={colors.primaryOn} />
         </View>
       )}
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   container: {
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#E0E0E0",
+    backgroundColor: colors.borderMuted,
     position: "relative",
   },
   image: {
@@ -152,14 +158,14 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 8,
   },
   uploadOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 8,
@@ -168,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   uploadProgressText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     fontSize: 14,
     fontWeight: "600",
     marginTop: 8,
@@ -180,13 +186,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   errorContainerOwn: {
-    backgroundColor: "#DCF8C6",
+    backgroundColor: colors.successSoft,
   },
   errorContainerOther: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
   },
   errorText: {
-    color: "#FF3B30",
+    color: colors.danger,
     fontSize: 12,
     marginTop: 8,
     textAlign: "center",
@@ -195,7 +201,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 8,
     right: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: colors.overlayBackdrop,
     borderRadius: 12,
     width: 24,
     height: 24,

@@ -1,0 +1,199 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "Spokio IELTS SaaS Platform" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e6]: Spokio
+        - generic [ref=e7]: IELTS SaaS Platform
+      - navigation [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: /
+        - link "Guides" [ref=e10] [cursor=pointer]:
+          - /url: /ielts
+        - link "Blog" [ref=e11] [cursor=pointer]:
+          - /url: /blog
+        - link "Advertise" [ref=e12] [cursor=pointer]:
+          - /url: /advertise
+        - link "Features" [ref=e13] [cursor=pointer]:
+          - /url: /features
+        - link "Pricing" [ref=e14] [cursor=pointer]:
+          - /url: /pricing
+        - link "Methodology" [ref=e15] [cursor=pointer]:
+          - /url: /methodology
+        - link "About" [ref=e16] [cursor=pointer]:
+          - /url: /about
+        - link "Contact" [ref=e17] [cursor=pointer]:
+          - /url: /contact
+      - generic [ref=e18]:
+        - button "Toggle theme" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+        - link "Login" [ref=e23] [cursor=pointer]:
+          - /url: /login
+        - link "Start Free" [ref=e24] [cursor=pointer]:
+          - /url: /register
+  - main [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - generic [ref=e30]: The Complete IELTS Platform
+          - heading "Raise your IELTS band with one focused learning system." [level=1] [ref=e32]
+          - paragraph [ref=e33]: Spokio combines realistic test practice, AI feedback, and clear improvement steps so learners can move from random practice to measurable band growth.
+          - generic [ref=e34]:
+            - link "Start Free Test arrow_forward" [ref=e35] [cursor=pointer]:
+              - /url: /register
+              - generic [ref=e36]:
+                - text: Start Free Test
+                - generic [ref=e37]: arrow_forward
+            - link "View Plans" [ref=e39] [cursor=pointer]:
+              - /url: /pricing
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - generic [ref=e42]: check_circle
+              - text: Band-focused feedback
+            - generic [ref=e43]:
+              - generic [ref=e44]: check_circle
+              - text: One free full test
+            - generic [ref=e45]:
+              - generic [ref=e46]: check_circle
+              - text: No card for trial
+        - complementary [ref=e47]:
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: visibility
+              - text: Outcome Snapshot
+            - heading "From practice to test-day confidence" [level=3] [ref=e52]
+            - list [ref=e53]:
+              - listitem [ref=e54]:
+                - generic [ref=e56]: check
+                - generic [ref=e57]: Guided speaking sessions with clear rubric feedback
+              - listitem [ref=e58]:
+                - generic [ref=e60]: check
+                - generic [ref=e61]: Full test simulation with results and coaching actions
+              - listitem [ref=e62]:
+                - generic [ref=e64]: check
+                - generic [ref=e65]: Cross-module roadmap for fluency, coherence, and timing
+            - link "rocket_launch Open Learner App" [ref=e67] [cursor=pointer]:
+              - /url: /app/dashboard
+              - generic [ref=e68]: rocket_launch
+              - text: Open Learner App
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - heading "Platform Capabilities" [level=2] [ref=e71]
+          - paragraph [ref=e72]: Designed for measurable improvement, not just isolated exercises.
+        - generic [ref=e73]:
+          - article [ref=e74]:
+            - generic [ref=e77]: moving
+            - heading "Band-focused coaching loop" [level=3] [ref=e78]
+            - paragraph [ref=e79]: Every session feeds a clear next action so learners know exactly what to practice next and why.
+          - article [ref=e80]:
+            - generic [ref=e83]: hub
+            - heading "Full IELTS in one place" [level=3] [ref=e84]
+            - paragraph [ref=e85]: Speaking, writing, reading, listening, and full mocks are connected in one progress timeline.
+          - article [ref=e86]:
+            - generic [ref=e89]: devices
+            - heading "Mobile + web continuity" [level=3] [ref=e90]
+            - paragraph [ref=e91]: The same account, limits, and score history follow learners across devices without reset friction.
+          - article [ref=e92]:
+            - generic [ref=e95]: admin_panel_settings
+            - heading "Instructor-ready visibility" [level=3] [ref=e96]
+            - paragraph [ref=e97]: Partners and admins can track learner progress, subscriptions, and growth metrics from one dashboard.
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - heading "How Learners Use Spokio in Practice" [level=2] [ref=e101]
+          - paragraph [ref=e102]: A clear, repeatable loop designed to increase your band score efficiently.
+        - generic [ref=e103]:
+          - generic [ref=e105]:
+            - generic [ref=e107]: "01"
+            - heading "Run a baseline full test" [level=4] [ref=e108]
+            - paragraph [ref=e109]: Start with one realistic mock to identify your highest-impact gaps.
+          - generic [ref=e110]:
+            - generic [ref=e112]: "02"
+            - heading "Train weak modules daily" [level=4] [ref=e113]
+            - paragraph [ref=e114]: Use focused speaking/writing/reading/listening loops instead of random drills.
+          - generic [ref=e115]:
+            - generic [ref=e117]: "03"
+            - heading "Track score movement weekly" [level=4] [ref=e118]
+            - paragraph [ref=e119]: Review your progress dashboard and repeat the cycle with stronger targets.
+      - generic [ref=e123]:
+        - generic [ref=e125]: verified
+        - heading "Band Score Improvement Guarantee" [level=2] [ref=e126]
+        - paragraph [ref=e127]: Follow your personalised study plan on a Pro subscription for 90 days. If your overall band score doesn't improve by at least 0.5 bands, we'll extend your subscription absolutely free for another 90 days.
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - generic [ref=e130]: timer
+            - heading "90-day commitment" [level=4] [ref=e131]
+            - paragraph [ref=e132]: Complete at least 3 practice sessions per week
+          - generic [ref=e133]:
+            - generic [ref=e134]: monitoring
+            - heading "Measurable progress" [level=4] [ref=e135]
+            - paragraph [ref=e136]: We compare your baseline and final full test scores
+          - generic [ref=e137]:
+            - generic [ref=e138]: shield
+            - heading "Risk-free guarantee" [level=4] [ref=e139]
+            - paragraph [ref=e140]: 90-day free extension if you don't improve
+        - generic [ref=e141]:
+          - link "Start With Pro" [ref=e142] [cursor=pointer]:
+            - /url: /register
+          - link "View Full Terms" [ref=e143] [cursor=pointer]:
+            - /url: /guarantee
+      - generic [ref=e148]:
+        - heading "Built for Serious Progress, Not Random Question Drills" [level=2] [ref=e149]
+        - paragraph [ref=e150]: Use targeted practice for weak areas, run full mock tests for readiness, then follow explicit next steps from your latest results to actually improve your band score.
+        - generic [ref=e151]:
+          - link "Create Free Account" [ref=e152] [cursor=pointer]:
+            - /url: /register
+          - link "Explore All Features" [ref=e153] [cursor=pointer]:
+            - /url: /features
+  - contentinfo [ref=e154]:
+    - generic [ref=e155]:
+      - generic [ref=e156]:
+        - generic [ref=e157]:
+          - link "Spokio" [ref=e158] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=e159]: The complete IELTS preparation platform for measurable band score improvement.
+        - generic [ref=e160]:
+          - heading "Product" [level=4] [ref=e161]
+          - list [ref=e162]:
+            - listitem [ref=e163]:
+              - link "Features" [ref=e164] [cursor=pointer]:
+                - /url: /features
+            - listitem [ref=e165]:
+              - link "Pricing" [ref=e166] [cursor=pointer]:
+                - /url: /pricing
+            - listitem [ref=e167]:
+              - link "Guarantee" [ref=e168] [cursor=pointer]:
+                - /url: /guarantee
+            - listitem [ref=e169]:
+              - link "Methodology" [ref=e170] [cursor=pointer]:
+                - /url: /methodology
+        - generic [ref=e171]:
+          - heading "Resources" [level=4] [ref=e172]
+          - list [ref=e173]:
+            - listitem [ref=e174]:
+              - link "IELTS Guides" [ref=e175] [cursor=pointer]:
+                - /url: /ielts
+            - listitem [ref=e176]:
+              - link "Blog" [ref=e177] [cursor=pointer]:
+                - /url: /blog
+            - listitem [ref=e178]:
+              - link "Editorial Policy" [ref=e179] [cursor=pointer]:
+                - /url: /editorial-policy
+        - generic [ref=e180]:
+          - heading "Company" [level=4] [ref=e181]
+          - list [ref=e182]:
+            - listitem [ref=e183]:
+              - link "About" [ref=e184] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=e185]:
+              - link "Contact" [ref=e186] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e187]:
+              - link "Advertise" [ref=e188] [cursor=pointer]:
+                - /url: /advertise
+      - generic [ref=e189]:
+        - paragraph [ref=e190]: © 2026 Spokio. All rights reserved.
+        - generic [ref=e191]:
+          - link "Editorial Policy" [ref=e192] [cursor=pointer]:
+            - /url: /editorial-policy
+          - link "Contact" [ref=e193] [cursor=pointer]:
+            - /url: /contact

@@ -104,4 +104,42 @@ describe('SpeechController contract', () => {
     expect(response.body.message).toBe('Transcript is required');
     expect(mockSpeechService.evaluateResponse).not.toHaveBeenCalled();
   });
+
+  it('keeps /speech/synthesize response contract stable', async () => {
+    const mockSpeechService = {
+      synthesize: jest.fn().mockResolvedValue({
+        buffer: Buffer.from('audio-binary'),
+        voiceId: 'voice-a',
+        cacheHit: false,
+        cacheExpiresAt: null
+      })
+    } as unknown as SpeechService;
+
+    Container.set({ id: SpeechService, value: mockSpeechService });
+    Container.set({ id: TestEvaluationService, value: {} as TestEvaluationService });
+    Container.set({ id: TestSessionService, value: {} as TestSessionService });
+
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/speech/synthesize')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Unique-Reference-Code', 'speech-synthesize-contract')
+      .send({
+        text: 'Please read this prompt aloud.',
+        voiceId: 'voice-a'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        audioBase64: expect.any(String),
+        mimeType: 'audio/mpeg',
+        voiceId: 'voice-a',
+        cacheHit: false,
+        textLength: expect.any(Number)
+      }
+    });
+  });
 });

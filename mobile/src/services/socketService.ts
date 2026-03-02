@@ -142,7 +142,7 @@ class SocketService {
         });
 
         this.socket?.on("connect_error", (error) => {
-          console.error("❌ Socket connection error:", error);
+          logger.warn("❌ Socket connection error:", error);
           this.isConnecting = false;
           this.reconnectAttempts++;
           monitoringService.captureException(error, {
@@ -153,7 +153,7 @@ class SocketService {
         });
       });
     } catch (error) {
-      console.error("❌ Failed to connect socket:", error);
+      logger.warn("❌ Failed to connect socket:", error);
       this.isConnecting = false;
       return false;
     }
@@ -268,7 +268,7 @@ class SocketService {
     });
 
     this.socket.on("reconnect_error", (error) => {
-      console.error("Socket reconnection error:", error);
+      logger.warn("Socket reconnection error:", error);
       monitoringService.captureException(error, { phase: "reconnect_error" });
     });
 

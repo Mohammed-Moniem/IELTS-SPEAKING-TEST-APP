@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Billing &amp; Subscriptions</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", 
+              "primary-hover": "#6D28D9", 
+              "background-light": "#F3F4F6", 
+              "background-dark": "#0F1115", 
+              "surface-light": "#FFFFFF",
+              "surface-dark": "#18181B", 
+              "surface-darker": "#131316", 
+              "text-light": "#1F2937", 
+              "text-dark": "#F9FAFB", 
+              "text-muted-light": "#6B7280", 
+              "text-muted-dark": "#9CA3AF", 
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", 
+              'xl': "1rem", 
+              '2xl': "1.5rem", 
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #374151;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #7C3AED;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #7C3AED;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-surface-light dark:bg-surface-darker border-r border-gray-200 dark:border-gray-800 flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-gray-100 dark:border-gray-800/50">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Spokio</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">dashboard</span>
+                Dashboard
+            </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+                Practice Areas
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">mic</span>
+                Speaking
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">edit</span>
+                Writing
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">menu_book</span>
+                Reading
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">headphones</span>
+                Listening
+            </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-text-muted-light dark:text-gray-500 uppercase tracking-wider">
+                Account
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-300 group" href="#">
+<span class="material-icons-round text-xl">credit_card</span>
+                Billing &amp; Plan
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted-light dark:text-text-muted-dark hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary dark:text-gray-500 dark:group-hover:text-violet-400 transition-colors">settings</span>
+                Settings
+            </a>
+</nav>
+<div class="p-4 border-t border-gray-100 dark:border-gray-800">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border-2 border-white dark:border-gray-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-gray-900 dark:text-white">Student One</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Spokio Pro</p>
+</div>
+<span class="material-icons-round ml-auto text-gray-400">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen">
+<header class="lg:hidden h-16 bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg dark:text-white">Spokio</span>
+</div>
+<button class="p-2 text-gray-500 hover:text-primary">
+<span class="material-icons-round">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-7xl mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<div>
+<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">Billing &amp; Subscription</h1>
+<p class="text-text-muted-light dark:text-gray-400 max-w-xl">
+                        Manage your plan, payment methods, and billing history.
+                    </p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-5 py-2.5 bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium rounded-xl transition-colors">
+<span class="material-icons-round text-lg">open_in_new</span>
+                        Manage in Stripe
+                    </button>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+<div class="lg:col-span-2 space-y-8">
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 p-6 lg:p-8 shadow-sm">
+<div class="flex flex-col sm:flex-row justify-between items-start gap-6 mb-8">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h2 class="text-lg font-bold text-gray-900 dark:text-white">Current Plan</h2>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary dark:bg-primary/20 dark:text-violet-300 border border-primary/20">
+                                        Active
+                                    </span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="text-3xl font-bold text-gray-900 dark:text-white">Spokio Pro</span>
+<span class="text-text-muted-light dark:text-gray-500">/ Monthly</span>
+</div>
+<p class="text-sm text-text-muted-light dark:text-gray-400">
+                                    Your next billing date is <span class="font-semibold text-gray-900 dark:text-white">November 24, 2023</span>.
+                                </p>
+</div>
+<div class="text-right">
+<div class="text-2xl font-bold text-gray-900 dark:text-white">$29.00</div>
+<div class="text-sm text-text-muted-light dark:text-gray-500">per month</div>
+</div>
+</div>
+<div class="bg-gray-50 dark:bg-surface-darker rounded-xl p-4 flex items-center justify-between border border-gray-100 dark:border-gray-800 mb-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-8 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+<img alt="Mastercard" class="h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXbkopGYvDICen7nc6qtLwsO6m_evRrTQGz99jCPn_GGZsE6fKDhSLr4QkJu-Afsr0D9SkMj8CnsrsSNcp7Tlj5VCR6awnZkhrodcN1UF5WcObTUgo_1zbU4A9SFdqqqjJmm8Sd_dt_TkisFJsFnLM6eGbfpxFE86QbvFZ5-wDKAYwGVZfIDjTKJ9xSe5IDxc3gl-_F-dKItrtP4RvwdvLOew1JHtx3TaRaNfzRzZI_aVIZK1T9OF1ZxUewCgHqdcfMwTgsK2ten6d"/>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">Mastercard ending in 4242</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Expires 12/25</p>
+</div>
+</div>
+<button class="text-sm font-medium text-primary hover:text-primary-hover transition-colors">Update</button>
+</div>
+<div class="flex flex-wrap gap-4">
+<button class="px-4 py-2 bg-red-50 text-red-600 dark:bg-red-900/10 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
+                                Cancel Subscription
+                            </button>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 p-6 lg:p-8 shadow-sm">
+<div class="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+<h2 class="text-xl font-bold text-gray-900 dark:text-white">Available Plans</h2>
+<div class="flex items-center bg-gray-100 dark:bg-surface-darker p-1 rounded-xl">
+<button class="px-4 py-2 text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm transition-all">Monthly</button>
+<button class="px-4 py-2 text-sm font-medium rounded-lg text-text-muted-light dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all">Yearly <span class="text-xs text-green-600 ml-1">-20%</span></button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="rounded-xl border border-gray-200 dark:border-gray-800 p-6 hover:border-primary/30 transition-colors relative">
+<h3 class="font-bold text-lg text-gray-900 dark:text-white mb-2">Basic Learner</h3>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="text-3xl font-bold text-gray-900 dark:text-white">$0</span>
+<span class="text-text-muted-light dark:text-gray-500 text-sm">/ month</span>
+</div>
+<ul class="space-y-3 mb-6">
+<li class="flex items-center gap-2 text-sm text-text-muted-light dark:text-gray-400">
+<span class="material-icons-round text-green-500 text-base">check</span>
+                                        2 Speaking Tests / month
+                                    </li>
+<li class="flex items-center gap-2 text-sm text-text-muted-light dark:text-gray-400">
+<span class="material-icons-round text-green-500 text-base">check</span>
+                                        Basic AI Feedback
+                                    </li>
+<li class="flex items-center gap-2 text-sm text-text-muted-light dark:text-gray-400">
+<span class="material-icons-round text-green-500 text-base">check</span>
+                                        Community Support
+                                    </li>
+</ul>
+<button class="w-full py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Downgrade</button>
+</div>
+<div class="rounded-xl border-2 border-primary p-6 relative bg-primary/5 dark:bg-primary/5">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Current Plan</div>
+<h3 class="font-bold text-lg text-primary mb-2">Spokio Pro</h3>
+<div class="flex items-baseline gap-1 mb-4">
+<span class="text-3xl font-bold text-gray-900 dark:text-white">$29</span>
+<span class="text-text-muted-light dark:text-gray-500 text-sm">/ month</span>
+</div>
+<ul class="space-y-3 mb-6">
+<li class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+<span class="material-icons-round text-primary text-base">check</span>
+                                        Unlimited Speaking Tests
+                                    </li>
+<li class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+<span class="material-icons-round text-primary text-base">check</span>
+                                        Advanced AI Analytics
+                                    </li>
+<li class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+<span class="material-icons-round text-primary text-base">check</span>
+                                        Writing &amp; Reading Modules
+                                    </li>
+<li class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+<span class="material-icons-round text-primary text-base">check</span>
+                                        Priority Support
+                                    </li>
+</ul>
+<button class="w-full py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors shadow-lg shadow-primary/20" disabled="">Current Plan</button>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm">
+<h3 class="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+<span class="material-icons-round text-gray-400">receipt_long</span>
+                            Invoice History
+                        </h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between group">
+<div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">Oct 24, 2023</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Pro Plan - Monthly</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-gray-900 dark:text-white">$29.00</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-primary transition-colors">
+<span class="material-icons-round text-lg">download</span>
+</button>
+</div>
+</div>
+<div class="w-full h-px bg-gray-100 dark:bg-gray-800"></div>
+<div class="flex items-center justify-between group">
+<div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">Sep 24, 2023</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Pro Plan - Monthly</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-gray-900 dark:text-white">$29.00</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-primary transition-colors">
+<span class="material-icons-round text-lg">download</span>
+</button>
+</div>
+</div>
+<div class="w-full h-px bg-gray-100 dark:bg-gray-800"></div>
+<div class="flex items-center justify-between group">
+<div>
+<p class="text-sm font-medium text-gray-900 dark:text-white">Aug 24, 2023</p>
+<p class="text-xs text-text-muted-light dark:text-gray-500">Pro Plan - Monthly</p>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-sm font-bold text-gray-900 dark:text-white">$29.00</span>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-primary transition-colors">
+<span class="material-icons-round text-lg">download</span>
+</button>
+</div>
+</div>
+</div>
+<button class="w-full mt-6 py-2 text-sm text-text-muted-light dark:text-gray-400 font-medium border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            View All Invoices
+                        </button>
+</div>
+<div class="bg-gradient-to-br from-[#1E1B4B] to-[#312E81] dark:from-[#1A1825] dark:to-[#2E1065] rounded-2xl p-6 text-white relative overflow-hidden border border-indigo-900 shadow-xl">
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-primary/30 rounded-full blur-2xl"></div>
+<h3 class="font-bold mb-4 relative z-10">Plan Usage</h3>
+<div class="space-y-4 relative z-10">
+<div>
+<div class="flex justify-between text-xs mb-1 text-indigo-200">
+<span>Speaking Tests</span>
+<span>Unlimited</span>
+</div>
+<div class="w-full bg-indigo-900/50 h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-xs mb-1 text-indigo-200">
+<span>AI Feedback Tokens</span>
+<span>450/500</span>
+</div>
+<div class="w-full bg-indigo-900/50 h-1.5 rounded-full overflow-hidden">
+<div class="bg-blue-400 h-full rounded-full" style="width: 90%"></div>
+</div>
+</div>
+</div>
+<div class="mt-6 pt-4 border-t border-indigo-500/30">
+<p class="text-xs text-indigo-200">Need more tokens?</p>
+<button class="mt-2 text-sm font-bold text-white hover:text-primary-200 transition-colors flex items-center gap-1">
+                                 Buy Extra Packs <span class="material-icons-round text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50">
+<button class="bg-surface-dark text-white dark:bg-white dark:text-gray-900 p-3 rounded-full shadow-lg hover:scale-110 transition-transform" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-icons-round block dark:hidden">dark_mode</span>
+<span class="material-icons-round hidden dark:block">light_mode</span>
+</button>
+</div>
+
+</body></html>

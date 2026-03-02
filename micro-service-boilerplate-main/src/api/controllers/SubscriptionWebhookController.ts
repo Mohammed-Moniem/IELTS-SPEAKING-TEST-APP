@@ -4,6 +4,7 @@ import { HttpCode, JsonController, Post, Req, Res } from 'routing-controllers';
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { Logger } from '@lib/logger';
+import { GrowthService } from '@services/GrowthService';
 import { StripeService } from '@services/StripeService';
 import { SubscriptionService } from '@services/SubscriptionService';
 
@@ -13,7 +14,8 @@ export class SubscriptionWebhookController {
 
   constructor(
     private readonly stripeService: StripeService,
-    private readonly subscriptionService: SubscriptionService
+    private readonly subscriptionService: SubscriptionService,
+    private readonly growthService: GrowthService
   ) {}
 
   @Post('/webhook')
@@ -23,14 +25,13 @@ export class SubscriptionWebhookController {
     ensureResponseHeaders(res, headers);
 
     try {
-      if (!req.rawBody) {
-        this.log.error('Stripe webhook received without raw body payload');
-        return res.status(HTTP_STATUS_CODES.BAD_REQUEST).json({ error: 'Webhook payload missing' });
-      }
-
       const signature = req.headers['stripe-signature'];
-      const event = this.stripeService.constructEvent(req.rawBody, signature);
+      const payloadBuffer =
+        req.rawBody ||
+        Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+      const event = this.stripeService.constructEvent(payloadBuffer, signature);
       await this.subscriptionService.handleStripeWebhook(event, headers);
+      await this.growthService.handleAdvertiserStripeWebhook(event);
 
       return res.status(HTTP_STATUS_CODES.SUCCESS).json({ received: true });
     } catch (error) {

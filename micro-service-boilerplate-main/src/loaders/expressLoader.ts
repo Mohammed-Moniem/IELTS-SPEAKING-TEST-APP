@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import { createServer } from 'http';
-import { createExpressServer } from 'routing-controllers';
+import { useExpressServer } from 'routing-controllers';
 import trimReqBody from 'trim-request-body';
 import xss from 'xss';
 
@@ -19,28 +19,7 @@ type ReferralLandingInfo = Awaited<ReturnType<typeof referralService.getReferral
 const log = new Logger(__filename);
 
 export const expressLoader = () => {
-  const expressApp: Application = createExpressServer({
-    cors: {
-      origin: env.app.corsOrigin === '*' ? true : env.app.corsOrigin
-    },
-    classTransformer: true,
-    routePrefix: env.app.routePrefix,
-    defaultErrorHandler: false,
-    controllers: env.app.dirs.controllers,
-    middlewares: env.app.dirs.middlewares,
-    interceptors: env.app.dirs.interceptors,
-    currentUserChecker: async (action: any) => {
-      return action.request.currentUser;
-    },
-    authorizationChecker: async (action: any, roles: string[]) => {
-      const user = action.request.currentUser;
-      if (!user) return false;
-      if (roles && roles.length > 0) {
-        return roles.includes(user.plan);
-      }
-      return true;
-    }
-  });
+  const expressApp: Application = express();
 
   const telemetryConfig = env.telemetry || { enabled: false, metricsEnabled: false, metricsPath: '/metrics' };
   const stripeWebhookPath = `${env.app.routePrefix}/subscription/webhook`;
@@ -369,6 +348,33 @@ export const expressLoader = () => {
     });
     expressApp.use(limiter);
   }
+
+  useExpressServer(
+    expressApp,
+    ({
+      bodyParser: false,
+      cors: {
+        origin: env.app.corsOrigin === '*' ? true : env.app.corsOrigin
+      },
+      classTransformer: true,
+      routePrefix: env.app.routePrefix,
+      defaultErrorHandler: false,
+      controllers: env.app.dirs.controllers,
+      middlewares: env.app.dirs.middlewares,
+      interceptors: env.app.dirs.interceptors,
+      currentUserChecker: async (action: any) => {
+        return action.request.currentUser;
+      },
+      authorizationChecker: async (action: any, roles: string[]) => {
+        const user = action.request.currentUser;
+        if (!user) return false;
+        if (roles && roles.length > 0) {
+          return roles.includes(user.plan);
+        }
+        return true;
+      }
+    } as any)
+  );
 
   if (!env.isTest) {
     // Create HTTP server

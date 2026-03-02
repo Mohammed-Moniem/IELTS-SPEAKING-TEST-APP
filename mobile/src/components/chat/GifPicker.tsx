@@ -1,6 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 // Initialize Giphy SDK (you'll need to get an API key from https://developers.giphy.com/)
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY || "YOUR_GIPHY_API_KEY_HERE";
@@ -37,6 +42,8 @@ export const GifPicker: React.FC<GifPickerProps> = ({
   onClose,
   onSelectGif,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize Giphy SDK
@@ -51,7 +58,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({
         GiphySDK.configure({ apiKey: GIPHY_API_KEY });
         setIsInitialized(true);
       } catch (error) {
-        console.error("Error initializing Giphy SDK:", error);
+        logger.warn("Failed to initialize Giphy SDK", error);
       }
     }
   }, []);
@@ -121,7 +128,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({
       >
         <View style={styles.fallbackContainer}>
           <View style={styles.fallbackContent}>
-            <Ionicons name="warning-outline" size={48} color="#FF6B6B" />
+            <Ionicons name="warning-outline" size={48} color={colors.warning} />
             <Text style={styles.fallbackTitle}>GIF Picker Unavailable</Text>
             <Text style={styles.fallbackMessage}>
               {!GiphySDK || !GiphyDialog
@@ -142,48 +149,49 @@ export const GifPicker: React.FC<GifPickerProps> = ({
   return null;
 };
 
-const styles = StyleSheet.create({
-  fallbackContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  fallbackContent: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-    alignItems: "center",
-  },
-  fallbackTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1F1F1F",
-    marginTop: 16,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  fallbackMessage: {
-    fontSize: 14,
-    color: "#667781",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  fallbackButton: {
-    backgroundColor: "#25D366",
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 24,
-  },
-  fallbackButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    fallbackContainer: {
+      flex: 1,
+      backgroundColor: colors.overlayBackdrop,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.lg,
+    },
+    fallbackContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: spacing.xl,
+      width: "100%",
+      maxWidth: 400,
+      alignItems: "center",
+    },
+    fallbackTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+      textAlign: "center",
+    },
+    fallbackMessage: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: spacing.xl,
+    },
+    fallbackButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.xxl,
+      borderRadius: 24,
+    },
+    fallbackButtonText: {
+      color: colors.primaryOn,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });
 
 export default GifPicker;

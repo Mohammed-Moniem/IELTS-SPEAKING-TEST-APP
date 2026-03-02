@@ -132,7 +132,7 @@ const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      backgroundColor: colors.overlayBackdrop,
       justifyContent: "center",
       alignItems: "center",
       padding: spacing.xl,
@@ -251,4 +251,3 @@ const createStyles = (colors: ColorTokens) =>
       fontWeight: "600",
     },
   });
-

@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { siteConfig } from '@/lib/seo/site';
 
 export const metadata: Metadata = {
@@ -39,9 +36,7 @@ const principles = [
   }
 ];
 
-export default async function AboutPage() {
-  const marketingVariant = await getServerMarketingVariant();
-  const isMotionVariant = marketingVariant === 'motion';
+export default function AboutPage() {
   const aboutSchema = {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
@@ -63,39 +58,27 @@ export default async function AboutPage() {
     <div className="space-y-10 lg:space-y-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema) }} />
 
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'rocket_launch', text: 'Our Mission' }}
-          title="About Spokio"
-          description="Spokio is built for measurable IELTS outcomes: realistic test conditions, feedback learners can act on, and architecture that preserves speaking compatibility while expanding to full-module preparation."
-        />
-      ) : (
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-white/10 rounded-full blur-[80px]" />
-          <div className="relative z-10 max-w-3xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-              <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
-              Our Mission
-            </span>
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">About Spokio</h1>
-            <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
-              Spokio is built for measurable IELTS outcomes: realistic test conditions, feedback learners can act on, and
-              architecture that preserves speaking compatibility while expanding to full-module preparation.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* ── Hero ── */}
+      <section className="marketing-hero-surface relative overflow-hidden rounded-[2rem] p-10 text-white lg:p-16">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-white/10 rounded-full blur-[80px]" />
+        <div className="relative z-10 max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+            <span className="material-symbols-outlined text-[14px]">rocket_launch</span>
+            Our Mission
+          </span>
+          <h1 className="hero-elegant-title text-4xl font-extrabold leading-[1.1] tracking-tight lg:text-5xl">About Spokio</h1>
+          <p className="hero-elegant-copy mt-4 max-w-2xl text-lg leading-relaxed text-white/80">
+            Spokio is built for measurable IELTS outcomes: realistic test conditions, feedback learners can act on, and
+            architecture that preserves speaking compatibility while expanding to full-module preparation.
+          </p>
+        </div>
+      </section>
 
       {/* ── Principles Grid ── */}
-      <section className={`relative isolate overflow-hidden rounded-3xl ${isMotionVariant ? 'p-5 sm:p-6' : ''}`}>
-        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-        <h2 className="relative z-10 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">
-          What We Optimize For
-        </h2>
-        <div className="relative z-10 grid gap-5 sm:grid-cols-3">
+      <section>
+        <h2 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6">What We Optimize For</h2>
+        <div className="grid gap-5 sm:grid-cols-3">
           {principles.map(item => (
             <article
               key={item.title}

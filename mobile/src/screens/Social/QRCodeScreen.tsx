@@ -15,13 +15,14 @@ import { useTheme } from "../../context";
 import { useProfile } from "../../hooks";
 import { useThemedStyles } from "../../hooks";
 import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 export const QRCodeScreen: React.FC = () => {
   const { generateQRCode } = useProfile();
   const [qrData, setQRData] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"friend" | "referral">("friend");
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const styles = useThemedStyles(createStyles);
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export const QRCodeScreen: React.FC = () => {
         title: mode === "referral" ? "Share Referral" : "Add Friend",
       });
     } catch (error) {
-      console.error("Error sharing:", error);
+      logger.warn("QR share failed", error);
     }
   };
 
@@ -126,8 +127,8 @@ export const QRCodeScreen: React.FC = () => {
               <QRCode
                 value={qrData}
                 size={250}
-                backgroundColor="#FFFFFF"
-                color="#000000"
+                backgroundColor={colors.primaryOn}
+                color={theme === "dark" ? colors.textInverse : colors.textPrimary}
               />
             </View>
             {mode === "referral" && qrPayload?.referralCode && (

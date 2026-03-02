@@ -1,5 +1,9 @@
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { useNavigation } from "@react-navigation/native";
+import {
+  CompositeNavigationProp,
+  useNavigation,
+} from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import {
@@ -12,6 +16,7 @@ import {
 } from "react-native";
 
 import { subscriptionApi, usageApi } from "../../api/services";
+import { getProgressStats } from "../../api/analyticsApi";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -22,13 +27,21 @@ import { Tag } from "../../components/Tag";
 import { ThemeModeSwitch } from "../../components/ThemeModeSwitch";
 import { useTheme } from "../../context";
 import { useThemedStyles } from "../../hooks";
-import { AppTabParamList } from "../../navigation/AppNavigator";
+import {
+  AppRootStackParamList,
+  AppTabParamList,
+} from "../../navigation/AppNavigator";
 import type { ColorTokens } from "../../theme/tokens";
 import { spacing } from "../../theme/tokens";
 import { formatDate } from "../../utils/date";
 
 export const HomeScreen: React.FC = () => {
-  const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
+  const navigation = useNavigation<
+    CompositeNavigationProp<
+      BottomTabNavigationProp<AppTabParamList>,
+      NativeStackNavigationProp<AppRootStackParamList>
+    >
+  >();
   const { user, refreshProfile } = useAuth();
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -43,15 +56,30 @@ export const HomeScreen: React.FC = () => {
     queryFn: subscriptionApi.current,
   });
 
+  const progressQuery = useQuery({
+    queryKey: ["home-progress-trend", user?._id],
+    queryFn: () =>
+      getProgressStats(user!._id, {
+        daysBack: 30,
+        includeTests: 20,
+      }),
+    enabled: Boolean(user?._id),
+  });
+
   const refreshing = usageQuery.isRefetching || subscriptionQuery.isRefetching;
 
   const handleRefresh = async () => {
     await Promise.all([
       usageQuery.refetch(),
       subscriptionQuery.refetch(),
+      progressQuery.refetch(),
       refreshProfile(),
     ]);
   };
+
+  const nextBestAction =
+    progressQuery.data?.weaknesses?.[0] ??
+    "Run one focused speaking practice session today.";
 
   return (
     <ScreenContainer>
@@ -78,12 +106,16 @@ export const HomeScreen: React.FC = () => {
             title="Start practice"
             onPress={() => navigation.navigate("Practice")}
             style={styles.actionButton}
+            accessibilityLabel="Start practice"
+            accessibilityHint="Open topic practice and begin a speaking session"
           />
           <Button
             title="Run simulation"
             onPress={() => navigation.navigate("Simulations")}
             style={styles.actionButton}
             variant="secondary"
+            accessibilityLabel="Run simulation"
+            accessibilityHint="Open exam-style simulation tests"
           />
         </View>
 
@@ -157,8 +189,48 @@ export const HomeScreen: React.FC = () => {
                 }
                 onPress={() => navigation.navigate("Profile")}
                 variant="ghost"
+                accessibilityLabel={
+                  subscriptionQuery.data.planType === "free"
+                    ? "Upgrade plan"
+                    : "Manage subscription"
+                }
+                accessibilityHint="Open your profile billing and subscription options"
               />
             ) : null}
+          </Card>
+        ) : null}
+
+        {progressQuery.data ? (
+          <Card>
+            <SectionHeading title="Your momentum" />
+            <View style={styles.trendRow}>
+              <View style={styles.trendMetric}>
+                <Text style={styles.trendValue}>
+                  {progressQuery.data.averageBand.toFixed(1)}
+                </Text>
+                <Text style={styles.trendLabel}>30-day average band</Text>
+              </View>
+              <View style={styles.trendMetric}>
+                <Text style={styles.trendValue}>
+                  {progressQuery.data.highestBand.toFixed(1)}
+                </Text>
+                <Text style={styles.trendLabel}>Highest band</Text>
+              </View>
+            </View>
+            <Text style={styles.trendSummary}>
+              Trend: {progressQuery.data.bandTrend}
+            </Text>
+            <View style={styles.nextBestActionCard}>
+              <Text style={styles.nextBestActionTitle}>Next best action</Text>
+              <Text style={styles.nextBestActionText}>{nextBestAction}</Text>
+            </View>
+            <Button
+              title="See full analytics"
+              variant="ghost"
+              onPress={() => navigation.navigate("Analytics")}
+              accessibilityLabel="See full analytics"
+              accessibilityHint="Open detailed performance analytics"
+            />
           </Card>
         ) : null}
       </ScrollView>
@@ -170,62 +242,108 @@ const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
     content: {
       paddingBottom: spacing.xxl + spacing.sm,
-  },
-  hero: {
-    marginBottom: spacing.xl,
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  greeting: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  subtitle: {
-    marginTop: spacing.sm,
-    color: colors.textMuted,
-    fontSize: 16,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  actionButton: {
-    flex: 1,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  resetHint: {
-    marginTop: spacing.sm,
-    color: colors.textMuted,
-  },
-  subscriptionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  subscriptionStatus: {
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  subscriptionMeta: {
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
-  featureList: {
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  featureItem: {
-    color: colors.textSecondary,
-  },
+    },
+    hero: {
+      marginBottom: spacing.xl,
+    },
+    heroTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+    },
+    greeting: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    subtitle: {
+      marginTop: spacing.sm,
+      color: colors.textMuted,
+      fontSize: 16,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    actionButton: {
+      flex: 1,
+    },
+    statsRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    resetHint: {
+      marginTop: spacing.sm,
+      color: colors.textMuted,
+    },
+    subscriptionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.sm,
+    },
+    subscriptionStatus: {
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    subscriptionMeta: {
+      color: colors.textMuted,
+      marginBottom: spacing.md,
+    },
+    featureList: {
+      marginBottom: spacing.md,
+      gap: spacing.xs,
+    },
+    featureItem: {
+      color: colors.textSecondary,
+    },
+    trendRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    trendMetric: {
+      flex: 1,
+      backgroundColor: colors.surfaceSubtle,
+      borderRadius: 12,
+      padding: spacing.sm,
+    },
+    trendValue: {
+      color: colors.textPrimary,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    trendLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: spacing.xxs,
+    },
+    trendSummary: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      marginBottom: spacing.sm,
+      textTransform: "capitalize",
+    },
+    nextBestActionCard: {
+      backgroundColor: colors.statusInfoBackground,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.statusInfoBorder,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    nextBestActionTitle: {
+      color: colors.statusInfoText,
+      fontWeight: "700",
+      fontSize: 13,
+      marginBottom: spacing.xxs,
+    },
+    nextBestActionText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
   });

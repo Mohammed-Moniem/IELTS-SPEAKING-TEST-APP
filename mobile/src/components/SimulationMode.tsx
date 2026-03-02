@@ -16,6 +16,7 @@ import { ttsService } from "../services/textToSpeechService";
 import { VoiceOrb } from "./VoiceOrb";
 import { Button } from "./Button";
 import { colors, radii, shadows, spacing } from "../theme/tokens";
+import { logger } from "../utils/logger";
 
 type TestPart = "part1" | "part2" | "part3";
 type SimulationState =
@@ -178,7 +179,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
       setCurrentQuestion(topic.question);
       return topic;
     } catch (error) {
-      console.error("Failed to load Part 1 topic:", error);
+      logger.warn("Failed to load Part 1 topic:", error);
       Alert.alert(
         "Connection Error",
         "Failed to load test questions. Please check your connection."
@@ -195,7 +196,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
       setCurrentQuestion(topic.question);
       return topic;
     } catch (error) {
-      console.error("Failed to load Part 2 topic:", error);
+      logger.warn("Failed to load Part 2 topic:", error);
       Alert.alert("Error", "Failed to load Part 2 topic.");
       return null;
     }
@@ -208,7 +209,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
       setCurrentQuestion(topic.question);
       return topic;
     } catch (error) {
-      console.error("Failed to load Part 3 topic:", error);
+      logger.warn("Failed to load Part 3 topic:", error);
       Alert.alert("Error", "Failed to load Part 3 topic.");
       return null;
     }
@@ -338,7 +339,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
       setCurrentState("part1");
       await beginCandidateTurn("part1");
     } catch (error) {
-      console.error("Failed to start simulation:", error);
+      logger.warn("Failed to start simulation:", error);
       Alert.alert(
         "Error",
         "Unable to start the full simulation. Please try again in a moment."
@@ -434,7 +435,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
         setRecording(null);
         setIsRecording(false);
       } catch (error) {
-        console.error("Error stopping recording:", error);
+        logger.warn("Error stopping recording:", error);
       }
     }
 
@@ -470,7 +471,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
     try {
       await ttsService.speak(trimmed);
     } catch (error) {
-      console.error("TTS Error:", error);
+      logger.warn("TTS Error:", error);
     } finally {
       setIsAISpeaking(false);
     }
@@ -496,7 +497,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
       setIsRecording(true);
       setPromptMessage("Speak now. Tap anywhere when you're finished.");
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      logger.warn("Failed to start recording:", error);
       Alert.alert("Error", "Failed to start recording. Please try again.");
       setPromptMessage("We couldn't start recording. Please try again.");
     }
@@ -517,7 +518,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
         await processUserResponse(uri);
       }
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      logger.warn("Failed to stop recording:", error);
       setPromptMessage("Something went wrong stopping the recording.");
     }
   };
@@ -576,7 +577,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
         setPromptMessage("Waiting for the examiner...");
       }
     } catch (error) {
-      console.error("Error processing response:", error);
+      logger.warn("Error processing response:", error);
       Alert.alert(
         "Error",
         "Failed to process your response. Please try again."
@@ -607,7 +608,7 @@ export const SimulationMode: React.FC<SimulationModeProps> = ({ onEnd }) => {
 
       onEnd(evaluation);
     } catch (error) {
-      console.error("Error getting evaluation:", error);
+      logger.warn("Error getting evaluation:", error);
       Alert.alert(
         "Error",
         "Failed to generate evaluation. Returning to main menu."

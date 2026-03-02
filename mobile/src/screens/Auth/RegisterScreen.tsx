@@ -223,6 +223,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                     <TouchableOpacity
                       style={styles.referralToggle}
                       onPress={() => setShowReferralField(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Add referral code"
+                      accessibilityHint="Expand optional referral code input"
                     >
                       <Text style={styles.referralToggleText}>
                         Have a referral code?
@@ -260,6 +263,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                   <TouchableOpacity
                     onPress={() => setStage(1)}
                     style={styles.backToBasics}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit basic details"
+                    accessibilityHint="Return to the first step of registration"
                   >
                     <Text style={styles.backToBasicsText}>
                       Edit basic details
@@ -274,6 +280,9 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.switchContainer}
+          accessibilityRole="button"
+          accessibilityLabel="Go to sign in"
+          accessibilityHint="Return to the login screen"
         >
           <Text style={styles.switchText}>
             Already have an account? Sign in

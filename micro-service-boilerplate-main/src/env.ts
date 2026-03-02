@@ -88,9 +88,20 @@ export const env = {
       webhookSecret: getOsEnv('STRIPE_WEBHOOK_SECRET'),
       defaultSuccessUrl: getOsEnv('STRIPE_DEFAULT_SUCCESS_URL'),
       defaultCancelUrl: getOsEnv('STRIPE_DEFAULT_CANCEL_URL'),
+      billingPortalReturnUrl: getOsEnv('STRIPE_BILLING_PORTAL_RETURN_URL'),
       priceIds: {
-        premium: getOsEnv('STRIPE_PRICE_PREMIUM'),
-        pro: getOsEnv('STRIPE_PRICE_PRO')
+        premium: {
+          monthly: getOsEnv('STRIPE_PRICE_PREMIUM_MONTHLY') || getOsEnv('STRIPE_PRICE_PREMIUM'),
+          annual: getOsEnv('STRIPE_PRICE_PREMIUM_ANNUAL')
+        },
+        pro: {
+          monthly: getOsEnv('STRIPE_PRICE_PRO_MONTHLY') || getOsEnv('STRIPE_PRICE_PRO'),
+          annual: getOsEnv('STRIPE_PRICE_PRO_ANNUAL')
+        },
+        team: {
+          monthly: getOsEnv('STRIPE_PRICE_TEAM_MONTHLY') || getOsEnv('STRIPE_PRICE_TEAM'),
+          annual: getOsEnv('STRIPE_PRICE_TEAM_ANNUAL')
+        }
       }
     }
   },
@@ -115,7 +126,13 @@ export const env = {
     broadcastAllowedEmails: (getOsEnv('PUSH_BROADCAST_ALLOWED_EMAILS') || '')
       .split(',')
       .map(email => email.trim())
-      .filter(Boolean)
+      .filter(Boolean),
+    firebaseProjectId: getOsEnv('FIREBASE_PROJECT_ID'),
+    firebaseClientEmail: getOsEnv('FIREBASE_CLIENT_EMAIL'),
+    firebasePrivateKey: (getOsEnv('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n'),
+    campaignSchedulerEnabled: toBool(getOsEnv('PUSH_CAMPAIGN_SCHEDULER_ENABLED') || 'true'),
+    campaignSweepIntervalMs: toNumber(getOsEnv('PUSH_CAMPAIGN_SWEEP_INTERVAL_MS')) || 60000,
+    campaignFallbackImmediateDefault: toBool(getOsEnv('PUSH_CAMPAIGN_FALLBACK_IMMEDIATE_DEFAULT') || 'false')
   },
   elevenlabs: {
     apiKey: getOsEnv('ELEVENLABS_API_KEY'),
@@ -181,5 +198,29 @@ export const env = {
     deepLinkScheme: getOsEnv('APP_DEEP_LINK_SCHEME') || 'ieltsspeaking',
     iosStoreUrl: getOsEnv('APP_IOS_STORE_URL') || 'https://apps.apple.com/',
     androidStoreUrl: getOsEnv('APP_ANDROID_STORE_URL') || 'https://play.google.com/'
+  },
+  partnerPortal: {
+    registrationUrl: getOsEnv('PARTNER_REGISTRATION_URL') || 'http://localhost:3000/app/partner',
+    dashboardUrl: getOsEnv('PARTNER_DASHBOARD_URL') || 'http://localhost:3000/app/partner'
+  },
+  email: {
+    resendApiKey: getOsEnv('RESEND_API_KEY'),
+    fromEmail: getOsEnv('RESEND_FROM_EMAIL') || 'noreply@spokio.com',
+    frontendUrl: getOsEnv('FRONTEND_URL') || 'http://localhost:3000'
+  },
+  partnerProgram: {
+    targetReconcileEnabled: toBool(getOsEnv('PARTNER_TARGET_RECONCILE_ENABLED') || 'true'),
+    targetReconcileHourUtc: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_HOUR_UTC')) || 1,
+    targetReconcileMinuteUtc: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_MINUTE_UTC')) || 0,
+    targetReconcileCheckIntervalMs: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_CHECK_INTERVAL_MS')) || 15 * 60 * 1000
+  },
+  growth: {
+    blogSchedulerEnabled: toBool(getOsEnv('GROWTH_BLOG_SCHEDULER_ENABLED') || 'true'),
+    blogSweepIntervalMs: toNumber(getOsEnv('GROWTH_BLOG_SWEEP_INTERVAL_MS')) || 10 * 60 * 1000,
+    blogQueueLimit: toNumber(getOsEnv('GROWTH_BLOG_QUEUE_LIMIT')) || 50,
+    blogJobLimit: toNumber(getOsEnv('GROWTH_BLOG_JOB_LIMIT')) || 25,
+    deckSchedulerEnabled: toBool(getOsEnv('GROWTH_DECK_SCHEDULER_ENABLED') || 'true'),
+    deckSweepIntervalMs: toNumber(getOsEnv('GROWTH_DECK_SWEEP_INTERVAL_MS')) || 30 * 60 * 1000,
+    deckReviewLimit: toNumber(getOsEnv('GROWTH_DECK_REVIEW_LIMIT')) || 200
   }
 };

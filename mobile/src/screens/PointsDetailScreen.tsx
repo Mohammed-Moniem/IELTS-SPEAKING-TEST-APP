@@ -163,6 +163,9 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            accessibilityHint="Return to the previous screen"
           >
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -172,7 +175,13 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.danger} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={refresh}
+            accessibilityRole="button"
+            accessibilityLabel="Retry points loading"
+            accessibilityHint="Try loading points data again"
+          >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -187,6 +196,9 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          accessibilityHint="Return to the previous screen"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -281,8 +293,11 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
               style={styles.redeemButton}
               onPress={() => navigation.navigate("RedeemDiscount")}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Redeem points for discount"
+              accessibilityHint="Open discount redemption options"
             >
-              <Ionicons name="gift" size={20} color="#fff" />
+              <Ionicons name="gift" size={20} color={colors.primaryOn} />
               <Text style={styles.redeemButtonText}>Redeem for Discount</Text>
             </TouchableOpacity>
 
@@ -294,6 +309,9 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
                   filter === "all" && styles.filterTabActive,
                 ]}
                 onPress={() => setFilter("all")}
+                accessibilityRole="button"
+                accessibilityLabel="Show all transactions"
+                accessibilityHint="Display both earned and redeemed points"
               >
                 <Text
                   style={[
@@ -310,6 +328,9 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
                   filter === "earned" && styles.filterTabActive,
                 ]}
                 onPress={() => setFilter("earned")}
+                accessibilityRole="button"
+                accessibilityLabel="Show earned transactions"
+                accessibilityHint="Display only points you earned"
               >
                 <Text
                   style={[
@@ -326,6 +347,9 @@ export const PointsDetailScreen: React.FC<{ navigation: any }> = ({
                   filter === "redeemed" && styles.filterTabActive,
                 ]}
                 onPress={() => setFilter("redeemed")}
+                accessibilityRole="button"
+                accessibilityLabel="Show redeemed transactions"
+                accessibilityHint="Display only points you spent"
               >
                 <Text
                   style={[
@@ -548,7 +572,7 @@ const createStyles = (colors: ColorTokens) =>
   redeemButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.primaryOn,
   },
   filterTabs: {
     flexDirection: "row",
@@ -573,7 +597,7 @@ const createStyles = (colors: ColorTokens) =>
     color: colors.textSecondary,
   },
   filterTabTextActive: {
-    color: "#fff",
+    color: colors.primaryOn,
   },
   sectionTitle: {
     fontSize: 16,
@@ -671,6 +695,6 @@ const createStyles = (colors: ColorTokens) =>
   retryButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.primaryOn,
   },
   });

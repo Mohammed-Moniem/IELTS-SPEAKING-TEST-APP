@@ -20,14 +20,20 @@ import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeading } from "../../components/SectionHeading";
 import { DEFAULT_NOTIFICATION_SETTINGS } from "../../constants/notifications";
+import { useTheme } from "../../context";
+import { useThemedStyles } from "../../hooks";
 import notificationService from "../../services/notificationService";
-import { colors, spacing } from "../../theme/tokens";
+import type { ColorTokens } from "../../theme/tokens";
+import { spacing } from "../../theme/tokens";
 import { NotificationSettings } from "../../types/api";
 import { extractErrorMessage } from "../../utils/errors";
+import { logger } from "../../utils/logger";
 
 const STORAGE_KEY = "notification_settings";
 
 export const NotificationSettingsScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [settings, setSettings] = useState<NotificationSettings>(
     DEFAULT_NOTIFICATION_SETTINGS
   );
@@ -37,8 +43,8 @@ export const NotificationSettingsScreen: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadSettings();
-    checkPermissionStatus();
+    void loadSettings();
+    void checkPermissionStatus();
   }, []);
 
   const loadSettings = async () => {
@@ -60,7 +66,7 @@ export const NotificationSettingsScreen: React.FC = () => {
           );
         }
       } catch (storageError) {
-        console.error("Unable to read cached notification settings", storageError);
+        logger.warn("Unable to read cached notification settings", storageError);
         setSettings(DEFAULT_NOTIFICATION_SETTINGS);
         await AsyncStorage.setItem(
           STORAGE_KEY,
@@ -91,7 +97,7 @@ export const NotificationSettingsScreen: React.FC = () => {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     } catch (error) {
-      console.error("Failed to save notification settings:", error);
+      logger.warn("Failed to save notification settings:", error);
       setSettings(previous);
       Alert.alert("Error", extractErrorMessage(error));
       throw error;
@@ -271,7 +277,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={toggleDailyReminder}
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
 
@@ -307,7 +313,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={(val) => toggleSetting("achievementsEnabled", val)}
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -327,7 +333,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -347,7 +353,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -367,7 +373,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -390,7 +396,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -410,7 +416,49 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Friend Requests</Text>
+            <Text style={styles.settingDescription}>
+              Alerts when someone sends you a friend request
+            </Text>
+          </View>
+          <Switch
+            testID="toggle-friend-requests"
+            value={settings.friendRequestsEnabled}
+            onValueChange={(val) =>
+              toggleSetting("friendRequestsEnabled", val)
+            }
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Friend Acceptances</Text>
+            <Text style={styles.settingDescription}>
+              Alerts when your friend request is accepted
+            </Text>
+          </View>
+          <Switch
+            testID="toggle-friend-acceptances"
+            value={settings.friendAcceptancesEnabled}
+            onValueChange={(val) =>
+              toggleSetting("friendAcceptancesEnabled", val)
+            }
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -433,7 +481,7 @@ export const NotificationSettingsScreen: React.FC = () => {
             }
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -451,7 +499,26 @@ export const NotificationSettingsScreen: React.FC = () => {
             onValueChange={(val) => toggleSetting("offersEnabled", val)}
             disabled={isSaving}
             trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={Platform.OS === "ios" ? undefined : "#fff"}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingTitle}>Partner Offers</Text>
+            <Text style={styles.settingDescription}>
+              Promotions shared through influencers and institutes
+            </Text>
+          </View>
+          <Switch
+            testID="toggle-partner-offers"
+            value={settings.partnerOffersEnabled}
+            onValueChange={(val) => toggleSetting("partnerOffersEnabled", val)}
+            disabled={isSaving}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={Platform.OS === "ios" ? undefined : colors.primaryOn}
           />
         </View>
       </Card>
@@ -469,7 +536,8 @@ export const NotificationSettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
   loadingText: {
     textAlign: "center",
     color: colors.textMuted,
@@ -507,7 +575,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   enableButtonText: {
-    color: "#fff",
+    color: colors.primaryOn,
     fontSize: 16,
     fontWeight: "600",
   },

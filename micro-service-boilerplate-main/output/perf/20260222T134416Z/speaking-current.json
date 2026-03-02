@@ -1,0 +1,356 @@
+{
+  "generated_at": "2026-02-22T13:44:16.702326+00:00",
+  "tool": "http_load_test.py",
+  "config": {
+    "default_concurrency": [
+      1,
+      2,
+      4
+    ],
+    "requests_per_level": 20,
+    "warmup_requests": 20,
+    "profile": "sweep",
+    "ramp_step_seconds": 20.0,
+    "soak_duration_seconds": 300.0,
+    "spike_baseline_seconds": 20.0,
+    "spike_duration_seconds": 15.0,
+    "spike_recovery_seconds": 20.0,
+    "spike_multiplier": 3.0,
+    "insecure_tls": false
+  },
+  "runs": [
+    {
+      "scenario": "speaking-topics-practice",
+      "url": "http://127.0.0.1:4000/api/v1/topics/practice?limit=10&offset=0&excludeCompleted=true&category=part1",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:18.687211+00:00",
+      "ended_at": "2026-02-22T13:44:24.702490+00:00",
+      "duration_s": 6.015,
+      "throughput_rps": 1.662,
+      "success_rps": 1.662,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 592.713,
+        "mean": 601.438,
+        "p50": 598.045,
+        "p90": 605.334,
+        "p95": 621.149,
+        "p99": 633.801,
+        "max": 636.964
+      }
+    },
+    {
+      "scenario": "speaking-topics-practice",
+      "url": "http://127.0.0.1:4000/api/v1/topics/practice?limit=10&offset=0&excludeCompleted=true&category=part1",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:24.702844+00:00",
+      "ended_at": "2026-02-22T13:44:28.535573+00:00",
+      "duration_s": 3.833,
+      "throughput_rps": 2.609,
+      "success_rps": 2.609,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 591.599,
+        "mean": 746.612,
+        "p50": 606.928,
+        "p90": 752.965,
+        "p95": 1380.829,
+        "p99": 1883.121,
+        "max": 2008.694
+      }
+    },
+    {
+      "scenario": "speaking-topics-practice",
+      "url": "http://127.0.0.1:4000/api/v1/topics/practice?limit=10&offset=0&excludeCompleted=true&category=part1",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 4,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:28.535829+00:00",
+      "ended_at": "2026-02-22T13:44:30.958105+00:00",
+      "duration_s": 2.422,
+      "throughput_rps": 4.128,
+      "success_rps": 4.128,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 599.146,
+        "mean": 882.563,
+        "p50": 604.198,
+        "p90": 1975.488,
+        "p95": 1997.263,
+        "p99": 2014.684,
+        "max": 2019.039
+      }
+    },
+    {
+      "scenario": "speaking-practice-history",
+      "url": "http://127.0.0.1:4000/api/v1/practice/sessions?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:31.154891+00:00",
+      "ended_at": "2026-02-22T13:44:33.223684+00:00",
+      "duration_s": 2.069,
+      "throughput_rps": 4.834,
+      "success_rps": 4.834,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 196.193,
+        "mean": 206.754,
+        "p50": 198.079,
+        "p90": 218.732,
+        "p95": 242.801,
+        "p99": 262.056,
+        "max": 266.87
+      }
+    },
+    {
+      "scenario": "speaking-practice-history",
+      "url": "http://127.0.0.1:4000/api/v1/practice/sessions?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:33.223965+00:00",
+      "ended_at": "2026-02-22T13:44:34.223391+00:00",
+      "duration_s": 0.999,
+      "throughput_rps": 10.006,
+      "success_rps": 10.006,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 196.96,
+        "mean": 199.631,
+        "p50": 199.668,
+        "p90": 201.617,
+        "p95": 202.041,
+        "p99": 202.38,
+        "max": 202.464
+      }
+    },
+    {
+      "scenario": "speaking-practice-history",
+      "url": "http://127.0.0.1:4000/api/v1/practice/sessions?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 4,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:34.223548+00:00",
+      "ended_at": "2026-02-22T13:44:34.829735+00:00",
+      "duration_s": 0.606,
+      "throughput_rps": 16.497,
+      "success_rps": 16.497,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 197.298,
+        "mean": 200.375,
+        "p50": 200.375,
+        "p90": 202.434,
+        "p95": 202.64,
+        "p99": 202.805,
+        "max": 202.846
+      }
+    },
+    {
+      "scenario": "speaking-simulation-history",
+      "url": "http://127.0.0.1:4000/api/v1/test-simulations?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 1,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:35.027038+00:00",
+      "ended_at": "2026-02-22T13:44:37.007137+00:00",
+      "duration_s": 1.98,
+      "throughput_rps": 5.05,
+      "success_rps": 5.05,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 195.347,
+        "mean": 197.857,
+        "p50": 197.464,
+        "p90": 201.344,
+        "p95": 202.263,
+        "p99": 202.998,
+        "max": 203.182
+      }
+    },
+    {
+      "scenario": "speaking-simulation-history",
+      "url": "http://127.0.0.1:4000/api/v1/test-simulations?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 2,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:37.007371+00:00",
+      "ended_at": "2026-02-22T13:44:38.001007+00:00",
+      "duration_s": 0.994,
+      "throughput_rps": 10.064,
+      "success_rps": 10.064,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 196.172,
+        "mean": 198.35,
+        "p50": 197.402,
+        "p90": 201.571,
+        "p95": 203.081,
+        "p99": 204.289,
+        "max": 204.591
+      }
+    },
+    {
+      "scenario": "speaking-simulation-history",
+      "url": "http://127.0.0.1:4000/api/v1/test-simulations?limit=10&offset=0",
+      "method": "GET",
+      "expected_status": [
+        "200"
+      ],
+      "profile": "sweep",
+      "phase": "sweep",
+      "measurement_mode": "count",
+      "concurrency": 4,
+      "requests": 10,
+      "planned_requests": 10,
+      "planned_duration_s": null,
+      "started_at": "2026-02-22T13:44:38.001265+00:00",
+      "ended_at": "2026-02-22T13:44:38.619192+00:00",
+      "duration_s": 0.618,
+      "throughput_rps": 16.184,
+      "success_rps": 16.184,
+      "success_count": 10,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "timeouts": 0,
+      "status_counts": {
+        "200": 10
+      },
+      "error_counts": {},
+      "latency_ms": {
+        "min": 201.806,
+        "mean": 205.244,
+        "p50": 205.847,
+        "p90": 207.071,
+        "p95": 207.332,
+        "p99": 207.541,
+        "max": 207.594
+      }
+    }
+  ]
+}

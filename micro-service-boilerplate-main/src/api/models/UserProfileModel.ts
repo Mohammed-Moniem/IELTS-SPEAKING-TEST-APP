@@ -10,8 +10,11 @@ export interface NotificationSettings {
   feedbackNotificationsEnabled: boolean;
   directMessagesEnabled: boolean;
   groupMessagesEnabled: boolean;
+  friendRequestsEnabled: boolean;
+  friendAcceptancesEnabled: boolean;
   systemAnnouncementsEnabled: boolean;
   offersEnabled: boolean;
+  partnerOffersEnabled: boolean;
 }
 
 export interface NotificationState {
@@ -29,8 +32,11 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   feedbackNotificationsEnabled: true,
   directMessagesEnabled: true,
   groupMessagesEnabled: true,
+  friendRequestsEnabled: true,
+  friendAcceptancesEnabled: true,
   systemAnnouncementsEnabled: true,
-  offersEnabled: true
+  offersEnabled: true,
+  partnerOffersEnabled: true
 };
 
 export interface IUserProfile extends Document {
@@ -240,6 +246,14 @@ const UserProfileSchema = new Schema<IUserProfile>(
         type: Boolean,
         default: DEFAULT_NOTIFICATION_SETTINGS.groupMessagesEnabled
       },
+      friendRequestsEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.friendRequestsEnabled
+      },
+      friendAcceptancesEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.friendAcceptancesEnabled
+      },
       systemAnnouncementsEnabled: {
         type: Boolean,
         default: DEFAULT_NOTIFICATION_SETTINGS.systemAnnouncementsEnabled
@@ -247,6 +261,10 @@ const UserProfileSchema = new Schema<IUserProfile>(
       offersEnabled: {
         type: Boolean,
         default: DEFAULT_NOTIFICATION_SETTINGS.offersEnabled
+      },
+      partnerOffersEnabled: {
+        type: Boolean,
+        default: DEFAULT_NOTIFICATION_SETTINGS.partnerOffersEnabled
       }
     },
     notificationState: {

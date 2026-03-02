@@ -558,22 +558,22 @@ export function getGuideIntentLinks(guide: IeltsGuide) {
 
   const moduleLinks = {
     speaking: {
-      href: '/register',
+      href: '/app/speaking',
       label: 'Practice Speaking',
       description: 'Run part-based speaking simulations with transcript feedback.'
     },
     writing: {
-      href: '/register',
+      href: '/app/writing',
       label: 'Practice Writing',
       description: 'Do timed writing tasks with rubric scoring.'
     },
     reading: {
-      href: '/register',
+      href: '/app/reading',
       label: 'Practice Reading',
       description: 'Train reading question types under exam timing.'
     },
     listening: {
-      href: '/register',
+      href: '/app/listening',
       label: 'Practice Listening',
       description: 'Improve accuracy with section-based listening drills.'
     }
@@ -594,7 +594,7 @@ export function getGuideIntentLinks(guide: IeltsGuide) {
   const links = [
     inferredModule in moduleLinks ? moduleLinks[inferredModule as keyof typeof moduleLinks] : null,
     {
-      href: '/register',
+      href: '/app/tests',
       label: 'Run Full Mock',
       description: 'Validate progress with end-to-end exam simulation.'
     },

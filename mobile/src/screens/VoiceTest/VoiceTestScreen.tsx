@@ -35,6 +35,7 @@ import { AppTabParamList } from "../../navigation/AppNavigator";
 import { resultsStorage } from "../../services/resultsStorage";
 import type { ColorTokens } from "../../theme/tokens";
 import { spacing } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 import { EvaluationResultsScreen } from "../EvaluationResults/EvaluationResultsScreen";
 
 type VoiceTestScreenRouteProp = RouteProp<AppTabParamList, "VoiceTest">;
@@ -196,7 +197,7 @@ export const VoiceTestScreen: React.FC = () => {
       setMode("practice");
       setShowVoiceUI(true);
     } catch (error: any) {
-      console.error("Failed to get topic:", error);
+      logger.warn("Failed to get topic:", error);
       const errorMessage = error.message?.includes("timeout")
         ? "Request took too long. The AI is generating your topic. Please try again."
         : "Failed to load practice question. Please check your connection and try again.";
@@ -537,7 +538,7 @@ export const VoiceTestScreen: React.FC = () => {
       // Show evaluation results modal
       setShowEvaluation(true);
     } catch (error) {
-      console.error("❌ Failed to save result:", error);
+      logger.warn("❌ Failed to save result:", error);
 
       // Still show evaluation even if save failed
       setEvaluationData(
@@ -739,10 +740,9 @@ export const VoiceTestScreen: React.FC = () => {
                 .invalidateQueries({ queryKey: ["full-test-results"] })
                 .catch(() => undefined);
             } catch (error) {
-              console.error("Failed to store legacy full test result", error);
+              logger.warn("Failed to store legacy full test result", error);
             }
             handleSessionEnd();
-            // TODO: Show results screen
             Alert.alert(
               "Test Complete!",
               "Your authentic IELTS test has been completed. Results will be evaluated soon.",
@@ -816,7 +816,7 @@ export const VoiceTestScreen: React.FC = () => {
                   .invalidateQueries({ queryKey: ["full-test-results"] })
                   .catch(() => undefined);
               } catch (error) {
-                console.error("Failed to store full test v2 result", error);
+                logger.warn("Failed to store full test v2 result", error);
               }
 
               setEvaluationData({
@@ -853,7 +853,7 @@ export const VoiceTestScreen: React.FC = () => {
                   .invalidateQueries({ queryKey: ["full-test-results"] })
                   .catch(() => undefined);
               } catch (error) {
-                console.error(
+                logger.warn(
                   "Failed to store fallback full test result",
                   error
                 );

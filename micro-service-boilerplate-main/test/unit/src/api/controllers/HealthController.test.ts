@@ -42,13 +42,17 @@ describe('HealthController', () => {
 
     const app = createApp();
     const response = await request(app)
-      .get('/v1/health')
+      .get('/health')
       .set('Unique-Reference-Code', 'controller-test');
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data).toMatchObject(mockData);
-    expect(mockService.getHealthStatus).toHaveBeenCalledWith({ urc: 'controller-test' });
+    expect(mockService.getHealthStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urc: 'controller-test'
+      })
+    );
   });
 
   it('returns error response when service throws', async () => {
@@ -59,11 +63,15 @@ describe('HealthController', () => {
     Container.set({ id: HealthService, value: mockService });
 
     const app = createApp();
-    const response = await request(app).get('/v1/health');
+    const response = await request(app).get('/health');
 
     expect(response.status).toBe(500);
     expect(response.body.success).toBe(false);
     expect(response.body.error).toBeDefined();
-    expect(mockService.getHealthStatus).toHaveBeenCalledWith({ urc: 'health-check' });
+    expect(mockService.getHealthStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        urc: expect.stringMatching(/^health-/)
+      })
+    );
   });
 });

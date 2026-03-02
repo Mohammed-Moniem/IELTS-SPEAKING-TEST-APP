@@ -8,6 +8,7 @@ export const colors = {
   surface: "#FFFFFF",
   surfaceSubtle: "#F1EFF8", // gray-100
   overlay: "#FFFFFF",
+  overlayBackdrop: "rgba(0, 0, 0, 0.55)",
 
   // Borders
   border: "rgba(124, 58, 237, 0.15)",
@@ -48,6 +49,22 @@ export const colors = {
   danger: red.red9,
   dangerSoft: red.red4,
   dangerOn: "#FFFFFF",
+
+  // Semantic badges
+  badgePremiumBackground: "#FEF3C7",
+  badgePremiumText: "#78350F",
+  badgePremiumBorder: "#FBBF24",
+
+  // Semantic status banners
+  statusInfoBackground: "#EEF2FF",
+  statusInfoBorder: "#C7D2FE",
+  statusInfoText: "#3730A3",
+
+  // Semantic reward tier colors
+  tierBronze: "#CD7F32",
+  tierSilver: "#A8A8A8",
+  tierGold: "#D4A017",
+  tierPlatinum: "#B8BDC7",
 
   // Tab
   tabInactive: "#7A7090", // gray-500

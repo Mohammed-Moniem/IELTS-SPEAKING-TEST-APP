@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
-import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { ieltsGuides } from '@/lib/seo/ieltsGuides';
 import { siteConfig } from '@/lib/seo/site';
 
@@ -33,9 +30,7 @@ const cards = [
   ['Admin Suite', 'Role-gated content ops, user/subscription support, analytics, AI cost, and feature flags.']
 ] as const;
 
-export default async function FeaturesPage() {
-  const marketingVariant = await getServerMarketingVariant();
-  const isMotionVariant = marketingVariant === 'motion';
+export default function FeaturesPage() {
   const itemListSchema = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -54,35 +49,24 @@ export default async function FeaturesPage() {
     <div className="space-y-10 lg:space-y-14">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }} />
 
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'widgets', text: 'Complete IELTS Feature Stack' }}
-          title="Everything Learners Need for IELTS Progress in One Connected Workflow"
-          description="Spokio links speaking, writing, reading, listening, and full mocks into one measurable learning loop with clear progress and actionable coaching signals."
-        />
-      ) : (
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-700 p-10 lg:p-16 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
-          <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-fuchsia-500/15 rounded-full blur-[80px]" />
-          <div className="relative z-10 max-w-3xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
-              <span className="material-symbols-outlined text-[14px]">widgets</span>
-              Complete IELTS Feature Stack
-            </span>
-            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.1]">Everything Learners Need for IELTS Progress in One Connected Workflow</h1>
-            <p className="mt-4 text-lg text-white/80 leading-relaxed max-w-2xl">
-              Spokio links speaking, writing, reading, listening, and full mocks into one measurable learning loop with
-              clear progress and actionable coaching signals.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* ── Hero ── */}
+      <section className="marketing-hero-surface relative overflow-hidden rounded-[2rem] p-10 text-white lg:p-16">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvc3ZnPg==')] opacity-60" />
+        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-fuchsia-500/15 rounded-full blur-[80px]" />
+        <div className="relative z-10 max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-wider mb-5">
+            <span className="material-symbols-outlined text-[14px]">widgets</span>
+            Complete IELTS Feature Stack
+          </span>
+          <h1 className="hero-elegant-title text-4xl font-extrabold leading-[1.1] tracking-tight lg:text-5xl">Everything Learners Need for IELTS Progress in One Connected Workflow</h1>
+          <p className="hero-elegant-copy mt-4 max-w-2xl text-lg leading-relaxed text-white/80">
+            Spokio links speaking, writing, reading, listening, and full mocks into one measurable learning loop with
+            clear progress and actionable coaching signals.
+          </p>
+        </div>
+      </section>
 
-      <section className={`relative isolate overflow-hidden rounded-3xl ${isMotionVariant ? 'p-5 sm:p-6' : ''}`}>
-        {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-        <div className="relative z-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(([title, copy]) => (
           <article key={title} className="group relative overflow-hidden rounded-2xl border border-gray-200/60 bg-white dark:bg-gray-900 p-6 space-y-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-500/10 dark:border-gray-800/60">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-50/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-violet-500/5" />
@@ -91,8 +75,7 @@ export default async function FeaturesPage() {
             <p className="relative z-10 text-sm text-gray-500 dark:text-gray-400">{copy}</p>
           </article>
         ))}
-        </div>
-      </section>
+      </div>
 
       <section className="rounded-2xl border border-gray-200/80 bg-white/50 backdrop-blur-sm p-8 dark:border-gray-800/80 dark:bg-gray-900/50 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] space-y-4">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">How This Improves IELTS Score Consistency</h3>

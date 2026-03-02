@@ -12,7 +12,9 @@ import {
   View,
 } from "react-native";
 import { LeaderboardSkeleton } from "../../components/skeletons/SocialSkeletons";
-import { useLeaderboard } from "../../hooks";
+import { useTheme } from "../../context";
+import { useLeaderboard, useThemedStyles } from "../../hooks";
+import type { ColorTokens } from "../../theme/tokens";
 
 type Period = "all-time" | "daily" | "weekly" | "monthly";
 type Metric = "score" | "practices" | "achievements" | "streak";
@@ -22,13 +24,6 @@ const METRIC_ICONS: Record<Metric, keyof typeof Ionicons.glyphMap> = {
   practices: "book",
   achievements: "trophy",
   streak: "flame",
-};
-
-const METRIC_COLORS: Record<Metric, string> = {
-  score: "#FFD60A",
-  practices: "#007AFF",
-  achievements: "#34C759",
-  streak: "#FF9500",
 };
 
 export const LeaderboardScreen: React.FC = () => {
@@ -44,6 +39,8 @@ export const LeaderboardScreen: React.FC = () => {
   const [period, setPeriod] = useState<Period>("all-time");
   const [metric, setMetric] = useState<Metric>("score");
   const [refreshing, setRefreshing] = useState(false);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -80,6 +77,13 @@ export const LeaderboardScreen: React.FC = () => {
     }
   };
 
+  const getMetricColor = (metricName: Metric): string => {
+    if (metricName === "score") return colors.warning;
+    if (metricName === "practices") return colors.primary;
+    if (metricName === "achievements") return colors.success;
+    return colors.warning;
+  };
+
   const renderLeaderboardItem = ({
     item,
     index,
@@ -99,7 +103,11 @@ export const LeaderboardScreen: React.FC = () => {
             name="trophy"
             size={24}
             color={
-              index === 0 ? "#FFD60A" : index === 1 ? "#C7C7CC" : "#CD7F32"
+              index === 0
+                ? colors.tierGold
+                : index === 1
+                ? colors.tierSilver
+                : colors.tierBronze
             }
           />
         ) : (
@@ -122,7 +130,7 @@ export const LeaderboardScreen: React.FC = () => {
           <Ionicons
             name={METRIC_ICONS[metric]}
             size={14}
-            color={METRIC_COLORS[metric]}
+            color={getMetricColor(metric)}
           />
           <Text style={styles.scoreText}>
             {metric === "score"
@@ -138,7 +146,7 @@ export const LeaderboardScreen: React.FC = () => {
 
       {item.streak > 0 && metric !== "streak" && (
         <View style={styles.streakBadge}>
-          <Ionicons name="flame" size={16} color="#FF9500" />
+          <Ionicons name="flame" size={16} color={colors.warning} />
           <Text style={styles.streakText}>{item.streak}</Text>
         </View>
       )}
@@ -181,7 +189,7 @@ export const LeaderboardScreen: React.FC = () => {
               <Ionicons
                 name={METRIC_ICONS[m]}
                 size={16}
-                color={metric === m ? "#FFFFFF" : METRIC_COLORS[m]}
+                color={metric === m ? colors.primaryOn : getMetricColor(m)}
               />
               <Text
                 style={[
@@ -200,7 +208,7 @@ export const LeaderboardScreen: React.FC = () => {
       {userPosition && !loading && (
         <View style={styles.positionCard}>
           <View style={styles.positionHeader}>
-            <Ionicons name="person" size={20} color="#007AFF" />
+            <Ionicons name="person" size={20} color={colors.primary} />
             <Text style={styles.positionTitle}>Your Position</Text>
           </View>
           <View style={styles.positionStats}>
@@ -225,7 +233,7 @@ export const LeaderboardScreen: React.FC = () => {
       ) : leaderboard.length === 0 ? (
         /* Empty State */
         <View style={styles.emptyContainer}>
-          <Ionicons name="trophy-outline" size={64} color="#C7C7CC" />
+          <Ionicons name="trophy-outline" size={64} color={colors.textMuted} />
           <Text style={styles.emptyTitle}>No Rankings Yet</Text>
           <Text style={styles.emptyText}>
             Complete more practices to appear on the leaderboard
@@ -245,13 +253,13 @@ export const LeaderboardScreen: React.FC = () => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#007AFF"
+                tintColor={colors.primary}
               />
             }
             ListFooterComponent={
               loadingMore ? (
                 <View style={styles.footerLoader}>
-                  <ActivityIndicator color="#007AFF" />
+                  <ActivityIndicator color={colors.primary} />
                 </View>
               ) : null
             }
@@ -262,208 +270,209 @@ export const LeaderboardScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F2F2F7",
-  },
-  tabs: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 16,
-    backgroundColor: "#F2F2F7",
-  },
-  activeTab: {
-    backgroundColor: "#007AFF",
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8E8E93",
-  },
-  activeTabText: {
-    color: "#FFFFFF",
-  },
-  metricSelector: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
-  metricChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#F2F2F7",
-    gap: 4,
-  },
-  activeMetricChip: {
-    backgroundColor: "#007AFF",
-  },
-  metricText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#8E8E93",
-  },
-  activeMetricText: {
-    color: "#FFFFFF",
-  },
-  positionCard: {
-    backgroundColor: "#FFFFFF",
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  positionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
-  positionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  positionStats: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-  },
-  positionStatItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  positionDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: "#E5E5EA",
-  },
-  positionLabel: {
-    fontSize: 12,
-    color: "#8E8E93",
-    marginBottom: 4,
-  },
-  positionRank: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#007AFF",
-  },
-  positionPercentile: {
-    fontSize: 28,
-    color: "#34C759",
-    fontWeight: "bold",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-    gap: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#000000",
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#8E8E93",
-    textAlign: "center",
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  leaderboardItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  currentUserItem: {
-    borderWidth: 2,
-    borderColor: "#007AFF",
-    backgroundColor: "#F0F8FF",
-  },
-  rankContainer: {
-    width: 40,
-    alignItems: "center",
-  },
-  rankText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000000",
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginHorizontal: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  username: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 4,
-  },
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  scoreText: {
-    fontSize: 14,
-    color: "#8E8E93",
-  },
-  streakBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF3E0",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  streakText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FF9500",
-  },
-  footerLoader: {
-    paddingVertical: 20,
-    alignItems: "center",
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.backgroundMuted,
+    },
+    tabs: {
+      flexDirection: "row",
+      backgroundColor: colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      gap: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceSubtle,
+    },
+    activeTab: {
+      backgroundColor: colors.primary,
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+    activeTabText: {
+      color: colors.primaryOn,
+    },
+    metricSelector: {
+      flexDirection: "row",
+      backgroundColor: colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      gap: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderMuted,
+    },
+    metricChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceSubtle,
+      gap: 4,
+    },
+    activeMetricChip: {
+      backgroundColor: colors.primary,
+    },
+    metricText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+    activeMetricText: {
+      color: colors.primaryOn,
+    },
+    positionCard: {
+      backgroundColor: colors.surface,
+      margin: 16,
+      padding: 16,
+      borderRadius: 12,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    positionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12,
+    },
+    positionTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.primary,
+    },
+    positionStats: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+    },
+    positionStatItem: {
+      flex: 1,
+      alignItems: "center",
+    },
+    positionDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: colors.divider,
+    },
+    positionLabel: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginBottom: 4,
+    },
+    positionRank: {
+      fontSize: 28,
+      fontWeight: "bold",
+      color: colors.primary,
+    },
+    positionPercentile: {
+      fontSize: 28,
+      color: colors.success,
+      fontWeight: "bold",
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 32,
+      gap: 16,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+    list: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
+    leaderboardItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 8,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    currentUserItem: {
+      borderWidth: 2,
+      borderColor: colors.primary,
+      backgroundColor: colors.statusInfoBackground,
+    },
+    rankContainer: {
+      width: 40,
+      alignItems: "center",
+    },
+    rankText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.textPrimary,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      marginHorizontal: 12,
+    },
+    userInfo: {
+      flex: 1,
+    },
+    username: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    statsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    scoreText: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    streakBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.warningSoft,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 4,
+    },
+    streakText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.warning,
+    },
+    footerLoader: {
+      paddingVertical: 20,
+      alignItems: "center",
+    },
+  });

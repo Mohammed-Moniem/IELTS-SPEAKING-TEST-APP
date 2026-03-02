@@ -1,0 +1,7 @@
+{
+  "http://127.0.0.1:3040/": "https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1771778085244-74248.report.html",
+  "http://127.0.0.1:3040/pricing": "https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1771778086821-93120.report.html",
+  "http://127.0.0.1:3040/features": "https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1771778088535-47799.report.html",
+  "http://127.0.0.1:3040/ielts": "https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1771778089583-75313.report.html",
+  "http://127.0.0.1:3040/ielts/ielts-speaking-practice-online": "https://storage.googleapis.com/lighthouse-infrastructure.appspot.com/reports/1771778090485-91869.report.html"
+}

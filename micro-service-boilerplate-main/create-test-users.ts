@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as bcrypt from 'bcrypt';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';

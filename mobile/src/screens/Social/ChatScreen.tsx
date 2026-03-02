@@ -30,11 +30,15 @@ import { ImageViewer } from "../../components/chat/ImageViewer";
 import { OnlineStatusBadge } from "../../components/chat/OnlineStatusBadge";
 import { TypingIndicator } from "../../components/chat/TypingIndicator";
 import { VideoMessage } from "../../components/chat/VideoMessage";
+import { useTheme } from "../../context";
 import { useChat } from "../../hooks";
+import { useThemedStyles } from "../../hooks";
 import audioRecordingService from "../../services/api/audioRecordingService";
 import type { ChatMessage } from "../../services/api/chatService";
 import socketService from "../../services/socketService";
 import { typingIndicatorService } from "../../services/typingIndicatorService";
+import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 // Check if Giphy SDK is available
 let isGiphyAvailable = false;
@@ -47,6 +51,8 @@ try {
 }
 
 export const ChatScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const route = useRoute<any>();
   const navigation = useNavigation();
   const { user, accessToken } = useAuth();
@@ -155,7 +161,13 @@ export const ChatScreen: React.FC = () => {
     navigation.setOptions({
       headerTitle: () => (
         <View style={{ flexDirection: "column", alignItems: "center" }}>
-          <Text style={{ fontSize: 17, fontWeight: "600", color: "#000" }}>
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: "600",
+              color: colors.textPrimary,
+            }}
+          >
             {recipientName || "Chat"}
           </Text>
           {recipientId && !isGroupChat && (
@@ -212,7 +224,7 @@ export const ChatScreen: React.FC = () => {
       }
       await refreshConversation();
     } catch (error) {
-      console.error("Failed to send message:", error);
+      logger.warn("Failed to send message", error);
     } finally {
       setSending(false);
     }
@@ -463,7 +475,7 @@ export const ChatScreen: React.FC = () => {
       setShowGifPicker(false);
       await refreshConversation();
     } catch (error) {
-      console.error("Failed to send GIF:", error);
+      logger.warn("Failed to send GIF", error);
       Alert.alert("Error", "Failed to send GIF. Please try again.");
     }
   };
@@ -534,7 +546,7 @@ export const ChatScreen: React.FC = () => {
 
       await refreshConversation(uploadResult?.message?.conversationId);
     } catch (error) {
-      console.error("Failed to send voice note:", error);
+      logger.warn("Failed to send voice note", error);
       Alert.alert("Error", "Failed to send voice note. Please try again.");
       setIsRecordingVoice(false);
       // Flag optimistic message as failed so user can retry or see status
@@ -826,7 +838,7 @@ export const ChatScreen: React.FC = () => {
     >
       {loading && messages.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -842,7 +854,7 @@ export const ChatScreen: React.FC = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor="#007AFF"
+              tintColor={colors.primary}
             />
           }
           ListHeaderComponent={
@@ -857,7 +869,7 @@ export const ChatScreen: React.FC = () => {
             loadingMore ? (
               <ActivityIndicator
                 size="small"
-                color="#007AFF"
+                color={colors.primary}
                 style={{ marginVertical: 10 }}
               />
             ) : null
@@ -879,7 +891,7 @@ export const ChatScreen: React.FC = () => {
           value={inputText}
           onChangeText={handleTyping}
           placeholder="Message..."
-          placeholderTextColor="#8E8E93"
+          placeholderTextColor={colors.textMuted}
           multiline
           maxLength={2000}
         />
@@ -893,9 +905,9 @@ export const ChatScreen: React.FC = () => {
           disabled={sending || !inputText.trim()}
         >
           {sending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={colors.primaryOn} />
           ) : (
-            <Ionicons name="send" size={20} color="#FFFFFF" />
+            <Ionicons name="send" size={20} color={colors.primaryOn} />
           )}
         </TouchableOpacity>
         {/* ) : (
@@ -903,7 +915,7 @@ export const ChatScreen: React.FC = () => {
               style={styles.micButton}
               onPress={handleVoiceRecordStart}
             >
-              <Ionicons name="mic" size={24} color="#128C7E" />
+              <Ionicons name="mic" size={24} color={colors.primary} />
             </TouchableOpacity>
           )} */}
       </View>
@@ -927,171 +939,167 @@ export const ChatScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#E5DDD5", // WhatsApp-style light background
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  messagesList: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  messageContainer: {
-    marginVertical: 2,
-    maxWidth: "80%",
-    position: "relative",
-  },
-  ownMessageContainer: {
-    alignSelf: "flex-end",
-  },
-  messageBubble: {
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 20, // Extra space for timestamp
-    position: "relative",
-    // Shadow for depth
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 1.5,
-    elevation: 2,
-  },
-  ownMessage: {
-    backgroundColor: "#DCF8C6", // WhatsApp green for sent messages
-  },
-  otherMessage: {
-    backgroundColor: "#FFFFFF", // White for received messages
-  },
-  // Message tail using border trick
-  tail: {
-    position: "absolute",
-    width: 0,
-    height: 0,
-    borderStyle: "solid",
-    bottom: 0,
-  },
-  ownTail: {
-    right: -5,
-    borderWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#DCF8C6", // Match own message background
-    borderBottomColor: "transparent",
-    transform: [{ rotate: "45deg" }],
-  },
-  otherTail: {
-    left: -5,
-    borderWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#FFFFFF", // Match other message background
-    borderBottomColor: "transparent",
-    transform: [{ rotate: "-45deg" }],
-  },
-  messageText: {
-    fontSize: 16,
-    color: "#000000",
-    lineHeight: 22,
-  },
-  ownMessageText: {
-    color: "#000000", // Dark text on green background
-  },
-  timestampSpacing: {
-    fontSize: 11,
-    opacity: 0, // Invisible but takes up space
-  },
-  timestampContainer: {
-    position: "absolute",
-    bottom: 4,
-    right: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  ownTimestampContainer: {
-    // Can customize if needed
-  },
-  timestamp: {
-    fontSize: 11,
-    color: "#667781", // WhatsApp timestamp gray
-    marginRight: 3,
-  },
-  ownTimestamp: {
-    color: "#667781", // Same color for both
-  },
-  readReceipt: {
-    fontSize: 14,
-    color: "#4FC3F7", // Blue checkmarks for read
-    fontWeight: "600",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 8,
-    backgroundColor: "#F0F0F0",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#C7C7CC",
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 16,
-    maxHeight: 100,
-    color: "#000000",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#128C7E", // WhatsApp green
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  micButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-    borderWidth: 1,
-    borderColor: "#128C7E",
-  },
-  // Date separator styles
-  dateSeparatorContainer: {
-    alignItems: "center",
-    marginVertical: 12,
-  },
-  dateSeparatorBadge: {
-    backgroundColor: "rgba(225, 245, 254, 0.92)", // Light blue with transparency
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  dateSeparatorText: {
-    fontSize: 13,
-    color: "#54656F", // WhatsApp date separator text color
-    fontWeight: "500",
-    letterSpacing: 0.2,
-  },
-});
+const createStyles = (colors: ColorTokens) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.backgroundMuted,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    messagesList: {
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+    },
+    messageContainer: {
+      marginVertical: 2,
+      maxWidth: "80%",
+      position: "relative",
+    },
+    ownMessageContainer: {
+      alignSelf: "flex-end",
+    },
+    messageBubble: {
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingTop: 8,
+      paddingBottom: 20,
+      position: "relative",
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.18,
+      shadowRadius: 1.5,
+      elevation: 2,
+    },
+    ownMessage: {
+      backgroundColor: colors.successSoft,
+    },
+    otherMessage: {
+      backgroundColor: colors.surface,
+    },
+    tail: {
+      position: "absolute",
+      width: 0,
+      height: 0,
+      borderStyle: "solid",
+      bottom: 0,
+    },
+    ownTail: {
+      right: -5,
+      borderWidth: 8,
+      borderLeftColor: "transparent",
+      borderRightColor: "transparent",
+      borderTopColor: colors.successSoft,
+      borderBottomColor: "transparent",
+      transform: [{ rotate: "45deg" }],
+    },
+    otherTail: {
+      left: -5,
+      borderWidth: 8,
+      borderLeftColor: "transparent",
+      borderRightColor: "transparent",
+      borderTopColor: colors.surface,
+      borderBottomColor: "transparent",
+      transform: [{ rotate: "-45deg" }],
+    },
+    messageText: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      lineHeight: 22,
+    },
+    ownMessageText: {
+      color: colors.textPrimary,
+    },
+    timestampSpacing: {
+      fontSize: 11,
+      opacity: 0,
+    },
+    timestampContainer: {
+      position: "absolute",
+      bottom: 4,
+      right: 8,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    ownTimestampContainer: {},
+    timestamp: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginRight: 3,
+    },
+    ownTimestamp: {
+      color: colors.textMuted,
+    },
+    readReceipt: {
+      fontSize: 14,
+      color: colors.info,
+      fontWeight: "600",
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 8,
+      backgroundColor: colors.surfaceSubtle,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderMuted,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      fontSize: 16,
+      maxHeight: 100,
+      color: colors.textPrimary,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+    },
+    sendButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 8,
+    },
+    sendButtonDisabled: {
+      opacity: 0.5,
+    },
+    micButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 8,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    dateSeparatorContainer: {
+      alignItems: "center",
+      marginVertical: 12,
+    },
+    dateSeparatorBadge: {
+      backgroundColor: colors.infoSoft,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      shadowColor: colors.textPrimary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    dateSeparatorText: {
+      fontSize: 13,
+      color: colors.textMutedStrong,
+      fontWeight: "500",
+      letterSpacing: 0.2,
+    },
+  });

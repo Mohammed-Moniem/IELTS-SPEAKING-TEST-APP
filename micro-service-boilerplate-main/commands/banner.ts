@@ -1,12 +1,12 @@
 import chalk from 'chalk';
 import * as figlet from 'figlet';
 
-figlet.text(process.argv[2], (error: any, data: any) => {
-    if (error) {
-        return process.exit(1);
-    }
-
-    console.log(chalk.blue(data));
-    console.log('');
-    return process.exit(0);
-});
+try {
+  const text = process.argv[2] || 'Spokio';
+  const data = typeof (figlet as any).textSync === 'function' ? (figlet as any).textSync(text) : text;
+  console.log(chalk.blue(data));
+  console.log('');
+  process.exit(0);
+} catch {
+  process.exit(1);
+}

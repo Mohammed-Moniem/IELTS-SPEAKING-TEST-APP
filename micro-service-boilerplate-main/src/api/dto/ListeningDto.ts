@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StartListeningTestRequest {
@@ -38,4 +38,16 @@ export class ListeningHistoryQuery {
   @IsInt()
   @Min(0)
   offset?: number;
+
+  @IsOptional()
+  @IsIn(['academic', 'general'])
+  track?: 'academic' | 'general';
+
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

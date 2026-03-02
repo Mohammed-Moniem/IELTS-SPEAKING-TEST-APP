@@ -33,7 +33,8 @@ const footerColumns = [
     links: [
       { href: '/ielts', label: 'IELTS Guides' },
       { href: '/blog', label: 'Blog' },
-      { href: '/editorial-policy', label: 'Editorial Policy' }
+      { href: '/editorial-policy', label: 'Editorial Policy' },
+      { href: '/contact?section=faq', label: 'FAQ' }
     ]
   },
   {
@@ -126,12 +127,12 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="mt-10 pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400">© {new Date().getFullYear()} Spokio. All rights reserved.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">© {new Date().getFullYear()} Spokio. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <Link href="/editorial-policy" className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+              <Link href="/editorial-policy" className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                 Editorial Policy
               </Link>
-              <Link href="/contact" className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+              <Link href="/contact" className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                 Contact
               </Link>
             </div>

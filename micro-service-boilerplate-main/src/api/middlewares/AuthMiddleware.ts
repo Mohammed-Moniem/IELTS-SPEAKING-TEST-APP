@@ -13,14 +13,23 @@ import { Service } from 'typedi';
 export class AuthMiddleware implements ExpressMiddlewareInterface {
   private log = new Logger(__filename);
 
-  private readonly PUBLIC_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/health'];
+  private readonly PUBLIC_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/health', '/subscription/webhook'];
+  private readonly PUBLIC_PATH_PATTERNS = [
+    /\/blog\/posts(?:\/|$)/,
+    /\/guides\/tree(?:\/|$)/,
+    /\/guides\/page(?:\/|$)/,
+    /\/guides\/related\/[^/]+(?:\/|$)/,
+    /\/guides\/search(?:\/|$)/
+  ];
 
   public use(req: express.Request, res: express.Response, next: express.NextFunction): void {
     const headers: IRequestHeaders = { urc: (req.header('Unique-Reference-Code') || '').trim() || 'auth-mw' };
     const logMessage = constructLogMessage(__filename, 'use', headers);
 
     // Skip authentication for public endpoints
-    const isPublicPath = this.PUBLIC_PATHS.some(path => req.path.endsWith(path));
+    const isPublicPath =
+      this.PUBLIC_PATHS.some(path => req.path.endsWith(path)) ||
+      this.PUBLIC_PATH_PATTERNS.some(pattern => pattern.test(req.path));
     if (isPublicPath) {
       this.log.debug(`${logMessage} :: Skipping auth for public path: ${req.path}`);
       return next();

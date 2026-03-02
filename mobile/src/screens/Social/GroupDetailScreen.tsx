@@ -22,6 +22,7 @@ import { useThemedStyles } from "../../hooks";
 import type { SocialStackParamList } from "../../navigation/SocialNavigator";
 import type { GroupMember, StudyGroup } from "../../services/api/groupService";
 import type { ColorTokens } from "../../theme/tokens";
+import { logger } from "../../utils/logger";
 
 type GroupDetailScreenRouteProp = RouteProp<
   SocialStackParamList,
@@ -67,7 +68,7 @@ export const GroupDetailScreen: React.FC = () => {
       setGroup(fetchedGroup ?? null);
       await refreshMembers();
     } catch (error) {
-      console.error("Failed to load group", error);
+      logger.warn("Failed to load group", error);
     } finally {
       setLoading(false);
     }
@@ -214,7 +215,7 @@ export const GroupDetailScreen: React.FC = () => {
         <View style={styles.headerRow}>
           <Text style={styles.groupTitle}>{group.name}</Text>
           <View style={styles.memberCountBadge}>
-            <Ionicons name="people" size={16} color="#0A7AFF" />
+            <Ionicons name="people" size={16} color={colors.primary} />
             <Text style={styles.memberCountText}>
               {memberCount}/{maxMembers}
             </Text>
@@ -251,9 +252,9 @@ export const GroupDetailScreen: React.FC = () => {
         onPress={handleOpenChat}
         activeOpacity={0.7}
       >
-        <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
+        <Ionicons name="chatbubbles" size={24} color={colors.primaryOn} />
         <Text style={styles.chatButtonText}>Open Group Chat</Text>
-        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+        <Ionicons name="arrow-forward" size={20} color={colors.primaryOn} />
       </TouchableOpacity>
 
       {isAdmin ? (
@@ -288,7 +289,7 @@ export const GroupDetailScreen: React.FC = () => {
               return (
                 <View style={styles.friendRow} key={friendId}>
                   <View style={styles.friendInfo}>
-                    <Ionicons name="person-circle" size={24} color="#007AFF" />
+                    <Ionicons name="person-circle" size={24} color={colors.primary} />
                     <View>
                       <Text style={styles.friendName}>{displayName}</Text>
                       {friend.friendId?.email ? (
@@ -303,7 +304,7 @@ export const GroupDetailScreen: React.FC = () => {
                     onPress={() => handleAddMember(friendId, displayName)}
                     disabled={busy}
                   >
-                    <Ionicons name="add" size={18} color="#0A7AFF" />
+                    <Ionicons name="add" size={18} color={colors.primary} />
                     <Text style={styles.addButtonText}>Add</Text>
                   </TouchableOpacity>
                 </View>
@@ -322,7 +323,11 @@ export const GroupDetailScreen: React.FC = () => {
           return (
             <View style={styles.memberRow} key={member.userId}>
               <View style={styles.memberInfo}>
-                <Ionicons name="person-circle" size={28} color="#4B5563" />
+                <Ionicons
+                  name="person-circle"
+                  size={28}
+                  color={colors.textSecondary}
+                />
                 <View style={styles.memberTextContainer}>
                   <Text style={styles.memberName}>
                     {member.displayName ||
@@ -354,7 +359,7 @@ export const GroupDetailScreen: React.FC = () => {
                   onPress={() => handleRemoveMember(member)}
                   disabled={busy}
                 >
-                  <Ionicons name="remove-circle" size={20} color="#EF4444" />
+                  <Ionicons name="remove-circle" size={20} color={colors.danger} />
                   <Text style={styles.removeButtonText}>Remove</Text>
                 </TouchableOpacity>
               ) : null}
@@ -370,7 +375,7 @@ export const GroupDetailScreen: React.FC = () => {
             onPress={handleDeleteGroup}
             disabled={busy}
           >
-            <Ionicons name="trash" size={20} color="#FFFFFF" />
+            <Ionicons name="trash" size={20} color={colors.primaryOn} />
             <Text style={styles.dangerButtonText}>Delete group</Text>
           </TouchableOpacity>
         ) : (
@@ -379,7 +384,7 @@ export const GroupDetailScreen: React.FC = () => {
             onPress={handleLeaveGroup}
             disabled={busy}
           >
-            <Ionicons name="log-out" size={20} color="#FFFFFF" />
+            <Ionicons name="log-out" size={20} color={colors.primaryOn} />
             <Text style={styles.dangerButtonText}>Leave group</Text>
           </TouchableOpacity>
         )}

@@ -6,6 +6,69 @@
 import monitoringService from "../services/monitoringService";
 
 const isDevelopment = __DEV__;
+const MAX_LOG_STRING_LENGTH = 800;
+
+const truncateString = (value: string): string => {
+  if (value.length <= MAX_LOG_STRING_LENGTH) {
+    return value;
+  }
+  return `${value.slice(0, MAX_LOG_STRING_LENGTH)}...(truncated)`;
+};
+
+const serializeForLog = (value: any): any => {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: truncateString(value.message),
+      stack: value.stack,
+    };
+  }
+
+  if (typeof value === "string") {
+    return truncateString(value);
+  }
+
+  if (value && typeof value === "object") {
+    const axiosLike = value as {
+      isAxiosError?: boolean;
+      message?: string;
+      code?: string;
+      config?: { url?: string; method?: string };
+      response?: { status?: number; data?: unknown };
+    };
+
+    if (axiosLike.isAxiosError) {
+      return {
+        message: truncateString(axiosLike.message || "Axios error"),
+        code: axiosLike.code,
+        status: axiosLike.response?.status,
+        method: axiosLike.config?.method?.toUpperCase(),
+        url: axiosLike.config?.url,
+        data: axiosLike.response?.data,
+      };
+    }
+
+    try {
+      return JSON.parse(
+        JSON.stringify(value, (_key, entry) => {
+          if (typeof entry === "string") {
+            return truncateString(entry);
+          }
+          return entry;
+        })
+      );
+    } catch (_error) {
+      return String(value);
+    }
+  }
+
+  return value;
+};
+
+const getErrorStatus = (error: any): number | undefined => {
+  const status = error?.response?.status ?? error?.status ?? error?.data?.status;
+  return typeof status === "number" ? status : undefined;
+};
 
 class Logger {
   /**
@@ -21,7 +84,12 @@ class Logger {
    * Log error messages (always logged, but can be sent to error tracking in production)
    */
   error(...args: any[]) {
-    console.error(...args);
+    const safeArgs = args.map(serializeForLog);
+    if (isDevelopment) {
+      console.warn(...safeArgs);
+    } else {
+      console.error(...safeArgs);
+    }
 
     const errorArg = args.find((arg) => arg instanceof Error) as
       | Error
@@ -37,7 +105,7 @@ class Logger {
           if (arg instanceof Error) {
             return { message: arg.message, stack: arg.stack };
           }
-          return arg;
+          return serializeForLog(arg);
         }),
       };
       monitoringService.captureException(derivedError, context);
@@ -106,19 +174,41 @@ class Logger {
    */
   apiError(error: any) {
     if (isDevelopment) {
-      const payload = {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url,
-      };
+      const status = getErrorStatus(error);
+      const url = error?.config?.url ?? error?.response?.config?.url;
+      const responseData = error?.response?.data;
+      const responseDataString =
+        typeof responseData === "string"
+          ? responseData
+          : JSON.stringify(responseData || "");
+      const isSpeechBillingIssue =
+        typeof url === "string" &&
+        url.includes("/speech/synthesize") &&
+        (status === 402 || status === 500) &&
+        /payment_required|paid_plan_required|payment_issue|billing/i.test(
+          responseDataString
+        );
 
-      if (payload.status === 401 || payload.status === 403) {
-        console.warn("⚠️ API Auth Error:", payload);
+      if (isSpeechBillingIssue) {
+        console.log(
+          "ℹ️ Speech provider is temporarily unavailable; continuing with fallback behavior."
+        );
         return;
       }
 
-      console.error("❌ API Error:", payload);
+      const payload = {
+        message: error.message,
+        status,
+        data: responseData,
+        url,
+      };
+
+      if (payload.status === 401 || payload.status === 403) {
+        console.log("ℹ️ API auth response:", serializeForLog(payload));
+        return;
+      }
+
+      console.warn("⚠️ API request failed:", serializeForLog(payload));
     }
   }
 

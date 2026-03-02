@@ -47,7 +47,7 @@ export class FriendService {
   /**
    * Accept a friend request
    */
-  async acceptFriendRequest(requestId: string): Promise<void> {
+  async acceptFriendRequest(requestId: string): Promise<IFriendRequest> {
     const request = await FriendRequest.findById(requestId);
 
     if (!request) {
@@ -72,6 +72,7 @@ export class FriendService {
     await friendship.save();
 
     log.info(`Friend request accepted: ${request.senderId} <-> ${request.receiverId}`);
+    return request;
   }
 
   /**

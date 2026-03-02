@@ -1,17 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
 import { ApiError, webApi } from '@/lib/api/client';
 import type { BlogPostDetail } from '@/lib/types';
 import { EmptyState, ErrorState, SkeletonSet } from '@/components/ui/v2';
 
 type Props = {
   slug: string;
-  isMotionVariant?: boolean;
 };
 
 const formatDate = (value?: string) => {
@@ -41,12 +38,12 @@ const toHtml = (markdown: string) => {
     .replace(/<p><\/p>/g, '');
 };
 
-export function BlogPostPage({ slug, isMotionVariant = false }: Props) {
+export function BlogPostPage({ slug }: Props) {
   const [post, setPost] = useState<BlogPostDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadPost = useCallback(async () => {
+  const loadPost = async () => {
     setLoading(true);
     setError('');
     try {
@@ -57,21 +54,13 @@ export function BlogPostPage({ slug, isMotionVariant = false }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  };
 
   useEffect(() => {
     void loadPost();
-  }, [loadPost]);
+  }, [slug]);
 
   const articleHtml = useMemo(() => (post ? toHtml(post.body || '') : ''), [post]);
-  const fallbackTitle = useMemo(
-    () =>
-      slug
-        .split('-')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' '),
-    [slug]
-  );
 
   const schema = useMemo(() => {
     if (!post) return null;
@@ -98,31 +87,6 @@ export function BlogPostPage({ slug, isMotionVariant = false }: Props) {
         Back to blog
       </Link>
 
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'article', text: post?.cluster || 'Blog Article' }}
-          title={post?.title || fallbackTitle}
-          description={post?.excerpt || 'Reviewed IELTS strategy guidance with practical next steps.'}
-          ctas={[
-            {
-              href: '/register',
-              label: 'Start Free',
-              ctaId: `blog_post_hero_start_free_${slug}`,
-              section: 'blog-post-hero'
-            },
-            {
-              href: '/pricing',
-              label: 'View Plans',
-              tone: 'secondary',
-              ctaId: `blog_post_hero_view_plans_${slug}`,
-              section: 'blog-post-hero'
-            }
-          ]}
-        />
-      ) : null}
-
       {loading ? <SkeletonSet rows={8} /> : null}
 
       {!loading && error ? <ErrorState body={error} onRetry={() => void loadPost()} /> : null}
@@ -130,13 +94,11 @@ export function BlogPostPage({ slug, isMotionVariant = false }: Props) {
       {!loading && !error && !post ? <EmptyState title="Article not found" body="This article may have been moved or unpublished." /> : null}
 
       {!loading && !error && post ? (
-        <article className="space-y-6">
+        <article className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 lg:p-8 space-y-6">
           {schema ? (
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
           ) : null}
-
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 lg:p-8 space-y-6">
-            <header className="space-y-3">
+          <header className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <span className="rounded-full bg-violet-100 dark:bg-violet-500/10 px-2.5 py-0.5 font-semibold text-violet-700 dark:text-violet-300">
                 {post.cluster}
@@ -155,29 +117,27 @@ export function BlogPostPage({ slug, isMotionVariant = false }: Props) {
                 ))}
               </div>
             ) : null}
-            </header>
+          </header>
 
-            <div
-              className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-violet-600 dark:prose-a:text-violet-400"
-              dangerouslySetInnerHTML={{ __html: articleHtml }}
-            />
+          <div
+            className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-bold prose-a:text-violet-600 dark:prose-a:text-violet-400"
+            dangerouslySetInnerHTML={{ __html: articleHtml }}
+          />
 
-            <section className="relative isolate overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4 space-y-3">
-              {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-              <h2 className="relative z-10 text-base font-bold text-gray-900 dark:text-white">Use this strategy in Spokio</h2>
-              <p className="relative z-10 text-sm text-gray-600 dark:text-gray-300">
-                Apply this article immediately inside the learner workspace using module practice flows and full exam simulation.
-              </p>
-              <div className="relative z-10 flex flex-wrap gap-2">
-                <Link href="/app/dashboard" className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
-                  Open Learner App
-                </Link>
-                <Link href="/pricing" className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-                  View plans
-                </Link>
-              </div>
-            </section>
-          </div>
+          <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4 space-y-3">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Use this strategy in Spokio</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Apply this article immediately inside the learner workspace using module practice flows and full exam simulation.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/app/dashboard" className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
+                Open Learner App
+              </Link>
+              <Link href="/pricing" className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+                View plans
+              </Link>
+            </div>
+          </section>
         </article>
       ) : null}
     </div>

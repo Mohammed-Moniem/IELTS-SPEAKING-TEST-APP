@@ -1,0 +1,181 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "Spokio IELTS SaaS Platform" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e6]: Spokio
+        - generic [ref=e7]: IELTS SaaS Platform
+      - navigation [ref=e8]:
+        - link "Home" [ref=e9] [cursor=pointer]:
+          - /url: /
+        - link "Guides" [ref=e10] [cursor=pointer]:
+          - /url: /ielts
+        - link "Blog" [ref=e11] [cursor=pointer]:
+          - /url: /blog
+        - link "Advertise" [ref=e12] [cursor=pointer]:
+          - /url: /advertise
+        - link "Features" [ref=e13] [cursor=pointer]:
+          - /url: /features
+        - link "Pricing" [ref=e14] [cursor=pointer]:
+          - /url: /pricing
+        - link "Methodology" [ref=e15] [cursor=pointer]:
+          - /url: /methodology
+        - link "About" [ref=e16] [cursor=pointer]:
+          - /url: /about
+        - link "Contact" [ref=e17] [cursor=pointer]:
+          - /url: /contact
+      - generic [ref=e18]:
+        - button "Toggle theme" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+        - link "Login" [ref=e23] [cursor=pointer]:
+          - /url: /login
+        - link "Start Free" [ref=e24] [cursor=pointer]:
+          - /url: /register
+  - main [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: campaign
+          - text: Sponsorship + Affiliate
+        - heading "Advertise with Spokio" [level=1] [ref=e33]
+        - paragraph [ref=e34]: Reach IELTS learners with policy-reviewed placements, measurable delivery, and attribution aligned with our affiliate engine. We support monthly, quarterly, and annual sponsorship programs.
+        - generic [ref=e35]:
+          - generic [ref=e36]: 110K+ monthly page views
+          - generic [ref=e37]: 38K+ active learners
+          - generic [ref=e38]: 4 core IELTS modules
+      - generic [ref=e39]:
+        - article [ref=e40]:
+          - heading "Product Inventory" [level=2] [ref=e41]
+          - list [ref=e42]:
+            - listitem [ref=e43]:
+              - paragraph [ref=e44]: Homepage Sponsor Card
+              - paragraph [ref=e45]: High-visibility placement on learner and marketing entry experiences.
+              - paragraph [ref=e46]: "Audience: All traffic"
+            - listitem [ref=e47]:
+              - paragraph [ref=e48]: Module Side Panel Sponsor
+              - paragraph [ref=e49]: Contextual placements beside speaking, writing, reading, and listening workflows.
+              - paragraph [ref=e50]: "Audience: Active learners"
+            - listitem [ref=e51]:
+              - paragraph [ref=e52]: Blog Sponsored Block
+              - paragraph [ref=e53]: Sponsored recommendations inside high-intent IELTS strategy articles.
+              - paragraph [ref=e54]: "Audience: Organic content visitors"
+            - listitem [ref=e55]:
+              - paragraph [ref=e56]: Newsletter Slot
+              - paragraph [ref=e57]: Sponsored feature in weekly learning and exam strategy roundups.
+              - paragraph [ref=e58]: "Audience: Email subscribers"
+            - listitem [ref=e59]:
+              - paragraph [ref=e60]: Partner Spotlight
+              - paragraph [ref=e61]: Premium spotlight unit for institutes and strategic coaching partners.
+              - paragraph [ref=e62]: "Audience: Conversion-ready users"
+        - article [ref=e63]:
+          - heading "Package Catalog" [level=2] [ref=e64]
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - generic [ref=e67]:
+                - paragraph [ref=e68]: Coach Starter
+                - generic [ref=e69]: $149 / month
+              - paragraph [ref=e70]: Solo coaches and small tutoring teams
+              - list [ref=e71]:
+                - listitem [ref=e72]: • Module side panel placement
+                - listitem [ref=e73]: • Basic analytics report
+                - listitem [ref=e74]: • Affiliate code support
+            - generic [ref=e75]:
+              - generic [ref=e76]:
+                - paragraph [ref=e77]: Institute Growth
+                - generic [ref=e78]: $499 / month
+              - paragraph [ref=e79]: Training centers and mid-size institutes
+              - list [ref=e80]:
+                - listitem [ref=e81]: • Homepage sponsor card
+                - listitem [ref=e82]: • Blog sponsored block
+                - listitem [ref=e83]: • Campaign performance export
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - paragraph [ref=e86]: Premium Spotlight
+                - generic [ref=e87]: $999 / month
+              - paragraph [ref=e88]: Large providers with growth targets
+              - list [ref=e89]:
+                - listitem [ref=e90]: • Partner spotlight
+                - listitem [ref=e91]: • Newsletter slot
+                - listitem [ref=e92]: • Priority campaign approvals
+            - generic [ref=e93]:
+              - generic [ref=e94]:
+                - paragraph [ref=e95]: Enterprise Custom
+                - generic [ref=e96]: Custom
+              - paragraph [ref=e97]: Multi-region institutions and enterprise partners
+              - list [ref=e98]:
+                - listitem [ref=e99]: • Custom placements
+                - listitem [ref=e100]: • Quarterly planning
+                - listitem [ref=e101]: • Dedicated operations support
+      - generic [ref=e102]:
+        - article [ref=e103]:
+          - heading "Policy and Approval" [level=2] [ref=e104]
+          - list [ref=e105]:
+            - listitem [ref=e106]: Creative and destination URLs are reviewed before campaign activation.
+            - listitem [ref=e107]: Sponsored placements are clearly labeled to preserve learner trust.
+            - listitem [ref=e108]: Campaigns violating learner-safety rules are paused and refunded per policy.
+            - listitem [ref=e109]: Impression and click analytics are available in advertiser billing cycles.
+        - article [ref=e110]:
+          - heading "Onboarding Flow" [level=2] [ref=e111]
+          - list [ref=e112]:
+            - listitem [ref=e113]: 1. Select package and share campaign objectives.
+            - listitem [ref=e114]: 2. Submit creative assets and optional affiliate code mapping.
+            - listitem [ref=e115]: 3. Complete Stripe checkout and campaign scheduling.
+            - listitem [ref=e116]: 4. Go live after policy approval and tracking verification.
+          - generic [ref=e117]:
+            - link "Start advertiser onboarding" [ref=e118] [cursor=pointer]:
+              - /url: /register
+            - link "Talk to partnerships" [ref=e119] [cursor=pointer]:
+              - /url: /contact
+  - contentinfo [ref=e120]:
+    - generic [ref=e121]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - link "Spokio" [ref=e124] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=e125]: The complete IELTS preparation platform for measurable band score improvement.
+        - generic [ref=e126]:
+          - heading "Product" [level=4] [ref=e127]
+          - list [ref=e128]:
+            - listitem [ref=e129]:
+              - link "Features" [ref=e130] [cursor=pointer]:
+                - /url: /features
+            - listitem [ref=e131]:
+              - link "Pricing" [ref=e132] [cursor=pointer]:
+                - /url: /pricing
+            - listitem [ref=e133]:
+              - link "Guarantee" [ref=e134] [cursor=pointer]:
+                - /url: /guarantee
+            - listitem [ref=e135]:
+              - link "Methodology" [ref=e136] [cursor=pointer]:
+                - /url: /methodology
+        - generic [ref=e137]:
+          - heading "Resources" [level=4] [ref=e138]
+          - list [ref=e139]:
+            - listitem [ref=e140]:
+              - link "IELTS Guides" [ref=e141] [cursor=pointer]:
+                - /url: /ielts
+            - listitem [ref=e142]:
+              - link "Blog" [ref=e143] [cursor=pointer]:
+                - /url: /blog
+            - listitem [ref=e144]:
+              - link "Editorial Policy" [ref=e145] [cursor=pointer]:
+                - /url: /editorial-policy
+        - generic [ref=e146]:
+          - heading "Company" [level=4] [ref=e147]
+          - list [ref=e148]:
+            - listitem [ref=e149]:
+              - link "About" [ref=e150] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=e151]:
+              - link "Contact" [ref=e152] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e153]:
+              - link "Advertise" [ref=e154] [cursor=pointer]:
+                - /url: /advertise
+      - generic [ref=e155]:
+        - paragraph [ref=e156]: © 2026 Spokio. All rights reserved.
+        - generic [ref=e157]:
+          - link "Editorial Policy" [ref=e158] [cursor=pointer]:
+            - /url: /editorial-policy
+          - link "Contact" [ref=e159] [cursor=pointer]:
+            - /url: /contact

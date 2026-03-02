@@ -139,8 +139,33 @@ export class WritingService {
     return submission;
   }
 
-  public async getHistory(userId: string, limit: number, offset: number) {
-    return WritingSubmissionModel.find({ userId }).sort({ createdAt: -1 }).skip(offset).limit(limit);
+  public async getHistory(
+    userId: string,
+    limit: number,
+    offset: number,
+    filters?: {
+      track?: 'academic' | 'general';
+      from?: string;
+      to?: string;
+    }
+  ) {
+    const query: Record<string, unknown> = { userId };
+
+    if (filters?.track) {
+      query.track = filters.track;
+    }
+
+    if (filters?.from || filters?.to) {
+      query.createdAt = {};
+      if (filters.from) {
+        (query.createdAt as Record<string, unknown>).$gte = new Date(filters.from);
+      }
+      if (filters.to) {
+        (query.createdAt as Record<string, unknown>).$lte = new Date(filters.to);
+      }
+    }
+
+    return WritingSubmissionModel.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit);
   }
 
   private async getUserPlan(userId: string) {

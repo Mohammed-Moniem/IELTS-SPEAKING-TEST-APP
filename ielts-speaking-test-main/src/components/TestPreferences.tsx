@@ -97,14 +97,14 @@ export function TestPreferences({ onComplete, userName }: TestPreferencesProps) 
   const selectedTimeFrame = timeFrames.find(tf => tf.value === preferences.timeFrame)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-secondary/20 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl shadow-xl border-0 bg-card">
+    <div className="min-h-screen flex items-center justify-center p-4 fade-in">
+      <Card className="w-full max-w-2xl glass-card border-0 shadow-lg">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center">
             <Target size={32} className="text-accent" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Welcome, {userName}!</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-foreground">Welcome, {userName}!</CardTitle>
             <CardDescription className="text-muted-foreground mt-2">
               Let's set up your IELTS goals to provide personalized feedback and practice recommendations.
             </CardDescription>

@@ -44,7 +44,7 @@ interface SimulationResult {
 }
 
 export const ResultsScreen = () => {
-  const [activeTab, setActiveTab] = useState<TabType>("local");
+  const [activeTab, setActiveTab] = useState<TabType>("practice");
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("date-desc");
@@ -137,6 +137,13 @@ export const ResultsScreen = () => {
           }
         }}
         disabled={false}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.topicTitle || "Practice session"} ${hasCompleted ? `Band ${band.toFixed(1)}` : "In progress"}`}
+        accessibilityHint={
+          hasCompleted
+            ? "Open detailed feedback for this session"
+            : "Resume this practice session"
+        }
       >
         <View style={styles.resultHeader}>
           <Text style={styles.topicTitle} numberOfLines={2}>
@@ -146,7 +153,7 @@ export const ResultsScreen = () => {
             <View
               style={[
                 styles.bandBadge,
-                { backgroundColor: getBandColor(band) },
+                { backgroundColor: getBandColor(band, colors) },
               ]}
             >
               <Text style={styles.bandText}>{band.toFixed(1)}</Text>
@@ -215,13 +222,16 @@ export const ResultsScreen = () => {
           setSelectedLocalResult(item);
           setShowLocalModal(true);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`Local result for Part ${item.part}, band ${band.toFixed(1)}`}
+        accessibilityHint="Open this local result details"
       >
         <View style={styles.resultHeader}>
           <Text style={styles.topicTitle} numberOfLines={2}>
             Part {item.part} - {item.topic}
           </Text>
           <View
-            style={[styles.bandBadge, { backgroundColor: getBandColor(band) }]}
+            style={[styles.bandBadge, { backgroundColor: getBandColor(band, colors) }]}
           >
             <Text style={styles.bandText}>{band.toFixed(1)}</Text>
           </View>
@@ -294,11 +304,14 @@ export const ResultsScreen = () => {
           setSelectedLocalResult(convertedResult);
           setShowLocalModal(true);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`Full IELTS speaking test result, band ${band.toFixed(1)}`}
+        accessibilityHint="Open full test evaluation details"
       >
         <View style={styles.resultHeader}>
           <Text style={styles.topicTitle}>Full IELTS Speaking Test</Text>
           <View
-            style={[styles.bandBadge, { backgroundColor: getBandColor(band) }]}
+            style={[styles.bandBadge, { backgroundColor: getBandColor(band, colors) }]}
           >
             <Text style={styles.bandText}>{band.toFixed(1)}</Text>
           </View>
@@ -345,6 +358,13 @@ export const ResultsScreen = () => {
           }
         }}
         disabled={!hasCompleted}
+        accessibilityRole="button"
+        accessibilityLabel={`Simulation ${hasCompleted ? `band ${band.toFixed(1)}` : "in progress"}`}
+        accessibilityHint={
+          hasCompleted
+            ? "Open detailed simulation feedback"
+            : "This simulation is still in progress"
+        }
       >
         <View style={styles.resultHeader}>
           <Text style={styles.topicTitle}>Full IELTS Simulation</Text>
@@ -352,7 +372,7 @@ export const ResultsScreen = () => {
             <View
               style={[
                 styles.bandBadge,
-                { backgroundColor: getBandColor(band) },
+                { backgroundColor: getBandColor(band, colors) },
               ]}
             >
               <Text style={styles.bandText}>{band.toFixed(1)}</Text>
@@ -551,6 +571,20 @@ export const ResultsScreen = () => {
     return filtered;
   }, [simulationData, filter, sortBy]);
 
+  const simulationCombinedData = useMemo(
+    () => [
+      ...filteredFullTestData.map((item) => ({
+        type: "fulltest" as const,
+        data: item,
+      })),
+      ...filteredSimulationData.map((item) => ({
+        type: "simulation" as const,
+        data: item,
+      })),
+    ],
+    [filteredFullTestData, filteredSimulationData]
+  );
+
   const isLoading =
     activeTab === "local"
       ? localResults.isLoading
@@ -559,6 +593,42 @@ export const ResultsScreen = () => {
       : fullTestResults.isLoading;
 
   const localData = (localResults.data || []) as StoredResult[];
+  const latestCompletedPractice = useMemo(
+    () =>
+      [...practiceData]
+        .filter((item) => item.completedAt && item.feedback)
+        .sort(
+          (a, b) =>
+            new Date(b.completedAt || b.createdAt).getTime() -
+            new Date(a.completedAt || a.createdAt).getTime()
+        )[0],
+    [practiceData]
+  );
+  const hasAnyResult =
+    localData.length > 0 ||
+    practiceData.length > 0 ||
+    fullTestData.length > 0 ||
+    filteredSimulationData.length > 0;
+  const nextBestAction = useMemo(() => {
+    const improvement = latestCompletedPractice?.feedback?.improvements?.[0];
+    if (improvement) {
+      return {
+        title: "Next best action",
+        body: improvement,
+        estimate: "Estimated gain: +0.3 to +0.5 band with focused repetition.",
+      };
+    }
+
+    if (latestCompletedPractice?.feedback?.summary) {
+      return {
+        title: "Next best action",
+        body: "Run another practice session focused on your weakest criterion.",
+        estimate: "Build consistency with 2-3 short sessions this week.",
+      };
+    }
+
+    return null;
+  }, [latestCompletedPractice]);
 
   return (
     <>
@@ -567,12 +637,49 @@ export const ResultsScreen = () => {
           Track your progress and review past evaluations
         </SectionHeading>
 
+        {nextBestAction ? (
+          <View style={styles.nextActionCard}>
+            <Text style={styles.nextActionTitle}>{nextBestAction.title}</Text>
+            <Text style={styles.nextActionBody}>{nextBestAction.body}</Text>
+            <Text style={styles.nextActionEstimate}>{nextBestAction.estimate}</Text>
+            <TouchableOpacity
+              style={styles.nextActionButton}
+              onPress={() => navigation.navigate("Practice")}
+              accessibilityRole="button"
+              accessibilityLabel="Practice this now"
+              accessibilityHint="Open practice topics based on this recommendation"
+            >
+              <Text style={styles.nextActionButtonText}>Practice this now</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !hasAnyResult ? (
+          <View style={styles.nextActionCard}>
+            <Text style={styles.nextActionTitle}>Start your first result</Text>
+            <Text style={styles.nextActionBody}>
+              Complete one speaking practice session to unlock feedback trends and
+              personalized next steps.
+            </Text>
+            <TouchableOpacity
+              style={styles.nextActionButton}
+              onPress={() => navigation.navigate("Practice")}
+              accessibilityRole="button"
+              accessibilityLabel="Go to practice"
+              accessibilityHint="Open practice topics and start your first session"
+            >
+              <Text style={styles.nextActionButtonText}>Go to practice</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Tab Switcher */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === "local" && styles.activeTab]}
             onPress={() => setActiveTab("local")}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voice Practice results"
+            accessibilityHint="Show quick voice practice session results"
           >
             <View
               style={[
@@ -583,7 +690,7 @@ export const ResultsScreen = () => {
               <Ionicons
                 name="mic-outline"
                 size={20}
-                color={activeTab === "local" ? "#FFFFFF" : colors.primary}
+                color={activeTab === "local" ? colors.primaryOn : colors.primary}
               />
             </View>
             <View style={styles.tabContent}>
@@ -620,6 +727,9 @@ export const ResultsScreen = () => {
             style={[styles.tab, activeTab === "practice" && styles.activeTab]}
             onPress={() => setActiveTab("practice")}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Practice Sessions results"
+            accessibilityHint="Show topic-based practice session results"
           >
             <View
               style={[
@@ -630,7 +740,7 @@ export const ResultsScreen = () => {
               <Ionicons
                 name="book-outline"
                 size={20}
-                color={activeTab === "practice" ? "#FFFFFF" : colors.primary}
+                color={activeTab === "practice" ? colors.primaryOn : colors.primary}
               />
             </View>
             <View style={styles.tabContent}>
@@ -667,6 +777,9 @@ export const ResultsScreen = () => {
             style={[styles.tab, activeTab === "simulation" && styles.activeTab]}
             onPress={() => setActiveTab("simulation")}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Full Tests results"
+            accessibilityHint="Show full speaking test and simulation results"
           >
             <View
               style={[
@@ -677,7 +790,7 @@ export const ResultsScreen = () => {
               <Ionicons
                 name="trophy-outline"
                 size={20}
-                color={activeTab === "simulation" ? "#FFFFFF" : colors.primary}
+                color={activeTab === "simulation" ? colors.primaryOn : colors.primary}
               />
             </View>
             <View style={styles.tabContent}>
@@ -698,14 +811,16 @@ export const ResultsScreen = () => {
                 Complete exams
               </Text>
             </View>
-            {fullTestData.length > 0 && (
+            {simulationCombinedData.length > 0 && (
               <View
                 style={[
                   styles.badge,
                   activeTab === "simulation" && styles.badgeActive,
                 ]}
               >
-                <Text style={styles.badgeText}>{fullTestData.length}</Text>
+                <Text style={styles.badgeText}>
+                  {simulationCombinedData.length}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -728,7 +843,12 @@ export const ResultsScreen = () => {
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                accessibilityHint="Clear the current topic search text"
+              >
                 <Ionicons
                   name="close-circle"
                   size={20}
@@ -744,6 +864,9 @@ export const ResultsScreen = () => {
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowFilters(!showFilters)}
+            accessibilityRole="button"
+            accessibilityLabel={showFilters ? "Hide filters" : "Show filters"}
+            accessibilityHint="Toggle result filtering options"
           >
             <Ionicons
               name="options-outline"
@@ -768,6 +891,9 @@ export const ResultsScreen = () => {
                     : "date-desc"
                 )
               }
+              accessibilityRole="button"
+              accessibilityLabel="Change sort order"
+              accessibilityHint="Cycle through sorting options for results"
             >
               <Text style={styles.sortButtonText}>
                 {sortBy === "date-desc"
@@ -796,6 +922,9 @@ export const ResultsScreen = () => {
                 filter === "all" && styles.filterChipActive,
               ]}
               onPress={() => setFilter("all")}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === "all" }}
+              accessibilityLabel="Filter all results"
             >
               <Text
                 style={[
@@ -812,6 +941,9 @@ export const ResultsScreen = () => {
                 filter === "completed" && styles.filterChipActive,
               ]}
               onPress={() => setFilter("completed")}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === "completed" }}
+              accessibilityLabel="Filter completed results"
             >
               <Text
                 style={[
@@ -828,6 +960,9 @@ export const ResultsScreen = () => {
                 filter === "in-progress" && styles.filterChipActive,
               ]}
               onPress={() => setFilter("in-progress")}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === "in-progress" }}
+              accessibilityLabel="Filter in-progress results"
             >
               <Text
                 style={[
@@ -886,7 +1021,7 @@ export const ResultsScreen = () => {
               showsVerticalScrollIndicator={false}
             />
           )
-        ) : filteredFullTestData.length === 0 ? (
+        ) : simulationCombinedData.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No full test results yet</Text>
             <Text style={styles.emptyText}>
@@ -895,9 +1030,17 @@ export const ResultsScreen = () => {
           </View>
         ) : (
           <FlatList
-            data={filteredFullTestData}
-            renderItem={renderFullTestItem}
-            keyExtractor={(item) => item.id}
+            data={simulationCombinedData}
+            renderItem={({ item }) =>
+              item.type === "fulltest"
+                ? renderFullTestItem({ item: item.data })
+                : renderSimulationItem({ item: item.data as SimulationResult })
+            }
+            keyExtractor={(item, index) =>
+              item.type === "fulltest"
+                ? `full-${item.data.id ?? index}`
+                : `sim-${(item.data as SimulationResult)._id ?? index}`
+            }
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />
@@ -952,16 +1095,53 @@ export const ResultsScreen = () => {
   );
 };
 
-const getBandColor = (band: number): string => {
-  if (band >= 8) return "#10B981"; // Green
-  if (band >= 7) return "#3B82F6"; // Blue
-  if (band >= 6) return "#F59E0B"; // Orange
-  if (band >= 5) return "#EF4444"; // Red
-  return "#6B7280"; // Gray
+const getBandColor = (band: number, colors: ColorTokens): string => {
+  if (band >= 8) return colors.success;
+  if (band >= 7) return colors.primary;
+  if (band >= 6) return colors.warning;
+  if (band >= 5) return colors.danger;
+  return colors.textMuted;
 };
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
+  nextActionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  nextActionTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: spacing.xs,
+  },
+  nextActionBody: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.xs,
+  },
+  nextActionEstimate: {
+    color: colors.textMutedStrong,
+    fontSize: 12,
+    marginBottom: spacing.sm,
+  },
+  nextActionButton: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  nextActionButtonText: {
+    color: colors.primaryOn,
+    fontWeight: "700",
+    fontSize: 13,
+  },
   tabContainer: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -979,7 +1159,7 @@ const createStyles = (colors: ColorTokens) =>
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -996,13 +1176,13 @@ const createStyles = (colors: ColorTokens) =>
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    backgroundColor: `${colors.primary}1A`,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.xs,
   },
   tabIconWrapperActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: `${colors.primaryOn}33`,
   },
   tabContent: {
     alignItems: "center",
@@ -1016,7 +1196,7 @@ const createStyles = (colors: ColorTokens) =>
     marginBottom: 2,
   },
   activeTabText: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
   tabSubtext: {
     fontSize: 11,
@@ -1025,7 +1205,7 @@ const createStyles = (colors: ColorTokens) =>
     textAlign: "center",
   },
   activeTabSubtext: {
-    color: "rgba(255, 255, 255, 0.8)",
+    color: `${colors.primaryOn}CC`,
   },
   badge: {
     backgroundColor: colors.primary,
@@ -1037,12 +1217,12 @@ const createStyles = (colors: ColorTokens) =>
     alignItems: "center",
   },
   badgeActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: `${colors.primaryOn}4D`,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
   searchContainer: {
     flexDirection: "row",
@@ -1127,17 +1307,19 @@ const createStyles = (colors: ColorTokens) =>
     color: colors.textSecondary,
   },
   filterChipTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryOn,
   },
   listContent: {
     paddingBottom: spacing.xl,
   },
   resultCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: spacing.md,
     marginBottom: spacing.md,
-    shadowColor: "#000",
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    shadowColor: colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1168,7 +1350,7 @@ const createStyles = (colors: ColorTokens) =>
   bandText: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: colors.primaryOn,
     textAlign: "center",
   },
   scoresRow: {

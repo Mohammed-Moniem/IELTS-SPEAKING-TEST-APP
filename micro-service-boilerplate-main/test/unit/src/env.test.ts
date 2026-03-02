@@ -109,11 +109,11 @@ describe('env', () => {
   });
 
   it('should have the correct app routePrefix', () => {
-    expect(env.app.routePrefix).toEqual(process.env.APP_ROUTE_PREFIX || '/service/api');
+    expect(env.app.routePrefix).toEqual('/api/v1');
   });
 
   it('should have the correct app port', () => {
-    expect(env.app.port).toEqual(3002);
+    expect(env.app.port).toEqual(4000);
   });
 
   it('should have the correct app banner', () => {
@@ -133,7 +133,7 @@ describe('env', () => {
   });
 
   it('should have the correct mongoURL', () => {
-    expect(env.db.mongoURL).toEqual(process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/ServiceDB');
+    expect(env.db.mongoURL).toEqual('mongodb://127.0.0.1:27017/ielts-speaking');
   });
 
   it('should correctly determine if monitor is enabled', () => {

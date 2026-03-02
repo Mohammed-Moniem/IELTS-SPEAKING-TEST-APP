@@ -27,6 +27,7 @@ export const authApi = {
     lastName: string;
     phone?: string;
     referralCode?: string;
+    partnerCode?: string;
   }) => unwrap<AuthResponse>(apiClient.post("/auth/register", payload)),
   login: (payload: { email: string; password: string }) =>
     unwrap<AuthResponse>(apiClient.post("/auth/login", payload)),
@@ -162,6 +163,7 @@ export const subscriptionApi = {
   checkout: (payload: {
     planType: "premium" | "pro";
     couponCode?: string;
+    partnerCode?: string;
     successUrl?: string;
     cancelUrl?: string;
   }) =>

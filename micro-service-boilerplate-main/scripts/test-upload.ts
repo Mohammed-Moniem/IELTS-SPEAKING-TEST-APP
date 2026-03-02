@@ -1,7 +1,5 @@
 import 'dotenv/config';
 import 'reflect-metadata';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { connect, connection } from 'mongoose';
 import { fileStorageService } from '../src/api/services/FileStorageService';
 import { chatService } from '../src/api/services/ChatService';

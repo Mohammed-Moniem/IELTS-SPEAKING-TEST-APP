@@ -139,7 +139,7 @@ export const StudyGroupsScreen: React.FC = () => {
           style={styles.createButton}
           onPress={handleCreateGroup}
         >
-          <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+          <Ionicons name="add-circle" size={20} color={colors.primaryOn} />
           <Text style={styles.createButtonText}>Create Group</Text>
         </TouchableOpacity>
       </View>

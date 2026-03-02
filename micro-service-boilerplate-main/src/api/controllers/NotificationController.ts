@@ -1,6 +1,7 @@
 import { env } from '@env';
 import {
   RegisterDeviceDto,
+  RegisterWebDeviceDto,
   BroadcastNotificationDto,
   UnregisterDeviceDto,
   UpdateNotificationSettingsDto
@@ -13,6 +14,8 @@ import { NotificationService } from '@services/NotificationService';
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
 import { Request, Response } from 'express';
 import { Body, Delete, Get, HttpCode, JsonController, Post, Put, Req, Res, UseBefore } from 'routing-controllers';
+
+const HTTP_STATUS_ACCEPTED = 202;
 
 @JsonController('/notifications')
 @UseBefore(AuthMiddleware)
@@ -66,7 +69,7 @@ export class NotificationController {
   }
 
   @Post('/device')
-  @HttpCode(HTTP_STATUS_CODES.ACCEPTED)
+  @HttpCode(HTTP_STATUS_ACCEPTED)
   public async registerDevice(@Body() body: RegisterDeviceDto, @Req() req: Request, @Res() res: Response) {
     const headers: IRequestHeaders = buildRequestHeaders(req, 'notifications-register-device');
     ensureResponseHeaders(res, headers);
@@ -76,12 +79,48 @@ export class NotificationController {
     }
 
     try {
-      await this.notificationService.registerDeviceToken(req.currentUser.id, body.token);
+      await this.notificationService.registerDeviceToken(req.currentUser.id, body.token, {
+        platform: body.platform,
+        locale: body.locale,
+        timezoneOffsetMinutes: body.timezoneOffsetMinutes,
+        appVersion: body.appVersion,
+        deviceId: body.deviceId
+      });
       return StandardResponse.success(
         res,
         undefined,
         'Device registered for notifications',
-        HTTP_STATUS_CODES.ACCEPTED,
+        HTTP_STATUS_ACCEPTED,
+        headers
+      );
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/device/web')
+  @HttpCode(HTTP_STATUS_ACCEPTED)
+  public async registerWebDevice(@Body() body: RegisterWebDeviceDto, @Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'notifications-register-web-device');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      await this.notificationService.registerWebDeviceToken(req.currentUser.id, {
+        token: body.token,
+        locale: body.locale,
+        timezoneOffsetMinutes: body.timezoneOffsetMinutes,
+        userAgent: body.userAgent
+      });
+
+      return StandardResponse.success(
+        res,
+        undefined,
+        'Web push endpoint registered',
+        HTTP_STATUS_ACCEPTED,
         headers
       );
     } catch (error) {
@@ -90,7 +129,7 @@ export class NotificationController {
   }
 
   @Delete('/device')
-  @HttpCode(HTTP_STATUS_CODES.ACCEPTED)
+  @HttpCode(HTTP_STATUS_ACCEPTED)
   public async unregisterDevice(@Body() body: UnregisterDeviceDto, @Req() req: Request, @Res() res: Response) {
     const headers: IRequestHeaders = buildRequestHeaders(req, 'notifications-unregister-device');
     ensureResponseHeaders(res, headers);
@@ -101,14 +140,38 @@ export class NotificationController {
 
     try {
       await this.notificationService.removeDeviceToken(req.currentUser.id, body.token);
-      return StandardResponse.success(res, undefined, 'Device removed', HTTP_STATUS_CODES.ACCEPTED, headers);
+      return StandardResponse.success(res, undefined, 'Device removed', HTTP_STATUS_ACCEPTED, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Delete('/device/web')
+  @HttpCode(HTTP_STATUS_ACCEPTED)
+  public async unregisterWebDevice(@Body() body: UnregisterDeviceDto, @Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'notifications-unregister-web-device');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      await this.notificationService.removeWebDeviceToken(req.currentUser.id, body.token);
+      return StandardResponse.success(
+        res,
+        undefined,
+        'Web push endpoint removed',
+        HTTP_STATUS_ACCEPTED,
+        headers
+      );
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }
   }
 
   @Post('/broadcast')
-  @HttpCode(HTTP_STATUS_CODES.ACCEPTED)
+  @HttpCode(HTTP_STATUS_ACCEPTED)
   public async broadcast(@Body() body: BroadcastNotificationDto, @Req() req: Request, @Res() res: Response) {
     const headers: IRequestHeaders = buildRequestHeaders(req, 'notifications-broadcast');
     ensureResponseHeaders(res, headers);
@@ -130,7 +193,7 @@ export class NotificationController {
         type: body.type,
         data: body.data
       });
-      return StandardResponse.success(res, undefined, 'Broadcast queued', HTTP_STATUS_CODES.ACCEPTED, headers);
+      return StandardResponse.success(res, undefined, 'Broadcast queued', HTTP_STATUS_ACCEPTED, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }

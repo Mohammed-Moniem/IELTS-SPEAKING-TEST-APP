@@ -20,10 +20,13 @@
     "db:check": "ts-node -e \"require('./test/utils/mongodb-setup').MongoDBSetup.checkConnection()\"",
     "db:migrate:supabase": "ts-node scripts/migrate-mongo-to-supabase.ts",
     "db:verify:parity": "ts-node scripts/verify-mongo-supabase-parity.ts",
+    "partners:backfill:influencers": "ts-node -r tsconfig-paths/register scripts/backfill-influencer-coupons-to-partners.ts",
+    "partners:reconcile:targets": "ts-node -r tsconfig-paths/register scripts/reconcile-partner-targets.ts",
     "test:e2e:setup": "npm run db:setup",
     "test:e2e:cleanup": "npm run db:cleanup",
     "test:full": "npm run test:e2e:setup && npm test && npm run test:e2e:cleanup",
-    "seed:achievements": "ts-node scripts/seedAchievements.ts"
+    "seed:achievements": "ts-node scripts/seedAchievements.ts",
+    "perf:checkpoint6": "bash scripts/perf/run_checkpoint6_load.sh"
   },
   "keywords": [
     "NodeJS",
@@ -69,6 +72,7 @@
     "express-mongo-sanitize": "2.2.0",
     "express-rate-limit": "8.1.0",
     "figlet": "^1.7.0",
+    "firebase-admin": "13.5.0",
     "form-data": "4.0.4",
     "helmet": "8.1.0",
     "hpp": "0.2.3",
@@ -97,6 +101,9 @@
     "uuid": "^9.0.1",
     "winston": "^3.13.0",
     "xss": "1.0.15"
+  },
+  "overrides": {
+    "fast-xml-parser": "5.3.6"
   },
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.18.6",

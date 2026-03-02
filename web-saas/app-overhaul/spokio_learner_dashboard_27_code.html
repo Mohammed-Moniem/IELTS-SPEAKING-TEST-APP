@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio Full Exam Simulation Lobby (Light Theme)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", // Violet-600
+              "primary-hover": "#6D28D9", // Violet-700
+              "background-main": "#FFFFFF", // White
+              "sidebar-bg": "#F9FAFB", // Light grey
+              "card-border": "#E5E7EB", // Light border
+              "text-main": "#1F2937", // Gray-800
+              "text-muted": "#6B7280", // Gray-500
+              "text-dark-slate": "#334155", // Slate-700
+            },
+            fontFamily: {
+              display: ['"Plus Jakarta Sans"', "sans-serif"],
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem", // 12px
+              'xl': "1rem", // 16px
+              '2xl': "1.5rem", // 24px
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+    </style>
+</head>
+<body class="bg-background-main text-text-main font-sans antialiased transition-colors duration-300 min-h-screen flex selection:bg-primary selection:text-white">
+<aside class="fixed inset-y-0 left-0 w-64 bg-sidebar-bg border-r border-card-border flex flex-col z-30 hidden lg:flex">
+<div class="h-20 flex items-center px-8 border-b border-card-border">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900">Spokio</span>
+</div>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">dashboard</span>
+                Dashboard
+            </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Practice Areas
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">mic</span>
+                Speaking
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">edit</span>
+                Writing
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">menu_book</span>
+                Reading
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">headphones</span>
+                Listening
+            </a>
+<div class="pt-6 pb-2 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Assessment
+            </div>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl bg-primary/10 text-primary group" href="#">
+<span class="material-icons-round text-xl">assignment</span>
+                Full Exams
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl text-text-muted hover:bg-white hover:text-primary hover:shadow-sm transition-all group" href="#">
+<span class="material-icons-round text-xl text-gray-400 group-hover:text-primary transition-colors">bar_chart</span>
+                Progress &amp; Stats
+            </a>
+</nav>
+<div class="p-4 border-t border-card-border">
+<button class="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all">
+<img alt="User Avatar" class="w-10 h-10 rounded-full border-2 border-white shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfY9uwWSIKmGeTABM8ES8QQZgT38Yp-5P9-CKLpDyIs16F4I6xyP21x0RN7hB-1mp4fUr2U5OwxzK8Qm_wHSofhuX3G-crJ_IDKHpz1E7lSWVLn9AdJO7aGsaJvbIqmp1XgMr7uqSI2IpXhnSPQTYMNk2x39McORr3yMfHVwiEr7tXEhzaoTyTv9vskEfmoblwyiCI_2-TAnDKB1GDDSaQ2H6AvFdUClaGMWypYMiVgLPJdcmMA9b2BrdCmOw3KEsQv0rETkxBd4YT"/>
+<div class="text-left hidden lg:block">
+<p class="text-sm font-bold text-gray-900">Student One</p>
+<p class="text-xs text-text-muted">Free Plan</p>
+</div>
+<span class="material-icons-round ml-auto text-gray-400">more_vert</span>
+</button>
+</div>
+</aside>
+<main class="lg:pl-64 flex-1 flex flex-col min-h-screen bg-white">
+<header class="lg:hidden h-16 bg-white border-b border-card-border flex items-center justify-between px-4 sticky top-0 z-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-lg text-gray-900">Spokio</span>
+</div>
+<button class="p-2 text-gray-500 hover:text-primary">
+<span class="material-icons-round">menu</span>
+</button>
+</header>
+<div class="p-6 lg:p-10 max-w-7xl mx-auto w-full">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+<div>
+<div class="flex items-center gap-2 mb-2 text-sm text-text-muted">
+<a class="hover:text-primary transition-colors" href="#">Home</a>
+<span class="material-icons-round text-xs">chevron_right</span>
+<span>Exams</span>
+</div>
+<h1 class="text-3xl font-bold text-gray-900 mb-2">Full Exam Simulation</h1>
+<p class="text-text-muted max-w-xl">
+                        Experience the real test environment. Complete all 4 sections in one sitting to get an accurate band score prediction.
+                    </p>
+</div>
+<div class="flex flex-col items-end">
+<div class="text-right">
+<p class="text-sm font-medium text-text-muted">Total Duration</p>
+<div class="flex items-center gap-2 text-primary text-xl font-bold">
+<span class="material-icons-round">timer</span>
+                            2h 45m
+                        </div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+<div class="lg:col-span-2 space-y-6">
+<div class="bg-white rounded-2xl border border-card-border overflow-hidden shadow-sm">
+<div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+<h3 class="font-bold text-gray-900 flex items-center gap-2">
+<span class="material-icons-round text-primary">layers</span>
+                                Exam Sequence
+                            </h3>
+<span class="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                                Academic Module
+                            </span>
+</div>
+<div class="divide-y divide-gray-100">
+<div class="p-6 flex items-start gap-4 group hover:bg-gray-50 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+<span class="material-icons-round text-2xl">headphones</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<h4 class="font-bold text-gray-900">Listening</h4>
+<span class="text-sm font-medium text-text-muted">30 mins</span>
+</div>
+<p class="text-sm text-text-muted mb-2">
+                                        4 recorded monologues and conversations.
+                                    </p>
+<div class="flex gap-2">
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">40 Questions</span>
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">4 Parts</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex items-start gap-4 group hover:bg-gray-50 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+<span class="material-icons-round text-2xl">article</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<h4 class="font-bold text-gray-900">Reading</h4>
+<span class="text-sm font-medium text-text-muted">60 mins</span>
+</div>
+<p class="text-sm text-text-muted mb-2">
+                                        3 long texts ranging from descriptive and factual to discursive and analytical.
+                                    </p>
+<div class="flex gap-2">
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">40 Questions</span>
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">3 Sections</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex items-start gap-4 group hover:bg-gray-50 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
+<span class="material-icons-round text-2xl">edit_note</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<h4 class="font-bold text-gray-900">Writing</h4>
+<span class="text-sm font-medium text-text-muted">60 mins</span>
+</div>
+<p class="text-sm text-text-muted mb-2">
+                                        Task 1 (Graph/Chart description) and Task 2 (Essay).
+                                    </p>
+<div class="flex gap-2">
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">2 Tasks</span>
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">150+ &amp; 250+ Words</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex items-start gap-4 group hover:bg-gray-50 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+<span class="material-icons-round text-2xl">mic</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-1">
+<h4 class="font-bold text-gray-900">Speaking</h4>
+<span class="text-sm font-medium text-text-muted">11-14 mins</span>
+</div>
+<p class="text-sm text-text-muted mb-2">
+                                        Face-to-face interview simulation with AI examiner.
+                                    </p>
+<div class="flex gap-2">
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">3 Parts</span>
+<span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">Live Recording</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-2xl border border-card-border p-6 shadow-sm">
+<h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+<span class="material-icons-round text-yellow-500">lightbulb</span>
+                            Before You Start
+                        </h3>
+<ul class="space-y-4 text-sm text-text-muted">
+<li class="flex gap-3">
+<span class="material-icons-round text-green-500 shrink-0 text-base mt-0.5">check_circle</span>
+<span>Ensure you have a stable internet connection for the entire duration.</span>
+</li>
+<li class="flex gap-3">
+<span class="material-icons-round text-green-500 shrink-0 text-base mt-0.5">check_circle</span>
+<span>Use headphones for the Listening section to simulate exam conditions.</span>
+</li>
+<li class="flex gap-3">
+<span class="material-icons-round text-green-500 shrink-0 text-base mt-0.5">check_circle</span>
+<span>Find a quiet environment. The Speaking section requires voice input.</span>
+</li>
+<li class="flex gap-3">
+<span class="material-icons-round text-green-500 shrink-0 text-base mt-0.5">check_circle</span>
+<span>Once started, the timer cannot be paused.</span>
+</li>
+</ul>
+<div class="mt-6 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+<p class="text-xs text-yellow-800 font-medium">
+<span class="font-bold block mb-1">Note:</span>
+                                Your results will be analyzed by our AI engine and available within 5 minutes of completion.
+                            </p>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-purple-50 rounded-2xl p-6 border border-purple-100 shadow-sm relative overflow-hidden">
+<div class="absolute -top-10 -right-10 w-40 h-40 bg-purple-100/50 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<div class="flex items-center justify-between mb-4">
+<div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+<span class="material-icons-round text-primary">history</span>
+</div>
+<span class="text-xs font-bold uppercase tracking-wider bg-white px-2 py-1 rounded text-primary border border-purple-100">Interrupted</span>
+</div>
+<h3 class="text-xl font-bold mb-2 text-primary">Resume Exam #42</h3>
+<p class="text-text-muted text-sm mb-4">
+                                You left off at the beginning of the <span class="text-primary font-semibold">Reading Section</span>.
+                            </p>
+<div class="w-full bg-purple-200 h-2 rounded-full mb-6 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 35%"></div>
+</div>
+<button class="w-full py-3 bg-white text-primary hover:bg-purple-50 border border-purple-200 font-bold rounded-xl transition-colors shadow-sm hover:shadow">
+                                Resume Exam
+                            </button>
+</div>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-card-border shadow-sm flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
+<span class="material-icons-round text-3xl">play_arrow</span>
+</div>
+<h3 class="text-xl font-bold text-gray-900 mb-2">Start New Full Exam</h3>
+<p class="text-sm text-text-muted mb-6">
+                            Begin a fresh simulation. This will count towards your weekly goal.
+                        </p>
+<button class="w-full py-3.5 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 transform hover:-translate-y-0.5">
+                            Start Full Exam Now
+                        </button>
+<p class="text-xs text-text-muted mt-4">
+                            Ensure you have 2h 45m available.
+                        </p>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-card-border shadow-sm">
+<h4 class="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wide">Recent Full Exams</h4>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer border border-gray-100">
+<div>
+<p class="text-sm font-bold text-gray-900">Exam #41</p>
+<p class="text-xs text-text-muted">Oct 20, 2023</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-green-600">Band 7.5</p>
+<p class="text-xs text-text-muted">Completed</p>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer border border-gray-100">
+<div>
+<p class="text-sm font-bold text-gray-900">Exam #40</p>
+<p class="text-xs text-text-muted">Oct 15, 2023</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-bold text-green-600">Band 6.5</p>
+<p class="text-xs text-text-muted">Completed</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 py-2 text-sm text-text-muted hover:text-primary font-medium transition-colors">
+                            View All History
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

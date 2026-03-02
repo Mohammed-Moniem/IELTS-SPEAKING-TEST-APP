@@ -41,5 +41,7 @@ export const CODES = {
   UsageLimitReached: 'UsageLimitReached',
   PremiumRequired: 'PremiumRequired',
   StripeError: 'StripeError',
-  NotImplemented: 'NotImplemented'
+  NotImplemented: 'NotImplemented',
+  InvalidToken: 'InvalidToken',
+  TokenExpired: 'TokenExpired'
 };

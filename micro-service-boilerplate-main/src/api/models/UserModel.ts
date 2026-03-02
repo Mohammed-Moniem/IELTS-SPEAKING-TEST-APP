@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { HydratedDocument, Schema, model } from '@lib/db/mongooseCompat';
 
-export type SubscriptionPlan = 'free' | 'premium' | 'pro';
+export type SubscriptionPlan = 'free' | 'premium' | 'pro' | 'team';
 export type AdminRole = 'superadmin' | 'content_manager' | 'support_agent';
 
 export interface IUser {
@@ -58,7 +58,7 @@ const UserSchema = new Schema<IUser>(
     },
     subscriptionPlan: {
       type: String,
-      enum: ['free', 'premium', 'pro'],
+      enum: ['free', 'premium', 'pro', 'team'],
       default: 'free'
     },
     adminRoles: {

@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useMemo, useState, useEffect } from 'react';
 
-import { MarketingGraphicLayer } from '@/components/marketing/MarketingGraphicLayer';
-import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
 import { ApiError, webApi } from '@/lib/api/client';
 import type { BlogPostSummary } from '@/lib/types';
 import { EmptyState, ErrorState, SkeletonSet, StatusBadge } from '@/components/ui/v2';
@@ -28,11 +26,7 @@ const formatDate = (value?: string) => {
   });
 };
 
-type BlogIndexPageProps = {
-  isMotionVariant?: boolean;
-};
-
-export function BlogIndexPage({ isMotionVariant = false }: BlogIndexPageProps) {
+export function BlogIndexPage() {
   const [posts, setPosts] = useState<BlogPostSummary[]>([]);
   const [cluster, setCluster] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -66,25 +60,15 @@ export function BlogIndexPage({ isMotionVariant = false }: BlogIndexPageProps) {
 
   return (
     <div className="space-y-6" data-testid="marketing-blog-index">
-      {isMotionVariant ? (
-        <MarketingPageHero
-          variant="full"
-          animated
-          badge={{ icon: 'article', text: 'Spokio Blog' }}
-          title="IELTS strategy and study insights"
-          description="Practical, reviewed content for speaking, writing, reading, listening, and exam strategy. Every post is tagged by cluster so you can jump directly into the topic that matters."
-        />
-      ) : (
-        <section className="rounded-2xl border border-violet-100 dark:border-violet-900/40 bg-gradient-to-r from-violet-600 to-indigo-600 p-8 text-white">
-          <span className="inline-block rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wider mb-3">
-            Spokio Blog
-          </span>
-          <h1 className="text-3xl font-bold tracking-tight">IELTS strategy and study insights</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/80">
-            Practical, reviewed content for speaking, writing, reading, listening, and exam strategy. Every post is tagged by cluster so you can jump directly into the topic that matters.
-          </p>
-        </section>
-      )}
+      <section className="marketing-hero-surface rounded-2xl p-8 text-white">
+        <span className="inline-block rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold uppercase tracking-wider mb-3">
+          Spokio Blog
+        </span>
+        <h1 className="hero-elegant-title text-3xl font-bold tracking-tight">IELTS strategy and study insights</h1>
+        <p className="hero-elegant-copy mt-2 max-w-2xl text-sm text-white/80">
+          Practical, reviewed content for speaking, writing, reading, listening, and exam strategy. Every post is tagged by cluster so you can jump directly into the topic that matters.
+        </p>
+      </section>
 
       <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -114,35 +98,32 @@ export function BlogIndexPage({ isMotionVariant = false }: BlogIndexPageProps) {
       ) : null}
 
       {!loading && !error && posts.length > 0 ? (
-        <section className={`relative isolate overflow-hidden rounded-3xl ${isMotionVariant ? 'p-5 sm:p-6' : ''}`}>
-          {isMotionVariant ? <MarketingGraphicLayer preset="content-highlight" intensity="subtle" /> : null}
-          <div className="relative z-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {posts.map(post => (
-              <article key={post.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="inline-flex rounded-full bg-violet-100 dark:bg-violet-500/10 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
-                    {post.cluster}
-                  </span>
-                  <StatusBadge tone={stateTone[post.state]}>{post.state.replace(/_/g, ' ')}</StatusBadge>
-                </div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">{post.title}</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">{post.excerpt || 'Open the article to read the full guide and action checklist.'}</p>
-                <div className="flex items-center justify-between gap-3 pt-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span>Updated {formatDate(post.lastUpdatedAt || post.updatedAt)}</span>
-                  <span>Reviewed {formatDate(post.lastReviewedAt || post.publishedAt)}</span>
-                </div>
-                <div className="pt-2">
-                  <Link
-                    href={`/blog/${post.slug}`}
-                    className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors"
-                  >
-                    Read article
-                    <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {posts.map(post => (
+            <article key={post.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex rounded-full bg-violet-100 dark:bg-violet-500/10 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                  {post.cluster}
+                </span>
+                <StatusBadge tone={stateTone[post.state]}>{post.state.replace(/_/g, ' ')}</StatusBadge>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">{post.title}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-3">{post.excerpt || 'Open the article to read the full guide and action checklist.'}</p>
+              <div className="flex items-center justify-between gap-3 pt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>Updated {formatDate(post.lastUpdatedAt || post.updatedAt)}</span>
+                <span>Reviewed {formatDate(post.lastReviewedAt || post.publishedAt)}</span>
+              </div>
+              <div className="pt-2">
+                <Link
+                  href={`/blog/${post.slug}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors"
+                >
+                  Read article
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </Link>
+              </div>
+            </article>
+          ))}
         </section>
       ) : null}
     </div>

@@ -4,6 +4,7 @@
  */
 
 import { API_KEY, apiClient } from "./client";
+import { logger } from "../utils/logger";
 
 export interface AudioRecording {
   id: string;
@@ -140,11 +141,11 @@ export async function uploadAudio(
         expiresAt: result.data.expiresAt,
       };
     } else {
-      console.error("❌ Failed to upload audio:", result.error);
+      logger.warn("❌ Failed to upload audio:", result.error);
       return null;
     }
   } catch (error) {
-    console.error("❌ Upload audio error:", error);
+    logger.warn("❌ Upload audio error:", error);
     return null;
   }
 }
@@ -183,11 +184,11 @@ export async function listUserRecordings(
         total: response.data.data.total,
       };
     } else {
-      console.error("❌ Failed to fetch recordings:", response.data.error);
+      logger.warn("❌ Failed to fetch recordings:", response.data.error);
       return { recordings: [], total: 0 };
     }
   } catch (error) {
-    console.error("❌ List recordings error:", error);
+    logger.warn("❌ List recordings error:", error);
     return { recordings: [], total: 0 };
   }
 }
@@ -219,11 +220,11 @@ export async function deleteRecording(
       console.log("✅ Recording deleted successfully");
       return true;
     } else {
-      console.error("❌ Failed to delete recording:", response.data.error);
+      logger.warn("❌ Failed to delete recording:", response.data.error);
       return false;
     }
   } catch (error) {
-    console.error("❌ Delete recording error:", error);
+    logger.warn("❌ Delete recording error:", error);
     return false;
   }
 }
@@ -243,11 +244,11 @@ export async function getStorageStats(
       console.log("✅ Storage stats fetched");
       return response.data.data;
     } else {
-      console.error("❌ Failed to fetch stats:", response.data.error);
+      logger.warn("❌ Failed to fetch stats:", response.data.error);
       return null;
     }
   } catch (error) {
-    console.error("❌ Get storage stats error:", error);
+    logger.warn("❌ Get storage stats error:", error);
     return null;
   }
 }

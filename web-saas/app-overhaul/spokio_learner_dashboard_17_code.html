@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Spokio - Marketing Pricing &amp; Plans</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#7C3AED", // Violet-600
+              "primary-hover": "#6D28D9", // Violet-700
+              "primary-light": "#EDE9FE", // Violet-100
+              "background-light": "#FFFFFF", 
+              "background-subtle": "#F9FAFB", // Gray-50
+              "surface-light": "#FFFFFF",
+              "text-main": "#111827", // Gray-900
+              "text-secondary": "#4B5563", // Gray-600
+              "text-muted": "#9CA3AF", // Gray-400
+              "accent-green": "#10B981",
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            borderRadius: {
+              'xl': "1rem",
+              '2xl': "1.5rem",
+              '3xl': "2rem",
+            },
+          },
+        },
+      };
+    </script>
+<style>
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #7C3AED;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #7C3AED;
+        }
+        .feature-check {
+            @apply text-accent-green mr-3 flex-shrink-0;
+        }
+        .feature-x {
+            @apply text-text-muted mr-3 flex-shrink-0;
+        }
+    </style>
+</head>
+<body class="bg-background-subtle text-text-main font-sans antialiased selection:bg-primary selection:text-white">
+<nav class="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-20">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl">S</div>
+<span class="text-xl font-bold tracking-tight text-gray-900">Spokio</span>
+</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-text-secondary hover:text-primary font-medium transition-colors" href="#">Features</a>
+<a class="text-text-secondary hover:text-primary font-medium transition-colors" href="#">Methodology</a>
+<a class="text-primary font-bold transition-colors" href="#">Pricing</a>
+<a class="text-text-secondary hover:text-primary font-medium transition-colors" href="#">Resources</a>
+</div>
+<div class="flex items-center gap-4">
+<a class="text-text-main font-semibold hover:text-primary transition-colors hidden sm:block" href="#">Log in</a>
+<a class="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-primary/20 hover:shadow-primary/30" href="#">Get Started</a>
+</div>
+</div>
+</div>
+</nav>
+<main class="pt-32 pb-20">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16">
+<span class="inline-block py-1 px-3 rounded-full bg-primary-light text-primary text-sm font-bold tracking-wide uppercase mb-4">
+                Unlock Your Potential
+            </span>
+<h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-6">
+                Invest in your academic future.
+            </h1>
+<p class="text-xl text-text-secondary max-w-2xl mx-auto mb-10">
+                Choose the plan that fits your IELTS preparation journey. Whether you're just starting or aiming for Band 8+, we have you covered.
+            </p>
+<div class="flex justify-center items-center gap-4 mb-12">
+<span class="text-base font-semibold text-gray-900">Monthly</span>
+<label class="relative inline-flex items-center cursor-pointer select-none" for="billing-toggle">
+<input class="sr-only peer" id="billing-toggle" type="checkbox"/>
+<div class="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary"></div>
+</label>
+<span class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                    Yearly
+                    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-bold">-20%</span>
+</span>
+</div>
+</div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="relative bg-white rounded-3xl border border-gray-200 p-8 hover:shadow-xl transition-shadow duration-300">
+<div class="mb-6">
+<h3 class="text-xl font-bold text-gray-900 mb-2">Starter</h3>
+<p class="text-text-secondary text-sm">Essential tools to get familiar with the exam format.</p>
+</div>
+<div class="mb-6">
+<span class="text-4xl font-bold text-gray-900">$0</span>
+<span class="text-text-secondary">/month</span>
+</div>
+<a class="block w-full py-3 px-6 text-center rounded-xl border-2 border-gray-200 text-gray-900 font-bold hover:border-gray-300 hover:bg-gray-50 transition-all mb-8" href="#">
+                        Get Started for Free
+                    </a>
+<ul class="space-y-4 text-sm text-text-secondary">
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Limited AI Speaking evaluations (2/mo)</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Basic Writing task feedback</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Access to vocabulary lists</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-x text-[20px]">close</span>
+<span class="text-text-muted decoration-gray-400">Full mock exams</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-x text-[20px]">close</span>
+<span class="text-text-muted decoration-gray-400">Advanced analytics dashboard</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-x text-[20px]">close</span>
+<span class="text-text-muted decoration-gray-400">Priority support</span>
+</li>
+</ul>
+</div>
+<div class="relative bg-[#1E1B4B] rounded-3xl border border-indigo-900 p-8 shadow-2xl scale-105 z-10 text-white overflow-hidden">
+<div class="absolute top-0 right-0 bg-primary text-white text-xs font-bold px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">
+                        Most Popular
+                    </div>
+<div class="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"></div>
+<div class="mb-6 relative z-10">
+<h3 class="text-xl font-bold text-white mb-2">Pro Scholar</h3>
+<p class="text-gray-300 text-sm">Complete preparation suite for serious candidates.</p>
+</div>
+<div class="mb-6 relative z-10">
+<span class="text-5xl font-bold text-white">$29</span>
+<span class="text-gray-400">/month</span>
+</div>
+<a class="relative z-10 block w-full py-3 px-6 text-center rounded-xl bg-primary hover:bg-primary-hover text-white font-bold transition-all shadow-lg shadow-primary/40 mb-8 transform hover:-translate-y-1" href="#">
+                        Start 7-Day Free Trial
+                    </a>
+<ul class="space-y-4 text-sm text-gray-300 relative z-10">
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">Unlimited AI Speaking evaluations</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">Detailed Writing corrections &amp; grammar fixes</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">10 Full-length mock exams per month</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">Band score predictor &amp; progress tracking</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">Speaking Part 2 &amp; 3 simulation</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-3 flex-shrink-0 text-[20px]">check_circle</span>
+<span class="text-white">Smart vocabulary builder</span>
+</li>
+</ul>
+</div>
+<div class="relative bg-white rounded-3xl border border-gray-200 p-8 hover:shadow-xl transition-shadow duration-300">
+<div class="mb-6">
+<h3 class="text-xl font-bold text-gray-900 mb-2">Institutional</h3>
+<p class="text-text-secondary text-sm">For schools, universities, and coaching centers.</p>
+</div>
+<div class="mb-6">
+<span class="text-4xl font-bold text-gray-900">Custom</span>
+</div>
+<a class="block w-full py-3 px-6 text-center rounded-xl border-2 border-gray-200 text-gray-900 font-bold hover:border-gray-300 hover:bg-gray-50 transition-all mb-8" href="#">
+                        Contact Sales
+                    </a>
+<ul class="space-y-4 text-sm text-text-secondary">
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Everything in Pro Scholar</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Teacher dashboard &amp; student monitoring</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Bulk license management</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Custom syllabus integration</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>API Access</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined feature-check text-[20px]">check</span>
+<span>Dedicated account manager</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-24">
+<h2 class="text-3xl font-bold text-center mb-12">Detailed Feature Comparison</h2>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr>
+<th class="py-4 px-6 bg-gray-50 text-sm font-semibold text-gray-500 rounded-tl-xl">Features</th>
+<th class="py-4 px-6 bg-gray-50 text-center text-lg font-bold text-gray-900">Starter</th>
+<th class="py-4 px-6 bg-indigo-50/50 text-center text-lg font-bold text-primary border-t-2 border-primary">Pro Scholar</th>
+<th class="py-4 px-6 bg-gray-50 text-center text-lg font-bold text-gray-900 rounded-tr-xl">Institutional</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<tr class="border-b border-gray-100">
+<td class="py-4 px-6 font-medium text-gray-900">AI Speaking Evaluation</td>
+<td class="py-4 px-6 text-center text-gray-500">2 per month</td>
+<td class="py-4 px-6 text-center font-semibold text-primary bg-indigo-50/20">Unlimited</td>
+<td class="py-4 px-6 text-center text-gray-500">Unlimited</td>
+</tr>
+<tr class="border-b border-gray-100">
+<td class="py-4 px-6 font-medium text-gray-900">Pronunciation Analysis</td>
+<td class="py-4 px-6 text-center text-gray-500">Basic</td>
+<td class="py-4 px-6 text-center font-semibold text-primary bg-indigo-50/20">Advanced (Phoneme level)</td>
+<td class="py-4 px-6 text-center text-gray-500">Advanced</td>
+</tr>
+<tr class="border-b border-gray-100">
+<td class="py-4 px-6 font-medium text-gray-900">Writing Corrections</td>
+<td class="py-4 px-6 text-center text-gray-500">Grammar only</td>
+<td class="py-4 px-6 text-center font-semibold text-primary bg-indigo-50/20">Grammar, Coherence &amp; Lexical</td>
+<td class="py-4 px-6 text-center text-gray-500">Full Suite</td>
+</tr>
+<tr class="border-b border-gray-100">
+<td class="py-4 px-6 font-medium text-gray-900">Full Mock Exams</td>
+<td class="py-4 px-6 text-center text-gray-500">-</td>
+<td class="py-4 px-6 text-center font-semibold text-primary bg-indigo-50/20">10 / month</td>
+<td class="py-4 px-6 text-center text-gray-500">Customizable</td>
+</tr>
+<tr>
+<td class="py-4 px-6 font-medium text-gray-900 rounded-bl-xl">Support</td>
+<td class="py-4 px-6 text-center text-gray-500">Community</td>
+<td class="py-4 px-6 text-center font-semibold text-primary bg-indigo-50/20">Priority Email</td>
+<td class="py-4 px-6 text-center text-gray-500 rounded-br-xl">Dedicated Manager</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="max-w-4xl mx-auto px-4 mt-24">
+<div class="bg-gradient-to-br from-indigo-900 to-primary rounded-3xl p-10 text-center text-white shadow-xl relative overflow-hidden">
+<div class="absolute -top-20 -left-20 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<span class="material-symbols-outlined text-5xl mb-4 text-yellow-300">verified_user</span>
+<h2 class="text-3xl font-bold mb-4">30-Day Money-Back Guarantee</h2>
+<p class="text-indigo-100 mb-8 max-w-lg mx-auto text-lg">
+                        We're confident Spokio will improve your band score. If you don't see progress within the first month, we'll refund your subscription in full. No questions asked.
+                    </p>
+<div class="flex justify-center gap-6 opacity-80 grayscale hover:grayscale-0 transition-all">
+<div class="h-8 flex items-center font-bold text-xl">VISA</div>
+<div class="h-8 flex items-center font-bold text-xl">Mastercard</div>
+<div class="h-8 flex items-center font-bold text-xl">PayPal</div>
+</div>
+</div>
+</div>
+</div>
+<div class="max-w-3xl mx-auto px-4 mt-24">
+<h2 class="text-3xl font-bold text-center mb-10 text-gray-900">Frequently Asked Questions</h2>
+<div class="space-y-4">
+<details class="group bg-white rounded-xl border border-gray-200 p-6 [&amp;_summary::-webkit-details-marker]:hidden cursor-pointer">
+<summary class="flex items-center justify-between font-semibold text-lg text-gray-900">
+                        Can I cancel my subscription at any time?
+                        <span class="material-symbols-outlined transition group-open:rotate-180">expand_more</span>
+</summary>
+<p class="text-text-secondary mt-4 leading-relaxed">
+                        Yes, you can cancel your subscription at any time from your account settings. You will retain access to Pro features until the end of your current billing period.
+                    </p>
+</details>
+<details class="group bg-white rounded-xl border border-gray-200 p-6 [&amp;_summary::-webkit-details-marker]:hidden cursor-pointer">
+<summary class="flex items-center justify-between font-semibold text-lg text-gray-900">
+                        How accurate is the AI grading?
+                        <span class="material-symbols-outlined transition group-open:rotate-180">expand_more</span>
+</summary>
+<p class="text-text-secondary mt-4 leading-relaxed">
+                        Our AI is trained on thousands of official IELTS exams graded by certified examiners. In 95% of cases, our AI score is within 0.5 bands of an official examiner's score.
+                    </p>
+</details>
+<details class="group bg-white rounded-xl border border-gray-200 p-6 [&amp;_summary::-webkit-details-marker]:hidden cursor-pointer">
+<summary class="flex items-center justify-between font-semibold text-lg text-gray-900">
+                        Do you offer discounts for students?
+                        <span class="material-symbols-outlined transition group-open:rotate-180">expand_more</span>
+</summary>
+<p class="text-text-secondary mt-4 leading-relaxed">
+                        Yes! If you have a valid .edu email address, you can apply for a 30% discount on the yearly Pro Scholar plan. Contact our support team for more details.
+                    </p>
+</details>
+<details class="group bg-white rounded-xl border border-gray-200 p-6 [&amp;_summary::-webkit-details-marker]:hidden cursor-pointer">
+<summary class="flex items-center justify-between font-semibold text-lg text-gray-900">
+                        What is the difference between Academic and General Training?
+                        <span class="material-symbols-outlined transition group-open:rotate-180">expand_more</span>
+</summary>
+<p class="text-text-secondary mt-4 leading-relaxed">
+                        Spokio supports both modules. When you set up your account, you can select your target module, and the practice materials (especially Reading and Writing Task 1) will be tailored accordingly.
+                    </p>
+</details>
+</div>
+</div>
+</main>
+<footer class="bg-gray-50 border-t border-gray-200 py-12">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+<div class="col-span-2 md:col-span-1">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">S</div>
+<span class="font-bold text-xl text-gray-900">Spokio</span>
+</div>
+<p class="text-sm text-text-secondary mb-4">
+                        AI-powered IELTS preparation platform helping students achieve their dream score.
+                    </p>
+<div class="flex gap-4">
+<a class="text-gray-400 hover:text-primary" href="#"><span class="material-symbols-outlined">public</span></a>
+<a class="text-gray-400 hover:text-primary" href="#"><span class="material-symbols-outlined">alternate_email</span></a>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-gray-900 mb-4">Platform</h4>
+<ul class="space-y-2 text-sm text-text-secondary">
+<li><a class="hover:text-primary" href="#">Pricing</a></li>
+<li><a class="hover:text-primary" href="#">For Schools</a></li>
+<li><a class="hover:text-primary" href="#">Success Stories</a></li>
+<li><a class="hover:text-primary" href="#">Methodology</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-gray-900 mb-4">Resources</h4>
+<ul class="space-y-2 text-sm text-text-secondary">
+<li><a class="hover:text-primary" href="#">Blog</a></li>
+<li><a class="hover:text-primary" href="#">IELTS Guide</a></li>
+<li><a class="hover:text-primary" href="#">Band Score Calculator</a></li>
+<li><a class="hover:text-primary" href="#">Free Practice Test</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-gray-900 mb-4">Company</h4>
+<ul class="space-y-2 text-sm text-text-secondary">
+<li><a class="hover:text-primary" href="#">About Us</a></li>
+<li><a class="hover:text-primary" href="#">Careers</a></li>
+<li><a class="hover:text-primary" href="#">Contact</a></li>
+<li><a class="hover:text-primary" href="#">Privacy Policy</a></li>
+</ul>
+</div>
+</div>
+<div class="border-t border-gray-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-sm text-gray-400">© 2023 Spokio Inc. All rights reserved.</p>
+<div class="flex gap-6 text-sm text-gray-400">
+<a class="hover:text-gray-900" href="#">Terms</a>
+<a class="hover:text-gray-900" href="#">Privacy</a>
+<a class="hover:text-gray-900" href="#">Cookies</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

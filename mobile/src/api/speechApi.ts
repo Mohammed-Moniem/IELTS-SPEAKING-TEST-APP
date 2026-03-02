@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { logger } from "../utils/logger";
 
 const DEFAULT_EXAMINER_FALLBACK_RESPONSE =
   "Thanks for your response. Could you expand on that a little more?";
@@ -150,7 +151,7 @@ export const transcribeAudio = async (
     );
     return response.data.data;
   } catch (error) {
-    console.error("❌ Transcription error:", error);
+    console.warn("⚠️ Transcription request warning:", error);
     throw error;
   }
 };
@@ -258,7 +259,7 @@ export const getExaminerResponse = async (
     );
     return response.data.data;
   } catch (error) {
-    console.error("❌ Examiner response error:", error);
+    console.warn("⚠️ Examiner response warning:", error);
     throw error;
   }
 };
@@ -290,7 +291,7 @@ export const evaluateResponse = async (
     );
     return response.data.data;
   } catch (error) {
-    console.error("❌ Evaluation error:", error);
+    console.warn("⚠️ Evaluation request warning:", error);
     throw error;
   }
 };
@@ -380,7 +381,7 @@ export const evaluateFullTest = async (
 
     return response.data.data as EvaluateFullTestResponse;
   } catch (error) {
-    console.error("❌ Full test evaluation error:", error);
+    logger.warn("Full test evaluation request failed", error);
     throw error;
   }
 };
@@ -438,7 +439,7 @@ export const processConversationTurn = async (
       audioUrl,
     };
   } catch (error) {
-    console.error("❌ Conversation turn error:", error);
+    logger.warn("Conversation turn request failed", error);
     throw error;
   }
 };

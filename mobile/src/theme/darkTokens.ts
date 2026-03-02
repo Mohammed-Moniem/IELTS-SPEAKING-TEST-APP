@@ -8,6 +8,7 @@ export const darkColors = {
   surface: "#1E1B2E", // Dark surface
   surfaceSubtle: "#252136", // Slightly lighter
   overlay: "#1E1B2E",
+  overlayBackdrop: "rgba(0, 0, 0, 0.72)",
 
   // Borders - Darker variants
   border: "rgba(124, 58, 237, 0.25)", // More visible in dark
@@ -48,6 +49,22 @@ export const darkColors = {
   danger: red.red10, // Slightly brighter
   dangerSoft: "#2E141A", // Dark red soft
   dangerOn: "#FFFFFF",
+
+  // Semantic badges
+  badgePremiumBackground: "#FDE68A",
+  badgePremiumText: "#3F2A00",
+  badgePremiumBorder: "#F59E0B",
+
+  // Semantic status banners
+  statusInfoBackground: "#1E243D",
+  statusInfoBorder: "#334155",
+  statusInfoText: "#BFDBFE",
+
+  // Semantic reward tier colors
+  tierBronze: "#D29350",
+  tierSilver: "#B5B8C0",
+  tierGold: "#E2BB3F",
+  tierPlatinum: "#D0D5DD",
 
   // Tab
   tabInactive: "#8B85A3",
