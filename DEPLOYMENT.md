@@ -2,12 +2,12 @@
 
 ## Prerequisites
 
-| Requirement | Minimum version |
-|-------------|----------------|
-| Docker | 24+ |
-| Docker Compose | v2+ (bundled with Docker Desktop) |
-| Node.js (local dev only) | 20 LTS |
-| MongoDB (if not using Docker) | 7.x |
+| Requirement                   | Minimum version                   |
+| ----------------------------- | --------------------------------- |
+| Docker                        | 24+                               |
+| Docker Compose                | v2+ (bundled with Docker Desktop) |
+| Node.js (local dev only)      | 20 LTS                            |
+| MongoDB (if not using Docker) | 7.x                               |
 
 ---
 
@@ -34,11 +34,11 @@ curl http://localhost:3000                  # Should return HTML
 
 The stack exposes:
 
-| Service | URL | Container name |
-|---------|-----|----------------|
-| Frontend | `http://localhost:3000` | `web` |
-| Backend API | `http://localhost:4000` | `api` |
-| MongoDB | `mongodb://localhost:27017` | `mongo` |
+| Service     | URL                         | Container name |
+| ----------- | --------------------------- | -------------- |
+| Frontend    | `http://localhost:3000`     | `web`          |
+| Backend API | `http://localhost:4000`     | `api`          |
+| MongoDB     | `mongodb://localhost:27017` | `mongo`        |
 
 ---
 
@@ -48,29 +48,29 @@ The stack exposes:
 
 These **must** be changed from defaults before going live:
 
-| Variable | Why |
-|----------|-----|
-| `JWT_ACCESS_SECRET` | Auth tokens — generate with `openssl rand -base64 48` |
-| `JWT_REFRESH_SECRET` | Refresh tokens — same generation method |
-| `OPENAI_API_KEY` | Powers AI speaking/writing feedback |
-| `CORS_ORIGIN` | Set to your production domain(s) |
-| `MONITOR_PASSWORD` | Status monitor access |
+| Variable             | Why                                                   |
+| -------------------- | ----------------------------------------------------- |
+| `JWT_ACCESS_SECRET`  | Auth tokens — generate with `openssl rand -base64 48` |
+| `JWT_REFRESH_SECRET` | Refresh tokens — same generation method               |
+| `OPENAI_API_KEY`     | Powers AI speaking/writing feedback                   |
+| `CORS_ORIGIN`        | Set to your production domain(s)                      |
+| `MONITOR_PASSWORD`   | Status monitor access                                 |
 
 These are **required** for their respective features:
 
-| Variable | Feature |
-|----------|---------|
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Payments / subscriptions |
-| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Password reset, email verification |
-| `FRONTEND_URL` | Email link targets |
-| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Web push notifications |
+| Variable                                                               | Feature                            |
+| ---------------------------------------------------------------------- | ---------------------------------- |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`                           | Payments / subscriptions           |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL`                                  | Password reset, email verification |
+| `FRONTEND_URL`                                                         | Email link targets                 |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Web push notifications             |
 
 ### Frontend (`web-saas/.env.local`)
 
-| Variable | Notes |
-|----------|-------|
-| `API_INTERNAL_BASE_URL` | Points to backend (Docker: `http://api:4000`, local: `http://127.0.0.1:4000`) |
-| `NEXT_PUBLIC_FIREBASE_*` | Firebase config for analytics + push |
+| Variable                 | Notes                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `API_INTERNAL_BASE_URL`  | Points to backend (Docker: `http://api:4000`, local: `http://127.0.0.1:4000`) |
+| `NEXT_PUBLIC_FIREBASE_*` | Firebase config for analytics + push                                          |
 
 ---
 
@@ -167,11 +167,11 @@ Set `MONGO_URL` in `.env` to your connection string and remove the `mongo` servi
 
 ## 6. Monitoring & Health
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/v1/health` | Liveness check — returns component status |
-| `GET /status` | Status monitor (password-protected) |
-| `GET /metrics` | Prometheus metrics (when `TELEMETRY_METRICS_ENABLED=true`) |
+| Endpoint             | Purpose                                                    |
+| -------------------- | ---------------------------------------------------------- |
+| `GET /api/v1/health` | Liveness check — returns component status                  |
+| `GET /status`        | Status monitor (password-protected)                        |
+| `GET /metrics`       | Prometheus metrics (when `TELEMETRY_METRICS_ENABLED=true`) |
 
 ### Docker health checks
 
@@ -249,14 +249,14 @@ docker compose up -d --build web
 
 ## 10. Troubleshooting
 
-| Symptom | Check |
-|---------|-------|
-| API returns 502 | `docker compose logs api` — likely missing env vars |
-| Frontend blank page | `docker compose logs web` — check `API_INTERNAL_BASE_URL` |
-| Auth fails | Verify `JWT_ACCESS_SECRET` matches between restarts |
-| Stripe webhooks fail | Check `STRIPE_WEBHOOK_SECRET`, verify endpoint URL in Stripe Dashboard |
-| Email not sending | Verify `RESEND_API_KEY` and that sender domain is verified in Resend |
-| MongoDB connection refused | `docker compose logs mongo` — check volume permissions |
+| Symptom                    | Check                                                                  |
+| -------------------------- | ---------------------------------------------------------------------- |
+| API returns 502            | `docker compose logs api` — likely missing env vars                    |
+| Frontend blank page        | `docker compose logs web` — check `API_INTERNAL_BASE_URL`              |
+| Auth fails                 | Verify `JWT_ACCESS_SECRET` matches between restarts                    |
+| Stripe webhooks fail       | Check `STRIPE_WEBHOOK_SECRET`, verify endpoint URL in Stripe Dashboard |
+| Email not sending          | Verify `RESEND_API_KEY` and that sender domain is verified in Resend   |
+| MongoDB connection refused | `docker compose logs mongo` — check volume permissions                 |
 
 ```bash
 # View all logs

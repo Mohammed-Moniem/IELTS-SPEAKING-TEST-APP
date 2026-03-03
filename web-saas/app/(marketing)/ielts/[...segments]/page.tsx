@@ -30,6 +30,17 @@ function humanizeSegment(value: string): string {
     .join(' ');
 }
 
+function toPublicHref(href?: string): string {
+  if (!href) return '/register';
+  const target = href.trim();
+
+  if (target.startsWith('/app') || target.startsWith('/admin')) {
+    return `/register?next=${encodeURIComponent(target)}`;
+  }
+
+  return target;
+}
+
 async function resolveGuideCanonicalPath(segments: string[]): Promise<string> {
   if (!segments.length) {
     return '/ielts';
@@ -158,6 +169,9 @@ export default async function GuideDetailPage({ params }: GuidePageProps) {
     }))
   };
 
+  const primaryCtaHref = toPublicHref(page.ctaConfig?.primary?.href || '/register');
+  const secondaryCtaHref = toPublicHref(page.ctaConfig?.secondary?.href || '/pricing');
+
   return (
     <div className="space-y-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
@@ -175,13 +189,13 @@ export default async function GuideDetailPage({ params }: GuidePageProps) {
           description={page.excerpt || page.metaDescription || 'Step-by-step IELTS guide with practice-first blocks.'}
           ctas={[
             {
-              href: page.ctaConfig?.primary?.href || '/register',
+              href: primaryCtaHref,
               label: page.ctaConfig?.primary?.label || 'Start Free',
               ctaId: `guide_hero_primary_${page.slug}`,
               section: 'guide-hero'
             },
             {
-              href: page.ctaConfig?.secondary?.href || '/pricing',
+              href: secondaryCtaHref,
               label: page.ctaConfig?.secondary?.label || 'Compare Plans',
               tone: 'secondary',
               ctaId: `guide_hero_secondary_${page.slug}`,
@@ -197,10 +211,10 @@ export default async function GuideDetailPage({ params }: GuidePageProps) {
           <h1 className="hero-elegant-title text-3xl font-bold">{page.title}</h1>
           <p className="hero-elegant-copy max-w-2xl text-white/80">{page.excerpt || page.metaDescription}</p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 hover:bg-gray-100 transition-colors shadow-lg shadow-black/10" href={page.ctaConfig?.primary?.href || '/register'}>
+            <Link className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 hover:bg-gray-100 transition-colors shadow-lg shadow-black/10" href={primaryCtaHref}>
               {page.ctaConfig?.primary?.label || 'Start Free'}
             </Link>
-            <Link className="rounded-xl border border-white/30 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors" href={page.ctaConfig?.secondary?.href || '/pricing'}>
+            <Link className="rounded-xl border border-white/30 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors" href={secondaryCtaHref}>
               {page.ctaConfig?.secondary?.label || 'Compare Plans'}
             </Link>
           </div>
@@ -291,7 +305,7 @@ export default async function GuideDetailPage({ params }: GuidePageProps) {
           {relatedGuides.slice(0, 3).map((item: { id: string; canonicalPath: string; title: string; excerpt?: string }) => (
             <Link
               key={item.id}
-              href={item.canonicalPath}
+              href={toPublicHref(item.canonicalPath)}
               className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4 space-y-1 hover:border-violet-300 dark:hover:border-violet-700 transition-colors no-underline"
             >
               <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
@@ -307,10 +321,10 @@ export default async function GuideDetailPage({ params }: GuidePageProps) {
           Move from content to action immediately: complete one timed drill, review mistakes, then follow the next route.
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <Link className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/25" href={page.ctaConfig?.primary?.href || '/register'}>
+          <Link className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/25" href={primaryCtaHref}>
             {page.ctaConfig?.primary?.label || 'Start Free'}
           </Link>
-          <Link className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" href={page.ctaConfig?.secondary?.href || '/pricing'}>
+          <Link className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" href={secondaryCtaHref}>
             {page.ctaConfig?.secondary?.label || 'Compare Plans'}
           </Link>
           <Link className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" href="/ielts">

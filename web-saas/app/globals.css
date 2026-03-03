@@ -35,10 +35,10 @@ ul {
 /* ── Material icon fonts ────────────────────────── */
 .material-symbols-outlined {
   font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -59,172 +59,6 @@ ul {
   }
 }
 
-@keyframes reveal-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float-soft {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-@keyframes field-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-3px);
-  }
-  75% {
-    transform: translateX(3px);
-  }
-}
-
-@keyframes hero-headline-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) scale(0.985);
-    filter: blur(5px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-@keyframes hero-keyphrase-flow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes hero-text-elegant {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-.motion-reveal {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.motion-reveal-visible {
-  animation: reveal-up 520ms ease-out forwards;
-}
-
-.motion-float {
-  animation: float-soft 5s ease-in-out infinite;
-}
-
-.motion-float-delayed {
-  animation: float-soft 6.5s ease-in-out infinite;
-}
-
-.motion-tilt-card {
-  transform-style: preserve-3d;
-  transition: transform 260ms ease, box-shadow 260ms ease;
-}
-
-.motion-tilt-card:hover,
-.motion-tilt-card:focus-within {
-  transform: perspective(1100px) rotateX(2deg) rotateY(-2deg) translateY(-2px);
-}
-
-.motion-input-field {
-  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
-}
-
-.motion-input-field:focus {
-  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.15);
-}
-
-.motion-error-shake {
-  animation: field-shake 180ms ease-in-out;
-}
-
-.scroll-reveal-init {
-  opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.985);
-  filter: blur(4px);
-  will-change: transform, opacity, filter;
-  transition:
-    opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 620ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 620ms cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: var(--scroll-reveal-delay, 0ms);
-}
-
-.scroll-reveal-in {
-  opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-  filter: blur(0);
-}
-
-.motion-hero-line {
-  display: inline-block;
-  opacity: 0;
-  animation: hero-headline-rise 780ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.motion-hero-line-1 {
-  animation-delay: 40ms;
-}
-
-.motion-hero-line-2 {
-  animation-delay: 170ms;
-}
-
-.motion-hero-line-3 {
-  animation-delay: 290ms;
-}
-
-.motion-hero-keyphrase {
-  background-size: 220% 220%;
-  animation: hero-keyphrase-flow 4.8s ease-in-out infinite;
-}
-
-.marketing-hero-surface {
-  border: 1px solid rgba(196, 181, 253, 0.45);
-  background: linear-gradient(118deg, #4c1d95 0%, #6d28d9 55%, #8b5cf6 100%);
-  box-shadow: 0 24px 60px -32px rgba(91, 33, 182, 0.65);
-}
-
-.hero-elegant-title {
-  opacity: 0;
-  animation: hero-text-elegant 680ms cubic-bezier(0.2, 0.65, 0.3, 1) 80ms forwards;
-}
-
-.hero-elegant-copy {
-  opacity: 0;
-  animation: hero-text-elegant 680ms cubic-bezier(0.2, 0.65, 0.3, 1) 200ms forwards;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -232,24 +66,5 @@ ul {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
-  }
-
-  .motion-reveal,
-  .motion-reveal-visible {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  .scroll-reveal-init,
-  .scroll-reveal-in {
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
-  }
-
-  .hero-elegant-title,
-  .hero-elegant-copy {
-    opacity: 1 !important;
-    transform: none !important;
   }
 }

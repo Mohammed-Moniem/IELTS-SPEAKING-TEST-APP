@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @layer base {
@@ -11,45 +11,45 @@
   /* Simple, elegant, and clean color palette */
   --background: oklch(0.99 0 0);
   --foreground: oklch(0.15 0 0);
-  
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.15 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0 0);
-  
+
   /* Elegant primary color (e.g., a deep, sophisticated indigo/blue) */
   --primary: oklch(0.45 0.1 260);
   --primary-foreground: oklch(0.98 0 0);
-  
+
   /* Subtle secondary */
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.25 0 0);
-  
+
   /* Clean grays */
   --muted: oklch(0.96 0 0);
   --muted-foreground: oklch(0.45 0 0);
-  
+
   /* Tasteful accent (e.g., a refined teal or gold) */
   --accent: oklch(0.65 0.15 190);
   --accent-foreground: oklch(0.98 0 0);
-  
+
   /* Destructive */
   --destructive: oklch(0.6 0.2 20);
   --destructive-foreground: oklch(0.98 0 0);
-  
+
   /* Borders and inputs */
   --border: oklch(0.92 0 0);
   --input: oklch(0.92 0 0);
   --ring: oklch(0.45 0.1 260);
-  
+
   --radius: 0.5rem;
-  
+
   --chart-1: oklch(0.45 0.1 260);
   --chart-2: oklch(0.6 0.1 200);
   --chart-3: oklch(0.5 0.1 40);
   --chart-4: oklch(0.7 0.1 280);
   --chart-5: oklch(0.8 0.1 340);
-  
+
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
   --sidebar-primary: oklch(0.45 0.1 260);
@@ -58,15 +58,17 @@
   --sidebar-accent-foreground: oklch(0.25 0 0);
   --sidebar-border: oklch(0.92 0 0);
   --sidebar-ring: oklch(0.45 0.1 260);
-  
+
   --shadow-color: oklch(0 0 0);
   --shadow-opacity: 0.05;
   --shadow-blur: 10px;
   --shadow-spread: 0px;
   --shadow-offset-x: 0px;
   --shadow-offset-y: 4px;
-  
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-serif: "Georgia", serif;
   --font-mono: "Menlo", monospace;
 }
@@ -107,12 +109,18 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.03),
+    0 1px 3px rgba(0, 0, 0, 0.02);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .glass-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 /* Elegant button styles */

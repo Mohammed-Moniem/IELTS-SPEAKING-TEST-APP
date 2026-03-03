@@ -9,6 +9,27 @@ interface SendEmailParams {
   text?: string;
 }
 
+type EmailProvider = 'resend' | 'dev-outbox' | 'disabled';
+
+export interface EmailSendResult {
+  delivered: boolean;
+  provider: EmailProvider;
+}
+
+export interface EmailDeliveryStatus {
+  configured: boolean;
+  provider: EmailProvider;
+}
+
+interface DevOutboxEmail {
+  id: string;
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  createdAt: string;
+}
+
 /**
  * Transactional email service using the Resend HTTP API.
  * No SDK dependency required — uses native fetch.
@@ -19,6 +40,7 @@ export class EmailService {
   private readonly apiKey: string;
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
+  private static devOutbox: DevOutboxEmail[] = [];
 
   constructor() {
     this.apiKey = env.email?.resendApiKey || '';
@@ -30,11 +52,58 @@ export class EmailService {
     return Boolean(this.apiKey);
   }
 
+  public getDeliveryStatus(): EmailDeliveryStatus {
+    if (this.isConfigured) {
+      return { configured: true, provider: 'resend' };
+    }
+
+    if (env.isDevelopment || env.isTest) {
+      return { configured: false, provider: 'dev-outbox' };
+    }
+
+    return { configured: false, provider: 'disabled' };
+  }
+
+  public listDevOutbox(to?: string, limit: number = 25): DevOutboxEmail[] {
+    const normalizedTo = (to || '').trim().toLowerCase();
+    const filtered = normalizedTo
+      ? EmailService.devOutbox.filter(entry => entry.to.toLowerCase() === normalizedTo)
+      : EmailService.devOutbox;
+
+    return filtered.slice(Math.max(0, filtered.length - limit)).reverse();
+  }
+
+  public clearDevOutbox(): void {
+    EmailService.devOutbox = [];
+  }
+
   /** Low-level email send via Resend HTTP API */
-  public async send(params: SendEmailParams): Promise<boolean> {
+  public async send(params: SendEmailParams): Promise<EmailSendResult> {
     if (!this.isConfigured) {
-      this.log.warn('EmailService :: Resend API key not configured — skipping email send');
-      return false;
+      if (env.isDevelopment || env.isTest) {
+        const outboxEntry: DevOutboxEmail = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          to: params.to,
+          subject: params.subject,
+          html: params.html,
+          text: params.text,
+          createdAt: new Date().toISOString()
+        };
+
+        EmailService.devOutbox.push(outboxEntry);
+
+        if (EmailService.devOutbox.length > 200) {
+          EmailService.devOutbox = EmailService.devOutbox.slice(EmailService.devOutbox.length - 200);
+        }
+
+        this.log.warn(
+          `EmailService :: Resend API key not configured — captured email in dev outbox (id=${outboxEntry.id}, to=${params.to})`
+        );
+        return { delivered: true, provider: 'dev-outbox' };
+      }
+
+      this.log.warn('EmailService :: Resend API key not configured — email delivery is disabled');
+      return { delivered: false, provider: 'disabled' };
     }
 
     try {
@@ -56,19 +125,19 @@ export class EmailService {
       if (!response.ok) {
         const errorBody = await response.text();
         this.log.error(`EmailService :: Resend API error ${response.status}: ${errorBody}`);
-        return false;
+        return { delivered: false, provider: 'resend' };
       }
 
       this.log.info(`EmailService :: Email sent to ${params.to} — subject: ${params.subject}`);
-      return true;
+      return { delivered: true, provider: 'resend' };
     } catch (error: any) {
       this.log.error(`EmailService :: Failed to send email: ${error?.message || error}`);
-      return false;
+      return { delivered: false, provider: 'resend' };
     }
   }
 
   /** Send password reset email */
-  public async sendPasswordReset(to: string, token: string, firstName: string): Promise<boolean> {
+  public async sendPasswordReset(to: string, token: string, firstName: string): Promise<EmailSendResult> {
     const resetUrl = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
     return this.send({
@@ -107,7 +176,7 @@ export class EmailService {
   }
 
   /** Send email verification email */
-  public async sendEmailVerification(to: string, token: string, firstName: string): Promise<boolean> {
+  public async sendEmailVerification(to: string, token: string, firstName: string): Promise<EmailSendResult> {
     const verifyUrl = `${this.frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
     return this.send({
@@ -147,7 +216,7 @@ export class EmailService {
   }
 
   /** Send welcome email after registration */
-  public async sendWelcome(to: string, firstName: string): Promise<boolean> {
+  public async sendWelcome(to: string, firstName: string): Promise<EmailSendResult> {
     const dashboardUrl = `${this.frontendUrl}/app/dashboard`;
 
     return this.send({

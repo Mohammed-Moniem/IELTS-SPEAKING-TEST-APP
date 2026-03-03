@@ -48,8 +48,28 @@ import {
 } from '@/lib/types';
 
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+const DEFAULT_LOCAL_DEV_API_FALLBACK = process.env.NEXT_PUBLIC_API_FALLBACK_URL || 'http://127.0.0.1:4000/api/v1';
+const USAGE_LIMIT_ERROR_CODE = 'UsageLimitReached';
+const USAGE_LIMIT_TOAST_KEY = 'spokio.usage_limit.toast';
+const DEFAULT_USAGE_LIMIT_MESSAGE = 'You have exceeded your monthly usage limit for your current plan. Please upgrade to continue.';
 
-const getApiBase = () => DEFAULT_API_BASE.replace(/\/$/, '');
+const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
+
+const isLocalBrowserHost = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+};
+
+const getApiBase = () => {
+  const configuredBase = trimTrailingSlash(DEFAULT_API_BASE);
+
+  // In local dev, prefer calling the backend directly when the Next.js /api rewrite isn't available.
+  if (process.env.NODE_ENV !== 'production' && configuredBase.startsWith('/') && isLocalBrowserHost()) {
+    return trimTrailingSlash(DEFAULT_LOCAL_DEV_API_FALLBACK);
+  }
+
+  return configuredBase;
+};
 
 export type ApiErrorCategory =
   | 'unauthorized'
@@ -63,11 +83,13 @@ export type ApiErrorCategory =
 export class ApiError extends Error {
   public readonly status: number;
   public readonly category: ApiErrorCategory;
+  public readonly code?: string;
 
-  constructor(message: string, status: number, category: ApiErrorCategory) {
+  constructor(message: string, status: number, category: ApiErrorCategory, code?: string) {
     super(message);
     this.status = status;
     this.category = category;
+    this.code = code;
   }
 }
 
@@ -125,12 +147,88 @@ const buildHeaders = (options: ApiOptions) => {
 };
 
 const parseErrorFromPayload = (payload: StandardResponse<unknown>, fallbackStatus: number) => {
-  const message = Array.isArray(payload.message)
-    ? payload.message.join(', ')
-    : payload.message || `Request failed with status ${payload.status || fallbackStatus}`;
+  const errorMessage = payload.error?.message;
+  const messageFromMessageField = Array.isArray(payload.message) ? payload.message.join(', ') : payload.message;
+  const message = errorMessage || messageFromMessageField || `Request failed with status ${payload.status || fallbackStatus}`;
   const status = payload.status || fallbackStatus;
+  const code = payload.error?.code;
 
-  return new ApiError(message, status, getErrorCategory(status));
+  return new ApiError(message, status, getErrorCategory(status), code);
+};
+
+const isUsageLimitError = (error: ApiError) => {
+  if (error.code === USAGE_LIMIT_ERROR_CODE) return true;
+  if (error.status !== 403) return false;
+  return /limit reached|usage limit/i.test(error.message || '');
+};
+
+const redirectToPricingForUsageLimit = (error: ApiError) => {
+  if (!isUsageLimitError(error) || typeof window === 'undefined') return;
+
+  const toastMessage = error.message || DEFAULT_USAGE_LIMIT_MESSAGE;
+
+  try {
+    window.sessionStorage.setItem(USAGE_LIMIT_TOAST_KEY, toastMessage);
+  } catch {
+    // Non-blocking storage failure.
+  }
+
+  if (window.location.pathname.startsWith('/pricing')) {
+    window.dispatchEvent(
+      new CustomEvent('spokio:usage-limit-toast', {
+        detail: { message: toastMessage }
+      })
+    );
+    return;
+  }
+
+  const target = new URL('/pricing', window.location.origin);
+  target.searchParams.set('upgrade_reason', 'usage_limit');
+  target.searchParams.set('upgrade_message', toastMessage);
+  window.location.assign(target.toString());
+};
+
+const coerceToApiError = (value: unknown): ApiError | null => {
+  if (value instanceof ApiError) return value;
+  if (!value || typeof value !== 'object') return null;
+
+  const candidate = value as {
+    status?: unknown;
+    code?: unknown;
+    message?: unknown;
+    error?: { code?: unknown; message?: unknown; status?: unknown } | null;
+  };
+
+  const status =
+    typeof candidate.status === 'number'
+      ? candidate.status
+      : typeof candidate.error?.status === 'number'
+        ? candidate.error.status
+        : 0;
+  const code =
+    typeof candidate.code === 'string'
+      ? candidate.code
+      : typeof candidate.error?.code === 'string'
+        ? candidate.error.code
+        : undefined;
+  const message =
+    typeof candidate.message === 'string'
+      ? candidate.message
+      : typeof candidate.error?.message === 'string'
+        ? candidate.error.message
+        : undefined;
+
+  if (!message && !code && status === 0) return null;
+
+  return new ApiError(message || `Request failed with status ${status || 'unknown'}`, status, getErrorCategory(status), code);
+};
+
+export const handleUsageLimitRedirect = (error: unknown) => {
+  const apiError = coerceToApiError(error);
+  if (!apiError) return false;
+  if (!isUsageLimitError(apiError)) return false;
+  redirectToPricingForUsageLimit(apiError);
+  return true;
 };
 
 const requestCore = async <T>(path: string, options: ApiOptions, hasRetriedAuth = false): Promise<T> => {
@@ -173,18 +271,27 @@ const requestCore = async <T>(path: string, options: ApiOptions, hasRetriedAuth 
 
   const payload = (await response.json()) as StandardResponse<T>;
   if (!payload.success) {
-    throw parseErrorFromPayload(payload, response.status);
+    const parsedError = parseErrorFromPayload(payload, response.status);
+    redirectToPricingForUsageLimit(parsedError);
+    throw parsedError;
   }
 
   if (typeof payload.data === 'undefined') {
-    throw new ApiError('Response payload missing data', payload.status || response.status || 500, 'unknown');
+    return undefined as T;
   }
 
   return payload.data;
 };
 
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  return requestCore<T>(path, options);
+  try {
+    return await requestCore<T>(path, options);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      redirectToPricingForUsageLimit(error);
+    }
+    throw error;
+  }
 }
 
 export async function apiRaw(path: string, options: ApiOptions = {}) {
@@ -211,8 +318,30 @@ export async function apiRaw(path: string, options: ApiOptions = {}) {
   }
 
   if (!response.ok) {
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+
+    if (isJson) {
+      const payload = (await response.json()) as StandardResponse<unknown>;
+      const parsedError = parseErrorFromPayload(payload, response.status);
+      redirectToPricingForUsageLimit(parsedError);
+      throw parsedError;
+    }
+
     const text = await response.text();
-    throw new ApiError(text || `Request failed with status ${response.status}`, response.status, getErrorCategory(response.status));
+    let parsedError: ApiError;
+    try {
+      const maybePayload = JSON.parse(text) as StandardResponse<unknown>;
+      parsedError = parseErrorFromPayload(maybePayload, response.status);
+    } catch {
+      parsedError = new ApiError(
+        text || `Request failed with status ${response.status}`,
+        response.status,
+        getErrorCategory(response.status)
+      );
+    }
+    redirectToPricingForUsageLimit(parsedError);
+    throw parsedError;
   }
 
   return response;

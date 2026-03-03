@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { ApiError, webApi } from '@/lib/api/client';
+import { getFallbackBlogPostBySlug } from '@/lib/seo/blogFallback';
 import type { BlogPostDetail } from '@/lib/types';
 import { EmptyState, ErrorState, SkeletonSet } from '@/components/ui/v2';
 
@@ -46,11 +47,17 @@ export function BlogPostPage({ slug }: Props) {
   const loadPost = async () => {
     setLoading(true);
     setError('');
+    setPost(null);
     try {
       const payload = await webApi.getBlogPost(slug);
       setPost(payload);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load blog post');
+      const fallbackPost = getFallbackBlogPostBySlug(slug);
+      if (fallbackPost) {
+        setPost(fallbackPost);
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Failed to load blog post');
+      }
     } finally {
       setLoading(false);
     }

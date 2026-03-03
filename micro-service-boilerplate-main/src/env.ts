@@ -13,11 +13,13 @@ dotenv.config({ path: path.join(process.cwd(), `.env${process.env.NODE_ENV === '
 /**
  * Environment variables
  */
+const nodeEnv = getOsEnv('NODE_ENV') || 'development';
+
 export const env = {
-  node: getOsEnv('NODE_ENV') || 'development',
-  isProduction: getOsEnv('NODE_ENV') === 'production',
-  isTest: getOsEnv('NODE_ENV') === 'test',
-  isDevelopment: getOsEnv('NODE_ENV') === 'development',
+  node: nodeEnv,
+  isProduction: nodeEnv === 'production',
+  isTest: nodeEnv === 'test',
+  isDevelopment: nodeEnv === 'development',
   app: {
     name: getOsEnv('APP_NAME') || (pkg as any).name,
     version: (pkg as any).version,
@@ -213,6 +215,22 @@ export const env = {
     targetReconcileHourUtc: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_HOUR_UTC')) || 1,
     targetReconcileMinuteUtc: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_MINUTE_UTC')) || 0,
     targetReconcileCheckIntervalMs: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_CHECK_INTERVAL_MS')) || 15 * 60 * 1000
+  },
+  usage: {
+    freePracticeLimit: toNumber(getOsEnv('FREE_PRACTICE_LIMIT')) || 10,
+    freeTestLimit: toNumber(getOsEnv('FREE_TEST_LIMIT')) || 3,
+    freeWritingLimit: toNumber(getOsEnv('FREE_WRITING_LIMIT')) || 20,
+    freeReadingLimit: toNumber(getOsEnv('FREE_READING_LIMIT')) || 20,
+    freeListeningLimit: toNumber(getOsEnv('FREE_LISTENING_LIMIT')) || 20
+  },
+  writing: {
+    deepFeedbackV2Enabled: toBool(getOsEnv('WRITING_DEEP_FEEDBACK_V2') || 'true'),
+    detailCacheEnabled: toBool(getOsEnv('WRITING_DETAIL_CACHE_ENABLED') || 'true'),
+    detailCacheTtlSeconds: toNumber(getOsEnv('WRITING_DETAIL_CACHE_TTL_SECONDS')) || 120,
+    deepBackfillEnabled: toBool(getOsEnv('WRITING_DEEP_BACKFILL_ENABLED') || 'true'),
+    deepBackfillBatchSize: toNumber(getOsEnv('WRITING_DEEP_BACKFILL_BATCH_SIZE')) || 12,
+    preventDuplicateEvaluation: toBool(getOsEnv('WRITING_PREVENT_DUPLICATE_EVALUATION') || 'true'),
+    evaluationTimeoutMs: toNumber(getOsEnv('WRITING_EVALUATION_TIMEOUT_MS')) || 45000
   },
   growth: {
     blogSchedulerEnabled: toBool(getOsEnv('GROWTH_BLOG_SCHEDULER_ENABLED') || 'true'),

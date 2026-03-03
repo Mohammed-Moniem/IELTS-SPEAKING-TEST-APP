@@ -11,6 +11,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [success, setSuccess] = useState(false);
+  const [devOutboxUrl, setDevOutboxUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSubmit = async (event: FormEvent) => {
@@ -22,12 +23,17 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true);
 
     try {
-      await apiRequest('/auth/forgot-password', {
+      const payload = await apiRequest<{ emailDelivery?: { configured: boolean; provider: string } }>('/auth/forgot-password', {
         method: 'POST',
         authOptional: true,
         retryOnUnauthorized: false,
         body: JSON.stringify({ email })
       });
+      if (payload?.emailDelivery?.provider === 'dev-outbox' && typeof window !== 'undefined') {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiBase = isLocal ? 'http://127.0.0.1:4000/api/v1' : '/api/v1';
+        setDevOutboxUrl(`${apiBase}/auth/dev-email-outbox?to=${encodeURIComponent(email)}`);
+      }
       setSuccess(true);
     } catch (err) {
       // Always show success to prevent email enumeration, but log for debugging
@@ -54,6 +60,20 @@ export default function ForgotPasswordPage() {
               If an account exists for <span className="font-semibold text-gray-700 dark:text-gray-300">{email}</span>,
               you&apos;ll receive a password reset link shortly.
             </p>
+            {devOutboxUrl ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-2.5">
+                Local development email delivery is using the dev outbox. Open{' '}
+                <a
+                  href={devOutboxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  dev email outbox
+                </a>{' '}
+                to retrieve your reset link.
+              </p>
+            ) : null}
           </div>
           <Link
             href="/login"

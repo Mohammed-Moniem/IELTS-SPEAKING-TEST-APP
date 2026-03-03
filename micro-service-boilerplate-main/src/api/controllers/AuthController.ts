@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Body, HttpCode, JsonController, Post, Req, Res } from 'routing-controllers';
+import { Body, Delete, Get, HttpCode, JsonController, Post, QueryParam, Req, Res } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
 import {
@@ -16,6 +16,7 @@ import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { StandardResponse } from '@responses/StandardResponse';
 import { AuthService } from '@services/AuthService';
+import { env } from '@env';
 
 @JsonController('/auth')
 export class AuthController {
@@ -85,10 +86,11 @@ export class AuthController {
 
     try {
       await this.authService.forgotPassword(body.email, headers);
+      const deliveryStatus = this.authService.getEmailDeliveryStatus();
       // Always return success to prevent email enumeration
       return StandardResponse.success(
         res,
-        undefined,
+        env.isDevelopment || env.isTest ? { emailDelivery: deliveryStatus } : {},
         'If an account exists for that email, a reset link has been sent.',
         HTTP_STATUS_CODES.SUCCESS,
         headers
@@ -151,10 +153,11 @@ export class AuthController {
       if (user) {
         await this.authService.sendVerificationEmail(user._id.toString(), headers);
       }
+      const deliveryStatus = this.authService.getEmailDeliveryStatus();
       // Always return success to prevent email enumeration
       return StandardResponse.success(
         res,
-        undefined,
+        env.isDevelopment || env.isTest ? { emailDelivery: deliveryStatus } : {},
         'If your email is registered, a verification link has been sent.',
         HTTP_STATUS_CODES.SUCCESS,
         headers
@@ -162,5 +165,58 @@ export class AuthController {
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }
+  }
+
+  @Get('/dev-email-outbox')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async getDevEmailOutbox(
+    @Req() req: Request,
+    @Res() res: Response,
+    @QueryParam('to') to?: string,
+    @QueryParam('limit') limit?: string
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'auth-dev-email-outbox');
+    ensureResponseHeaders(res, headers);
+
+    if (!env.isDevelopment && !env.isTest) {
+      return StandardResponse.notFound(res, 'Route', headers);
+    }
+
+    const parsedLimit = Number(limit);
+    const safeLimit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(100, parsedLimit)) : 25;
+
+    const messages = this.authService.listDevEmailOutbox(to, safeLimit);
+
+    return StandardResponse.success(
+      res,
+      {
+        total: messages.length,
+        messages
+      },
+      'Developer email outbox fetched.',
+      HTTP_STATUS_CODES.SUCCESS,
+      headers
+    );
+  }
+
+  @Delete('/dev-email-outbox')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async clearDevEmailOutbox(@Req() req: Request, @Res() res: Response) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'auth-clear-dev-email-outbox');
+    ensureResponseHeaders(res, headers);
+
+    if (!env.isDevelopment && !env.isTest) {
+      return StandardResponse.notFound(res, 'Route', headers);
+    }
+
+    this.authService.clearDevEmailOutbox();
+
+    return StandardResponse.success(
+      res,
+      { cleared: true },
+      'Developer email outbox cleared.',
+      HTTP_STATUS_CODES.SUCCESS,
+      headers
+    );
   }
 }

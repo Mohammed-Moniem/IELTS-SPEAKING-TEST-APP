@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
-import { apiRequest, ApiError } from '@/lib/api/client';
+import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { ObjectiveAttempt, ObjectiveQuestion, ObjectiveTestPayload } from '@/lib/types';
 
 type StartListeningResponse = {
@@ -86,6 +86,7 @@ export default function ListeningPage() {
       setActiveQuestionIndex(0);
       startTimer((started.test.suggestedTimeMinutes || 20) * 60);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start listening test');
     } finally {
       setLoading(false);
@@ -116,6 +117,7 @@ export default function ListeningPage() {
       stopTimer();
       await loadHistory();
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit listening test');
     } finally {
       setLoading(false);
@@ -127,6 +129,7 @@ export default function ListeningPage() {
       const detail = await apiRequest<ObjectiveAttempt>(`/listening/tests/${id}`);
       setResult(detail);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to load attempt');
     }
   };

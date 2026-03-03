@@ -15,6 +15,7 @@ function LoginPageContent() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,13 +68,25 @@ function LoginPageContent() {
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Password</span>
               <Link href="/forgot-password" className="text-xs font-semibold text-violet-600 dark:text-violet-400 hover:underline">Forgot password?</Link>
             </div>
-            <input
-              className={`rounded-xl border bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${fieldErrors.password ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setFieldErrors(fe => { const { password: _, ...rest } = fe; return rest; }); }}
-              required
-            />
+            <div className="relative">
+              <input
+                className={`w-full rounded-xl border bg-white dark:bg-gray-900 px-3 py-2.5 pr-11 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${fieldErrors.password ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'}`}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setFieldErrors(fe => { const { password: _, ...rest } = fe; return rest; }); }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(value => !value)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </div>
             {fieldErrors.password ? <span className="text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</span> : null}
           </label>
           <button className="w-full rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/25 disabled:opacity-50" type="submit" disabled={isSubmitting}>

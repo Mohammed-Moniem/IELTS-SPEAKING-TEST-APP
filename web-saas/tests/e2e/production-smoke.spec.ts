@@ -1,6 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from "@playwright/test";
 
-import { bootstrapSession, mockAppConfig, mockJsonSuccess, mockUsageSummary } from './helpers/mockApi';
+import {
+  bootstrapSession,
+  mockAppConfig,
+  mockJsonSuccess,
+  mockUsageSummary,
+} from "./helpers/mockApi";
 
 /**
  * Production smoke tests — lightweight assertions that every critical page
@@ -9,146 +14,169 @@ import { bootstrapSession, mockAppConfig, mockJsonSuccess, mockUsageSummary } fr
  * basic component rendering.
  */
 
-const nowIso = '2026-02-22T12:00:00.000Z';
+const nowIso = "2026-02-22T12:00:00.000Z";
 
 const learnerDashboardView = {
   generatedAt: nowIso,
-  plan: 'premium',
+  plan: "premium",
   kpis: {
     averageBand: 6.5,
     currentStreak: 4,
     testsCompleted: 12,
-    nextGoalBand: 7
+    nextGoalBand: 7,
   },
   quickPractice: [
     {
-      module: 'speaking',
-      title: 'Speaking Simulation',
-      description: 'AI-powered interview simulation covering Part 1, 2, and 3.',
-      href: '/app/speaking'
+      module: "speaking",
+      title: "Speaking Simulation",
+      description: "AI-powered interview simulation covering Part 1, 2, and 3.",
+      href: "/app/speaking",
     },
     {
-      module: 'writing',
-      title: 'Writing Task 1 & 2',
-      description: 'Get instant AI grading and feedback on your essays.',
-      href: '/app/writing'
+      module: "writing",
+      title: "Writing Task 1 & 2",
+      description: "Get instant AI grading and feedback on your essays.",
+      href: "/app/writing",
     },
     {
-      module: 'reading',
-      title: 'Reading Comprehension',
-      description: 'Practice with academic texts and question types.',
-      href: '/app/reading'
+      module: "reading",
+      title: "Reading Comprehension",
+      description: "Practice with academic texts and question types.",
+      href: "/app/reading",
     },
     {
-      module: 'listening',
-      title: 'Listening Practice',
-      description: 'Improve your listening skills with varied accents.',
-      href: '/app/listening'
-    }
+      module: "listening",
+      title: "Listening Practice",
+      description: "Improve your listening skills with varied accents.",
+      href: "/app/listening",
+    },
   ],
   resume: {
-    type: 'practice',
-    sessionId: 'practice-1',
-    title: 'Resume Practice',
-    subtitle: 'Part 3 • Intermediate',
+    type: "practice",
+    sessionId: "practice-1",
+    title: "Resume Practice",
+    subtitle: "Part 3 • Intermediate",
     progressPercent: 42,
-    href: '/app/speaking'
+    href: "/app/speaking",
   },
   recommended: [
-    { topicId: 'topic-1', slug: 'social-influence', title: 'Social Media Influence', part: 3, difficulty: 'intermediate' },
-    { topicId: 'topic-2', slug: 'role-models', title: 'Role Models in Life', part: 2, difficulty: 'intermediate' },
-    { topicId: 'topic-3', slug: 'environment', title: 'Environmental Changes', part: 2, difficulty: 'advanced' }
+    {
+      topicId: "topic-1",
+      slug: "social-influence",
+      title: "Social Media Influence",
+      part: 3,
+      difficulty: "intermediate",
+    },
+    {
+      topicId: "topic-2",
+      slug: "role-models",
+      title: "Role Models in Life",
+      part: 2,
+      difficulty: "intermediate",
+    },
+    {
+      topicId: "topic-3",
+      slug: "environment",
+      title: "Environmental Changes",
+      part: 2,
+      difficulty: "advanced",
+    },
   ],
   activity: [
     {
-      module: 'speaking',
-      itemId: 'practice-1',
-      title: 'Urbanization & Society',
-      subtitle: 'Part 3',
-      status: 'completed',
+      module: "speaking",
+      itemId: "practice-1",
+      title: "Urbanization & Society",
+      subtitle: "Part 3",
+      status: "completed",
       score: 6.5,
       durationSeconds: 860,
       createdAt: nowIso,
-      href: '/app/speaking/history/practice-1'
+      href: "/app/speaking/history/practice-1",
     },
     {
-      module: 'writing',
-      itemId: 'writing-attempt-1',
-      title: 'Task 2: Education',
-      subtitle: 'Essay',
-      status: 'in_progress',
+      module: "writing",
+      itemId: "writing-attempt-1",
+      title: "Task 2: Education",
+      subtitle: "Essay",
+      status: "in_progress",
       score: 0,
       durationSeconds: 0,
       createdAt: nowIso,
-      href: '/app/writing/history/writing-attempt-1'
-    }
-  ]
+      href: "/app/writing/history/writing-attempt-1",
+    },
+  ],
 };
 
 const learnerProgressView = {
-  range: '90d',
-  module: 'all',
+  range: "90d",
+  module: "all",
   totals: {
     overallBand: 6.2,
     predictedScore: 6.8,
     testsCompleted: 10,
-    studyHours: 24
+    studyHours: 24,
   },
   trend: [
-    { date: '2026-01-01T00:00:00.000Z', score: 5.2, target: 6.5 },
-    { date: '2026-01-10T00:00:00.000Z', score: 5.6, target: 6.5 },
-    { date: '2026-01-20T00:00:00.000Z', score: 5.9, target: 6.8 },
-    { date: '2026-01-30T00:00:00.000Z', score: 6.2, target: 7.0 }
+    { date: "2026-01-01T00:00:00.000Z", score: 5.2, target: 6.5 },
+    { date: "2026-01-10T00:00:00.000Z", score: 5.6, target: 6.5 },
+    { date: "2026-01-20T00:00:00.000Z", score: 5.9, target: 6.8 },
+    { date: "2026-01-30T00:00:00.000Z", score: 6.2, target: 7.0 },
   ],
   skillBreakdown: {
     speaking: 6.0,
     writing: 5.8,
     reading: 6.5,
-    listening: 6.4
+    listening: 6.4,
   },
   attempts: [
     {
-      module: 'speaking',
-      itemId: 'practice-1',
-      title: 'Urbanization & Society',
-      subtitle: 'Part 3 simulation',
-      status: 'completed',
+      module: "speaking",
+      itemId: "practice-1",
+      title: "Urbanization & Society",
+      subtitle: "Part 3 simulation",
+      status: "completed",
       score: 6.5,
       durationSeconds: 860,
       createdAt: nowIso,
-      href: '/app/speaking/history/practice-1'
-    }
-  ]
+      href: "/app/speaking/history/practice-1",
+    },
+  ],
 };
 
 const setupPointsMocks = async (page: Page) => {
-  await page.route('**/api/v1/points/summary**', route =>
+  await page.route("**/api/v1/points/summary**", (route) =>
     route.fulfill(
       mockJsonSuccess({
         balance: 2200,
         totalEarned: 3400,
         totalRedeemed: 1200,
-        currentTier: { tier: '5%', percentage: 5, pointsRequired: 1000 },
-        nextTier: { tier: '10%', percentage: 10, pointsRequired: 2500, pointsNeeded: 300 },
+        currentTier: { tier: "5%", percentage: 5, pointsRequired: 1000 },
+        nextTier: {
+          tier: "10%",
+          percentage: 10,
+          pointsRequired: 2500,
+          pointsNeeded: 300,
+        },
         canRedeem: true,
-        activeDiscounts: []
-      })
-    )
+        activeDiscounts: [],
+      }),
+    ),
   );
-  await page.route('**/api/v1/points/transactions**', route =>
+  await page.route("**/api/v1/points/transactions**", (route) =>
     route.fulfill(
       mockJsonSuccess([
         {
-          _id: 'tx-1',
-          userId: '507f1f77bcf86cd799439011',
-          type: 'practice_completion',
+          _id: "tx-1",
+          userId: "507f1f77bcf86cd799439011",
+          type: "practice_completion",
           amount: 10,
           balance: 2200,
-          reason: 'Practice completion reward',
-          createdAt: nowIso
-        }
-      ])
-    )
+          reason: "Practice completion reward",
+          createdAt: nowIso,
+        },
+      ]),
+    ),
   );
 };
 
@@ -156,60 +184,70 @@ const setupLearnerContext = async (page: Page) => {
   await bootstrapSession(page);
   await mockAppConfig(page);
   await mockUsageSummary(page);
-  await page.route('**/api/v1/app/dashboard-view**', route => route.fulfill(mockJsonSuccess(learnerDashboardView)));
-  await page.route('**/api/v1/app/progress-view**', route => route.fulfill(mockJsonSuccess(learnerProgressView)));
+  await page.route("**/api/v1/app/dashboard-view**", (route) =>
+    route.fulfill(mockJsonSuccess(learnerDashboardView)),
+  );
+  await page.route("**/api/v1/app/progress-view**", (route) =>
+    route.fulfill(mockJsonSuccess(learnerProgressView)),
+  );
   await setupPointsMocks(page);
 };
 
 const mockEmptyArray = (page: Page, pattern: string) =>
-  page.route(pattern, route => route.fulfill(mockJsonSuccess([])));
+  page.route(pattern, (route) => route.fulfill(mockJsonSuccess([])));
 
 // ── Marketing pages ─────────────────────────────────────────────────────────
 
-test.describe('Marketing smoke', () => {
-  test('home page renders hero and CTA', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: /start free test/i })).toBeVisible();
+test.describe("Marketing smoke", () => {
+  test("home page renders hero and CTA", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("h1")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /start free test/i }),
+    ).toBeVisible();
   });
 
-  test('pricing page renders plan cards', async ({ page }) => {
-    await page.goto('/pricing');
+  test("pricing page renders plan cards", async ({ page }) => {
+    await page.goto("/pricing");
     await expect(page.getByText(/free/i).first()).toBeVisible();
     await expect(page.getByText(/pro/i).first()).toBeVisible();
   });
 
-  test('guarantee page renders', async ({ page }) => {
-    await page.goto('/guarantee');
+  test("guarantee page renders", async ({ page }) => {
+    await page.goto("/guarantee");
     await expect(page.getByText(/band score/i).first()).toBeVisible();
   });
 
-  test('login page renders form', async ({ page }) => {
-    await page.goto('/login');
+  test("login page renders form", async ({ page }) => {
+    await page.goto("/login");
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
   });
 
-  test('register page renders form', async ({ page }) => {
-    await page.goto('/register');
+  test("register page renders form", async ({ page }) => {
+    await page.goto("/register");
     await expect(page.getByLabel(/first name/i)).toBeVisible();
     await expect(page.getByLabel(/email/i)).toBeVisible();
   });
 
-  test('forgot-password page renders form', async ({ page }) => {
-    await page.goto('/forgot-password');
+  test("forgot-password page renders form", async ({ page }) => {
+    await page.goto("/forgot-password");
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /send|reset/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /send|reset/i }),
+    ).toBeVisible();
   });
 
-  test('verify-email page renders verifying state', async ({ page }) => {
-    await page.goto('/verify-email');
+  test("verify-email page renders verifying state", async ({ page }) => {
+    await page.goto("/verify-email");
     // No token → should show invalid/expired state
-    await expect(page.getByText(/invalid|expired|verification/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/invalid|expired|verification/i).first(),
+    ).toBeVisible();
   });
 
-  test('404 page renders for unknown route', async ({ page }) => {
-    const response = await page.goto('/this-page-does-not-exist');
+  test("404 page renders for unknown route", async ({ page }) => {
+    const response = await page.goto("/this-page-does-not-exist");
     expect(response?.status()).toBe(404);
     await expect(page.getByText(/not found|404/i).first()).toBeVisible();
   });
@@ -217,64 +255,71 @@ test.describe('Marketing smoke', () => {
 
 // ── Learner app pages ───────────────────────────────────────────────────────
 
-test.describe('Learner app smoke', () => {
-  test('dashboard renders after auth', async ({ page }) => {
+test.describe("Learner app smoke", () => {
+  test("dashboard renders after auth", async ({ page }) => {
     await setupLearnerContext(page);
 
-    await page.goto('/app/dashboard');
+    await page.goto("/app/dashboard");
     await expect(page.getByText(/dashboard/i).first()).toBeVisible();
   });
 
-  test('achievements page renders', async ({ page }) => {
+  test("achievements page renders", async ({ page }) => {
     await setupLearnerContext(page);
-    await mockEmptyArray(page, '**/api/v1/achievements/my**');
-    await mockEmptyArray(page, '**/api/v1/achievements**');
+    await mockEmptyArray(page, "**/api/v1/achievements/my**");
+    await mockEmptyArray(page, "**/api/v1/achievements**");
 
-    await page.goto('/app/achievements');
+    await page.goto("/app/achievements");
     await expect(page.getByText(/achievement/i).first()).toBeVisible();
   });
 
-  test('leaderboard page renders', async ({ page }) => {
+  test("leaderboard page renders", async ({ page }) => {
     await setupLearnerContext(page);
 
-    await page.route('**/api/v1/leaderboard**', route =>
+    await page.route("**/api/v1/leaderboard**", (route) =>
       route.fulfill(
         mockJsonSuccess([
           {
             rank: 1,
-            userId: '507f1f77bcf86cd799439011',
-            username: 'Playwright Learner',
+            userId: "507f1f77bcf86cd799439011",
+            username: "Playwright Learner",
             score: 6.7,
             totalSessions: 20,
             achievements: 4,
             streak: 6,
-            isCurrentUser: true
-          }
-        ])
-      )
+            isCurrentUser: true,
+          },
+        ]),
+      ),
     );
-    await page.route('**/api/v1/leaderboard/friends**', route =>
-      route.fulfill(mockJsonSuccess([]))
+    await page.route("**/api/v1/leaderboard/friends**", (route) =>
+      route.fulfill(mockJsonSuccess([])),
     );
-    await page.route('**/api/v1/leaderboard/position**', route =>
-      route.fulfill(mockJsonSuccess({ rank: 1, score: 6.7, totalUsers: 124, percentile: 15.2 }))
+    await page.route("**/api/v1/leaderboard/position**", (route) =>
+      route.fulfill(
+        mockJsonSuccess({
+          rank: 1,
+          score: 6.7,
+          totalUsers: 124,
+          percentile: 15.2,
+        }),
+      ),
     );
 
-    await page.goto('/app/leaderboard');
+    await page.goto("/app/leaderboard");
     await expect(page.getByText(/leaderboard/i).first()).toBeVisible();
   });
 
-  test('rewards page renders', async ({ page }) => {
+  test("rewards page renders", async ({ page }) => {
     await setupLearnerContext(page);
 
-    await page.goto('/app/rewards');
+    await page.goto("/app/rewards");
     await expect(page.getByText(/reward|point/i).first()).toBeVisible();
   });
 
-  test('study plan page renders', async ({ page }) => {
+  test("study plan page renders", async ({ page }) => {
     await setupLearnerContext(page);
 
-    await page.goto('/app/study-plan');
+    await page.goto("/app/study-plan");
     await expect(page.getByText(/study plan/i).first()).toBeVisible();
   });
 });

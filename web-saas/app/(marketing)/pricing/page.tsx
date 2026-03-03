@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import { PricingMotionCallout } from '@/components/marketing/PricingMotionCallout';
 import { TrackedMarketingLink } from '@/components/marketing/TrackedMarketingLink';
+import { UsageLimitToast } from '@/components/marketing/UsageLimitToast';
 import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { ieltsGuides } from '@/lib/seo/ieltsGuides';
 import { siteConfig } from '@/lib/seo/site';
@@ -98,6 +99,7 @@ export default async function PricingPage() {
 
   return (
     <div className="space-y-10 lg:space-y-14">
+      <UsageLimitToast />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }} />
 
       {/* ── Hero ── */}
@@ -127,8 +129,12 @@ export default async function PricingPage() {
               }`}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-violet-50/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-violet-500/5" />
-            {plan.tier === 'pro' ? <span className="absolute -top-3 left-4 rounded-full bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/25">Most Popular</span> : null}
-            <div className="relative z-10">
+            <div className="relative z-10 space-y-2">
+              {plan.tier === 'pro' ? (
+                <span className="inline-flex rounded-full bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white shadow-lg shadow-violet-500/25">
+                  Most Popular
+                </span>
+              ) : null}
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">{plan.name}</h3>
               <p className="text-4xl font-extrabold text-gray-900 dark:text-white mt-2">{plan.priceMonthly}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Annual: {plan.priceAnnual}</p>

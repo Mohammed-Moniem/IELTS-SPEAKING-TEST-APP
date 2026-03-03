@@ -30,6 +30,18 @@ export class AuthService {
     private readonly emailService: EmailService
   ) {}
 
+  public getEmailDeliveryStatus() {
+    return this.emailService.getDeliveryStatus();
+  }
+
+  public listDevEmailOutbox(to?: string, limit: number = 25) {
+    return this.emailService.listDevOutbox(to, limit);
+  }
+
+  public clearDevEmailOutbox() {
+    this.emailService.clearDevOutbox();
+  }
+
   public async register(payload: RegisterRequest, headers: IRequestHeaders): Promise<AuthResult> {
     const logMessage = constructLogMessage(__filename, 'register', headers);
     this.log.info(`${logMessage} :: Attempting to register user ${payload.email}`);
@@ -92,8 +104,13 @@ export class AuthService {
 
     await this.appendRefreshToken(createdUser._id.toString(), tokens.refreshToken);
 
-    // Send welcome email and verification email (fire-and-forget)
-    void this.emailService.sendWelcome(createdUser.email, createdUser.firstName);
+    // Send welcome + verification asynchronously so registration is never blocked by mail provider issues.
+    void (async () => {
+      const welcomeResult = await this.emailService.sendWelcome(createdUser!.email, createdUser!.firstName);
+      if (!welcomeResult.delivered) {
+        this.log.warn(`${logMessage} :: Welcome email was not delivered via ${welcomeResult.provider}`);
+      }
+    })();
     void this.sendVerificationEmail(createdUser._id.toString(), headers);
 
     return {
@@ -196,7 +213,10 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
     });
 
-    await this.emailService.sendPasswordReset(user.email, plainToken, user.firstName);
+    const mailResult = await this.emailService.sendPasswordReset(user.email, plainToken, user.firstName);
+    if (!mailResult.delivered) {
+      this.log.warn(`${logMessage} :: Password reset email was not delivered via ${mailResult.provider}`);
+    }
   }
 
   /**
@@ -270,7 +290,10 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     });
 
-    await this.emailService.sendEmailVerification(user.email, plainToken, user.firstName);
+    const mailResult = await this.emailService.sendEmailVerification(user.email, plainToken, user.firstName);
+    if (!mailResult.delivered) {
+      this.log.warn(`${logMessage} :: Verification email was not delivered via ${mailResult.provider}`);
+    }
   }
 
   /**

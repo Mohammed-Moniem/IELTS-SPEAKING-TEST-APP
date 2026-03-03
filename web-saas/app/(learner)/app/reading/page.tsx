@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
-import { apiRequest, ApiError } from '@/lib/api/client';
+import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { ObjectiveAttempt, ObjectiveQuestion, ObjectiveTestPayload } from '@/lib/types';
 
 type StartReadingResponse = {
@@ -86,6 +86,7 @@ export default function ReadingPage() {
       setActiveQuestionIndex(0);
       startTimer((started.test.suggestedTimeMinutes || 20) * 60);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start reading test');
     } finally {
       setLoading(false);
@@ -117,6 +118,7 @@ export default function ReadingPage() {
       setReviewMode(false);
       await loadHistory();
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit reading test');
     } finally {
       setLoading(false);
@@ -128,6 +130,7 @@ export default function ReadingPage() {
       const detail = await apiRequest<ObjectiveAttempt>(`/reading/tests/${id}`);
       setResult(detail);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to load attempt');
     }
   };

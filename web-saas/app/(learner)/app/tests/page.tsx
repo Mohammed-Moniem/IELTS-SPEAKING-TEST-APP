@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { ModalConfirm, SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
-import { apiRequest, ApiError, webApi } from '@/lib/api/client';
+import { apiRequest, ApiError, handleUsageLimitRedirect, webApi } from '@/lib/api/client';
 import {
   ExamRuntimeState,
   FullExamSession,
@@ -319,6 +319,7 @@ export default function TestsPage() {
       });
       setSpeaking({ simulation, responses: {} });
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start speaking section');
     } finally {
       setLoading(false);
@@ -348,6 +349,7 @@ export default function TestsPage() {
 
       await submitSection('speaking', speaking.simulation.simulationId, result.overallBand);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit speaking section');
     } finally {
       setLoading(false);
@@ -364,6 +366,7 @@ export default function TestsPage() {
       });
       setWriting({ task, response: '' });
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start writing section');
     } finally {
       setLoading(false);
@@ -387,6 +390,7 @@ export default function TestsPage() {
 
       await submitSection('writing', submission._id, submission.overallBand);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit writing section');
     } finally {
       setLoading(false);
@@ -405,6 +409,7 @@ export default function TestsPage() {
       setReadingActiveQuestionIndex(0);
       setReadingFlaggedQuestionIds([]);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start reading section');
     } finally {
       setLoading(false);
@@ -430,6 +435,7 @@ export default function TestsPage() {
 
       await submitSection('reading', reading.attemptId, submission.normalizedBand);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit reading section');
     } finally {
       setLoading(false);
@@ -448,6 +454,7 @@ export default function TestsPage() {
       setListeningActiveQuestionIndex(0);
       setListeningFlaggedQuestionIds([]);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start listening section');
     } finally {
       setLoading(false);
@@ -473,6 +480,7 @@ export default function TestsPage() {
 
       await submitSection('listening', listening.attemptId, submission.normalizedBand);
     } catch (err) {
+      if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit listening section');
     } finally {
       setLoading(false);

@@ -13,7 +13,18 @@ import { Service } from 'typedi';
 export class AuthMiddleware implements ExpressMiddlewareInterface {
   private log = new Logger(__filename);
 
-  private readonly PUBLIC_PATHS = ['/auth/register', '/auth/login', '/auth/refresh', '/health', '/subscription/webhook'];
+  private readonly PUBLIC_PATHS = [
+    '/auth/register',
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/verify-email',
+    '/auth/send-verification',
+    '/auth/dev-email-outbox',
+    '/health',
+    '/subscription/webhook'
+  ];
   private readonly PUBLIC_PATH_PATTERNS = [
     /\/blog\/posts(?:\/|$)/,
     /\/guides\/tree(?:\/|$)/,

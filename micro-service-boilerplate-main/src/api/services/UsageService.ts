@@ -1,5 +1,6 @@
 import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
+import { env } from '@env';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
@@ -8,11 +9,11 @@ import { SubscriptionPlan } from '@models/UserModel';
 import { Service } from 'typedi';
 
 const FREE_LIMITS = {
-  practice: 3,
-  test: 1,
-  writing: 2,
-  reading: 2,
-  listening: 2
+  practice: env.usage.freePracticeLimit,
+  test: env.usage.freeTestLimit,
+  writing: env.usage.freeWritingLimit,
+  reading: env.usage.freeReadingLimit,
+  listening: env.usage.freeListeningLimit
 };
 
 @Service()

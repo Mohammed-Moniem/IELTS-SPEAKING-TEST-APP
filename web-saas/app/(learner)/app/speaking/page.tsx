@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import { useAuth } from '@/components/auth/AuthProvider';
-import { ApiError, apiRequest } from '@/lib/api/client';
+import { ApiError, apiRequest, handleUsageLimitRedirect } from '@/lib/api/client';
 import { PageHeader, SectionCard, StatusBadge, SegmentedTabs, EmptyState } from '@/components/ui/v2';
 import {
   PracticeAudioUploadResult,
@@ -194,6 +194,7 @@ export default function SpeakingPage() {
       setTopicsOffset(nextOffset + page.topics.length);
       setHasMoreTopics(page.hasMore);
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Failed to load speaking topics.');
     } finally {
       setTopicLoading(false);
@@ -233,6 +234,7 @@ export default function SpeakingPage() {
       setPracticeSession(session);
       startPracticeTimer();
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Failed to start speaking practice session.');
     }
   };
@@ -260,6 +262,7 @@ export default function SpeakingPage() {
       await refreshPracticeHistory();
       setRecorderState('idle');
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setRecorderState('error');
       setErrorMessage(error?.message || 'Failed to complete speaking practice session.');
     }
@@ -298,6 +301,7 @@ export default function SpeakingPage() {
       setRecorderState('idle');
       await refreshPracticeHistory();
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setRecorderState('error');
       setErrorMessage(error?.message || 'Audio upload failed. You can still use manual transcript input.');
     } finally {
@@ -374,6 +378,7 @@ export default function SpeakingPage() {
       partStartedAtRef.current = Date.now();
       startSimulationTimer();
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Failed to start speaking simulation.');
     }
   };
@@ -418,6 +423,7 @@ export default function SpeakingPage() {
       setSimulationResult(result);
       await refreshSimulationHistory();
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Failed to complete simulation.');
     }
   };
@@ -428,6 +434,7 @@ export default function SpeakingPage() {
       const detail = await apiRequest<SimulationSession>(`/test-simulations/${simulationId}`);
       setSimulationResult(detail);
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Unable to load simulation details.');
     }
   };
@@ -452,6 +459,7 @@ export default function SpeakingPage() {
       });
       setQuickEvaluation(evaluation);
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Quick speech evaluation failed.');
     }
   };
@@ -469,6 +477,7 @@ export default function SpeakingPage() {
       const audio = new Audio(url);
       await audio.play();
     } catch (error: any) {
+      if (handleUsageLimitRedirect(error)) return;
       setErrorMessage(error?.message || 'Prompt TTS failed');
     }
   };

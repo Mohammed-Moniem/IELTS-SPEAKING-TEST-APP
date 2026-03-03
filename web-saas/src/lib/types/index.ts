@@ -117,6 +117,12 @@ export interface StandardResponse<T> {
   status: number;
   success: boolean;
   message?: string | string[];
+  error?: {
+    code: string;
+    message: string;
+    description?: string;
+    details?: unknown;
+  };
   data?: T;
   timestamp: string;
   requestId?: string;
@@ -275,16 +281,70 @@ export interface WritingSubmissionFeedback {
   inlineSuggestions: string[];
   strengths: string[];
   improvements: string[];
+  overall?: WritingOverallBandDetails;
+  criteria?: WritingDeepFeedback;
+}
+
+export interface WritingEvidenceItem {
+  issue: string;
+  quotedText: string;
+  whyItCostsBand: string;
+  revision: string;
+  whyRevisionIsBetter: string;
+  practiceInstruction: string;
+}
+
+export interface WritingBandUpgradeExamples {
+  nextBandSnippet: string;
+  band9Snippet: string;
+  differenceNotes: string[];
+}
+
+export interface WritingCriterionDetails {
+  band: number;
+  descriptorSummary: string;
+  strengths: string[];
+  limitations: string[];
+  evidence: WritingEvidenceItem[];
+  whyNotHigher: string[];
+  howToReach8: string[];
+  howToReach9: string[];
+  targetedDrills: string[];
+  commonExaminerPenaltyTriggers: string[];
+  bandUpgradeExamples?: WritingBandUpgradeExamples;
+}
+
+export interface WritingDeepFeedback {
+  taskAchievementOrResponse: WritingCriterionDetails;
+  coherenceCohesion: WritingCriterionDetails;
+  lexicalResource: WritingCriterionDetails;
+  grammaticalRangeAccuracy: WritingCriterionDetails;
+}
+
+export interface WritingOverallBandDetails {
+  band: number;
+  label: string;
+  examinerSummary: string;
+  whyThisBand: string[];
+  bandGapTo8: string[];
+  bandGapTo9: string[];
+  priorityOrder: string[];
+  nextSteps24h: string[];
+  nextSteps7d: string[];
+  nextSteps14d: string[];
 }
 
 export interface WritingSubmission {
   _id: string;
-  taskId?: string;
+  taskId?: string | WritingTask;
   track?: IELTSModuleTrack;
   taskType?: 'task1' | 'task2';
+  responseText?: string;
   overallBand: number;
   wordCount?: number;
   durationSeconds?: number;
+  feedbackVersion?: 'v1' | 'v2';
+  deepFeedbackReady?: boolean;
   breakdown: WritingSubmissionBreakdown;
   feedback: WritingSubmissionFeedback;
   createdAt?: string;

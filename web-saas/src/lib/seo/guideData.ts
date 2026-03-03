@@ -611,6 +611,148 @@ function fallbackModuleHubDetail(
   };
 }
 
+function fallbackTaxonomyNodeDetail(path: string, tree: GuideTreeResponse): GuideDetailResponse | null {
+  const normalizedPath = normalizeIeltsPath(path);
+  const node = tree.flat.find(item => normalizeIeltsPath(item.canonicalPath) === normalizedPath);
+
+  if (!node) {
+    return null;
+  }
+
+  const nodeModule = isGuideModule(node.module) ? node.module : inferModuleFromCanonicalPath(normalizedPath);
+  if (isExcludedGuideModule(nodeModule)) {
+    return null;
+  }
+
+  const descendants = tree.flat
+    .filter(item => {
+      const itemPath = normalizeIeltsPath(item.canonicalPath);
+      return itemPath !== normalizedPath && itemPath.startsWith(`${normalizedPath}/`);
+    })
+    .sort((a, b) => {
+      if (a.depth !== b.depth) return a.depth - b.depth;
+      if (a.order !== b.order) return a.order - b.order;
+      return a.title.localeCompare(b.title);
+    });
+
+  if (!descendants.length) {
+    return null;
+  }
+
+  const summary: GuidePageSummary = {
+    id: `taxonomy-${node.id}`,
+    slug: node.slug,
+    canonicalPath: normalizedPath,
+    title: node.title,
+    excerpt: node.excerpt || `Browse route coverage under ${node.title}.`,
+    module: nodeModule,
+    pageType: node.pageType || 'module_hub',
+    contentClass: node.contentClass,
+    state: 'published',
+    qaPassed: true,
+    qaScore: 80,
+    publishedAt: new Date().toISOString(),
+    lastReviewedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const page: GuidePageDetail = {
+    ...summary,
+    depth: normalizedPath.split('/').filter(Boolean).length - 1,
+    order: node.order || 1,
+    legacySlugs: [],
+    track: 'both',
+    intent: 'informational',
+    templateType: 'ModuleHubTemplate',
+    metaTitle: summary.title,
+    metaDescription: summary.excerpt || '',
+    bodyMarkdown: [
+      `# ${summary.title}`,
+      '',
+      summary.excerpt || '',
+      '',
+      '## Route map',
+      ...descendants.slice(0, 24).map(item => `- [${item.title}](${normalizeIeltsPath(item.canonicalPath)})`)
+    ].join('\n'),
+    keyTakeaways: [
+      `This topic contains ${descendants.length} related routes.`,
+      'Progress route-by-route with one timed drill per page.',
+      'Use related routes to continue depth-first preparation.'
+    ],
+    faqItems: [
+      {
+        question: `How should I use ${summary.title}?`,
+        answer: 'Start with the first linked route, complete the practice drill, then move to the next route in sequence.'
+      },
+      {
+        question: 'What should I do if I need exam-focused practice next?',
+        answer: 'Create a free account and continue drills inside the learner workspace.'
+      }
+    ],
+    practiceBlocks: {
+      quickAnswer: `Use ${summary.title} as a structured route cluster and complete one timed drill before moving on.`,
+      commonMistakes: [
+        'Skipping the first foundational route and jumping straight to advanced pages.',
+        'Reading strategy content without running a timed drill.',
+        'Not logging your next route before leaving.'
+      ],
+      stepByStepMethod: [
+        'Open the first route listed in this cluster.',
+        'Complete one timed practice cycle and checklist.',
+        'Continue to the next linked route.'
+      ],
+      timedPracticeDrill: 'Run one 25-minute route cycle: 5 minutes review, 15 minutes execution, 5 minutes self-check.',
+      selfCheckChecklist: [
+        'I completed one full timed drill on this route cluster.',
+        'I noted at least one improvement target.',
+        'I selected the next route to continue.'
+      ]
+    },
+    ctaConfig: {
+      primary: {
+        label: 'Start Free',
+        href: '/register'
+      },
+      secondary: {
+        label: 'Compare Plans',
+        href: '/pricing'
+      }
+    },
+    contentRisk: 'low',
+    citationCoverageScore: 0.85,
+    duplicationScore: 0,
+    readabilityScore: 0.8,
+    linkValidationPassed: true,
+    schemaValidationPassed: true,
+    sourceUrls: [],
+    sourceSnapshotVersion: new Date().toISOString().slice(0, 10),
+    rewriteNotes: 'Taxonomy node fallback generated from guide tree to prevent broken hub routes.',
+    noindex: false,
+    changeFrequency: 'weekly',
+    priority: 0.75,
+    createdAt: new Date().toISOString()
+  };
+
+  const related = descendants.slice(0, 6).map(item => ({
+    id: item.id,
+    slug: item.slug,
+    canonicalPath: normalizeIeltsPath(item.canonicalPath),
+    title: item.title,
+    excerpt: item.excerpt,
+    module: item.module,
+    pageType: item.pageType,
+    contentClass: item.contentClass,
+    state: 'published',
+    qaPassed: true,
+    qaScore: 80
+  }));
+
+  return {
+    page,
+    related
+  };
+}
+
 export async function getGuideTreeWithFallback(): Promise<GuideTreeResponse> {
   const apiTree = await fetchGuideTreeAllPages();
   if (apiTree) {
@@ -713,6 +855,12 @@ export async function getGuideDetailWithFallback(path: string): Promise<GuideDet
     const moduleNodes = tree.flat.filter(item => item.module === moduleSegment);
     const detail = fallbackModuleHubDetail(moduleSegment, moduleNodes);
     return detail ? enrichGuideDetailResponse(detail) : null;
+  }
+
+  const tree = await getGuideTreeWithFallback();
+  const taxonomyFallback = fallbackTaxonomyNodeDetail(normalizedPath, tree);
+  if (taxonomyFallback) {
+    return enrichGuideDetailResponse(taxonomyFallback);
   }
 
   return null;

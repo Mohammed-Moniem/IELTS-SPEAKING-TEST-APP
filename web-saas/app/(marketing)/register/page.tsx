@@ -22,6 +22,7 @@ function RegisterPageContent() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [partnerCode, setPartnerCode] = useState('');
@@ -125,15 +126,27 @@ function RegisterPageContent() {
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Password</span>
-              <input
-                className={`motion-input-field rounded-xl border bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${fieldErrors.password ? 'border-red-400 dark:border-red-500 motion-error-shake' : 'border-gray-200 dark:border-gray-700'}`}
-                type="password"
-                placeholder="At least 8 chars with upper/lower/number/special"
-                value={password}
-                onChange={e => { setPassword(e.target.value); clearField('password'); }}
-                required
-                minLength={8}
-              />
+              <div className="relative">
+                <input
+                  className={`motion-input-field w-full rounded-xl border bg-white dark:bg-gray-900 px-3 py-2.5 pr-11 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${fieldErrors.password ? 'border-red-400 dark:border-red-500 motion-error-shake' : 'border-gray-200 dark:border-gray-700'}`}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="At least 8 chars with upper/lower/number/special"
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); clearField('password'); }}
+                  required
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(value => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {showPassword ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
               {fieldErrors.password ? <span className="text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</span> : null}
             </label>
             <label className="flex flex-col gap-1.5">

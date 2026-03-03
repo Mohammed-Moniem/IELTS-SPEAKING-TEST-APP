@@ -70,10 +70,10 @@ function VerifyEmailContent() {
             </p>
           </div>
           <Link
-            href="/app/dashboard"
+            href="/login"
             className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:bg-violet-700 transition-colors"
           >
-            Go to Dashboard
+            Continue to Login
           </Link>
         </div>
       </div>
@@ -91,10 +91,10 @@ function VerifyEmailContent() {
           <p className="text-sm text-gray-500 dark:text-gray-400">{errorMessage}</p>
         </div>
         <Link
-          href="/app/settings"
+          href="/login"
           className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
-          Go to Settings
+          Back to Login
         </Link>
       </div>
     </div>

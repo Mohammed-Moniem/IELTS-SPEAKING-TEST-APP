@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState, useEffect } from 'react';
 
 import { ApiError, webApi } from '@/lib/api/client';
+import { listFallbackBlogPosts } from '@/lib/seo/blogFallback';
 import type { BlogPostSummary } from '@/lib/types';
 import { EmptyState, ErrorState, SkeletonSet, StatusBadge } from '@/components/ui/v2';
 
@@ -41,9 +42,20 @@ export function BlogIndexPage() {
         limit: 40,
         offset: 0
       });
-      setPosts(payload.posts);
+      if (payload.posts.length > 0) {
+        setPosts(payload.posts);
+        return;
+      }
+
+      const fallback = listFallbackBlogPosts();
+      setPosts(targetCluster === 'all' ? fallback : fallback.filter(post => post.cluster === targetCluster));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load blog posts');
+      const fallback = listFallbackBlogPosts();
+      if (fallback.length > 0) {
+        setPosts(targetCluster === 'all' ? fallback : fallback.filter(post => post.cluster === targetCluster));
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Failed to load blog posts');
+      }
     } finally {
       setLoading(false);
     }
