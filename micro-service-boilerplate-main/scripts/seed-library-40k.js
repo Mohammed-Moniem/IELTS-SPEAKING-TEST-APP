@@ -32,15 +32,10 @@ const path = require('path');
 
 const MODULES = ['speaking', 'writing', 'reading', 'listening'];
 const BATCH_SIZE = 200; // rows per INSERT statement
-const DATA_FILES = [
-  path.join(__dirname, 'library-data', 'group1.js'),
-  path.join(__dirname, 'library-data', 'group2.js'),
-  path.join(__dirname, 'library-data', 'group3.js'),
-  path.join(__dirname, 'library-data', 'group4.js'),
-  path.join(__dirname, 'library-data', 'group5.js'),
-  path.join(__dirname, 'library-data', 'group6.js'),
-  path.join(__dirname, 'library-data', 'group7.js'),
-];
+const DATA_FILES = [];
+for (let i = 1; i <= 91; i++) {
+  DATA_FILES.push(path.join(__dirname, 'library-data', `group${i}.js`));
+}
 
 const CEFR_BAND_MAP = {
   A2: [4, 5],
