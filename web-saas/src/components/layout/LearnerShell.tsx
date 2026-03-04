@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { useAuth } from '@/components/auth/AuthProvider';
+import { ThemeToggle } from './ThemeToggle';
 
 const practiceLinks = [
   { href: '/app/speaking', label: 'Speaking', icon: 'record_voice_over' },
@@ -191,6 +192,10 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="ml-[264px] flex-1 min-h-screen">
+        {/* Top navbar */}
+        <header className="sticky top-0 z-10 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-6">
+          <ThemeToggle />
+        </header>
         <div className="max-w-[1440px] mx-auto p-6 lg:p-10">
           {children}
         </div>
