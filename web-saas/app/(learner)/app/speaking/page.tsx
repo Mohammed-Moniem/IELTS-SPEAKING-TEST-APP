@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
+import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ApiError, apiRequest, handleUsageLimitRedirect } from '@/lib/api/client';
 import { PageHeader, SectionCard, StatusBadge, SegmentedTabs, EmptyState } from '@/components/ui/v2';
@@ -25,6 +26,21 @@ type SynthesizeResponse = {
 type RecorderState = 'idle' | 'recording' | 'uploading' | 'error';
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
+const speakingResumeStorageKey = 'spokio.web.speaking.resume';
+
+type SpeakingResumeSnapshot = {
+  activeTab: 'practice' | 'simulation' | 'quick';
+  practiceSession: PracticeSessionStartPayload | null;
+  practiceManualResponse: string;
+  practiceTranscription: string;
+  practiceElapsed: number;
+  simulation: SimulationStartPayload | null;
+  simulationResponses: Record<number, string>;
+  simulationPartIndex: number;
+  simulationTimeSpent: Record<number, number>;
+  simulationElapsed: number;
+  savedAt: string;
+};
 
 const quickQuestionBank = [
   'Describe a skill you learned recently and why it was important.',
@@ -82,6 +98,7 @@ export default function SpeakingPage() {
 
   const [activeTab, setActiveTab] = useState<'practice' | 'simulation' | 'quick'>('practice');
   const [errorMessage, setErrorMessage] = useState('');
+  const [resumeNotice, setResumeNotice] = useState('');
   const [deviceId, setDeviceId] = useState('');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [recorderState, setRecorderState] = useState<RecorderState>('idle');
@@ -143,12 +160,12 @@ export default function SpeakingPage() {
     streamRef.current = null;
   };
 
-  const startPracticeTimer = () => {
+  const startPracticeTimer = (initialElapsed = 0) => {
     if (practiceTimerRef.current) {
       window.clearInterval(practiceTimerRef.current);
     }
 
-    setPracticeElapsed(0);
+    setPracticeElapsed(initialElapsed);
     practiceTimerRef.current = window.setInterval(() => {
       setPracticeElapsed(prev => prev + 1);
     }, 1000);
@@ -161,12 +178,12 @@ export default function SpeakingPage() {
     }
   };
 
-  const startSimulationTimer = () => {
+  const startSimulationTimer = (initialElapsed = 0) => {
     if (simulationTimerRef.current) {
       window.clearInterval(simulationTimerRef.current);
     }
 
-    setSimulationElapsed(0);
+    setSimulationElapsed(initialElapsed);
     simulationTimerRef.current = window.setInterval(() => {
       setSimulationElapsed(prev => prev + 1);
     }, 1000);
@@ -178,6 +195,46 @@ export default function SpeakingPage() {
       simulationTimerRef.current = null;
     }
   };
+
+  const hasActiveSpeakingAttempt = Boolean(
+    (practiceSession && !practiceResult) || (simulation && !simulationResult)
+  );
+
+  const saveSpeakingSnapshot = useCallback(() => {
+    const snapshot: SpeakingResumeSnapshot = {
+      activeTab,
+      practiceSession,
+      practiceManualResponse,
+      practiceTranscription,
+      practiceElapsed,
+      simulation,
+      simulationResponses,
+      simulationPartIndex,
+      simulationTimeSpent,
+      simulationElapsed,
+      savedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(speakingResumeStorageKey, JSON.stringify(snapshot));
+    return snapshot;
+  }, [
+    activeTab,
+    practiceElapsed,
+    practiceManualResponse,
+    practiceSession,
+    practiceTranscription,
+    simulation,
+    simulationElapsed,
+    simulationPartIndex,
+    simulationResponses,
+    simulationTimeSpent
+  ]);
+
+  const saveSpeakingSnapshotForLeave = useCallback(async () => {
+    if (!hasActiveSpeakingAttempt) return;
+    saveSpeakingSnapshot();
+    stopPracticeTimer();
+    stopSimulationTimer();
+  }, [hasActiveSpeakingAttempt, saveSpeakingSnapshot]);
 
   const loadTopics = async (reset = false) => {
     setTopicLoading(true);
@@ -221,6 +278,7 @@ export default function SpeakingPage() {
 
   const startPracticeSession = async (topic: PracticeTopic) => {
     setErrorMessage('');
+    setResumeNotice('');
     setPracticeResult(null);
     setPracticeTranscription('');
     setPracticeManualResponse('');
@@ -259,6 +317,7 @@ export default function SpeakingPage() {
 
       setPracticeResult(result);
       stopPracticeTimer();
+      window.localStorage.removeItem(speakingResumeStorageKey);
       await refreshPracticeHistory();
       setRecorderState('idle');
     } catch (error: any) {
@@ -298,6 +357,7 @@ export default function SpeakingPage() {
       setPracticeResult(payload.data.session);
       setPracticeTranscription(payload.data.transcription.text);
       stopPracticeTimer();
+      window.localStorage.removeItem(speakingResumeStorageKey);
       setRecorderState('idle');
       await refreshPracticeHistory();
     } catch (error: any) {
@@ -363,6 +423,7 @@ export default function SpeakingPage() {
 
   const startSimulation = async () => {
     setErrorMessage('');
+    setResumeNotice('');
     setSimulationResult(null);
     setSimulationResponses({});
     setSimulationTimeSpent({});
@@ -421,6 +482,7 @@ export default function SpeakingPage() {
       });
       stopSimulationTimer();
       setSimulationResult(result);
+      window.localStorage.removeItem(speakingResumeStorageKey);
       await refreshSimulationHistory();
     } catch (error: any) {
       if (handleUsageLimitRedirect(error)) return;
@@ -497,6 +559,52 @@ export default function SpeakingPage() {
   /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
+    const raw = window.localStorage.getItem(speakingResumeStorageKey);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as SpeakingResumeSnapshot;
+      if (!parsed || (!parsed.practiceSession && !parsed.simulation)) return;
+
+      setActiveTab(parsed.activeTab || 'practice');
+      setPracticeSession(parsed.practiceSession || null);
+      setPracticeManualResponse(parsed.practiceManualResponse || '');
+      setPracticeTranscription(parsed.practiceTranscription || '');
+      setPracticeElapsed(parsed.practiceElapsed || 0);
+      setPracticeResult(null);
+
+      setSimulation(parsed.simulation || null);
+      setSimulationResponses(parsed.simulationResponses || {});
+      setSimulationPartIndex(parsed.simulationPartIndex || 0);
+      setSimulationTimeSpent(parsed.simulationTimeSpent || {});
+      setSimulationElapsed(parsed.simulationElapsed || 0);
+      setSimulationResult(null);
+
+      if (parsed.practiceSession) {
+        startPracticeTimer(Math.max(0, parsed.practiceElapsed || 0));
+      }
+      if (parsed.simulation) {
+        partStartedAtRef.current = Date.now();
+        startSimulationTimer(Math.max(0, parsed.simulationElapsed || 0));
+      }
+
+      setResumeNotice('Recovered your saved speaking attempt. Continue from where you left off.');
+    } catch {
+      window.localStorage.removeItem(speakingResumeStorageKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasActiveSpeakingAttempt) return;
+    saveSpeakingSnapshot();
+  }, [hasActiveSpeakingAttempt, saveSpeakingSnapshot]);
+
+  useEffect(() => {
+    if (hasActiveSpeakingAttempt) return;
+    window.localStorage.removeItem(speakingResumeStorageKey);
+  }, [hasActiveSpeakingAttempt]);
+
+  useEffect(() => {
     return () => {
       stopPracticeTimer();
       stopSimulationTimer();
@@ -564,6 +672,12 @@ export default function SpeakingPage() {
           onChange={(val: any) => setActiveTab(val)}
         />
       </div>
+
+      {resumeNotice ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300">
+          {resumeNotice}
+        </div>
+      ) : null}
 
       {activeTab === 'practice' ? (
         <div className="space-y-6 mt-4">
@@ -1068,6 +1182,15 @@ export default function SpeakingPage() {
           {errorMessage}
         </div>
       ) : null}
+
+      <ActiveAttemptLeaveGuard
+        enabled={hasActiveSpeakingAttempt}
+        title="Leave speaking attempt?"
+        subtitle="We will save your current speaking attempt so you can resume later."
+        confirmLabel="Save and Leave"
+        cancelLabel="Stay Here"
+        onConfirmLeave={saveSpeakingSnapshotForLeave}
+      />
     </div>
   );
 }

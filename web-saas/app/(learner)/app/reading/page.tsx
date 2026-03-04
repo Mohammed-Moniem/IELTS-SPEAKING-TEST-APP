@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ReadingEngine, { ReadingWorkspaceState } from '@/components/reading/ReadingEngine';
-import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
+import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
+import { ModalConfirm, SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
 import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { ObjectiveAttempt, ObjectiveTestPayload } from '@/lib/types';
 
@@ -30,6 +31,7 @@ const isAnswered = (value: AnswerValue | undefined) => {
 
 export default function ReadingPage() {
   const timerRef = useRef<number | null>(null);
+  const workspaceStateRef = useRef<ReadingWorkspaceState | null>(null);
   const [track, setTrack] = useState<'academic' | 'general'>('academic');
   const [attemptId, setAttemptId] = useState('');
   const [test, setTest] = useState<ObjectiveTestPayload | null>(null);
@@ -44,6 +46,7 @@ export default function ReadingPage() {
   const [loading, setLoading] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
   const [openingAttemptId, setOpeningAttemptId] = useState('');
+  const [showSubmitWarning, setShowSubmitWarning] = useState(false);
 
   const allQuestions = useMemo(() => {
     if (!test) return [];
@@ -61,14 +64,14 @@ export default function ReadingPage() {
   const questionCount = allQuestions.length;
   const answeredCount = allQuestions.reduce((count, question) => (isAnswered(answers[question.questionId]) ? count + 1 : count), 0);
 
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  };
+  }, []);
 
-  const startTimer = (seconds: number, elapsed = 0) => {
+  const startTimer = useCallback((seconds: number, elapsed = 0) => {
     stopTimer();
     setTimerSecondsLeft(seconds);
     setElapsedSeconds(elapsed);
@@ -77,21 +80,21 @@ export default function ReadingPage() {
       setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
-  };
+  }, [stopTimer]);
 
-  const pauseTimer = () => {
+  const pauseTimer = useCallback(() => {
     stopTimer();
     setIsTimerPaused(true);
-  };
+  }, [stopTimer]);
 
-  const resumeTimer = () => {
+  const resumeTimer = useCallback(() => {
     if (timerRef.current || timerSecondsLeft <= 0 || result) return;
     setIsTimerPaused(false);
     timerRef.current = window.setInterval(() => {
       setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
-  };
+  }, [result, timerSecondsLeft]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -156,7 +159,18 @@ export default function ReadingPage() {
     } finally {
       setLoading(false);
     }
-  }, [allQuestions, answers, attemptId, elapsedSeconds, loadHistory, test]);
+  }, [allQuestions, answers, attemptId, elapsedSeconds, loadHistory, stopTimer, test]);
+
+  const requestSubmit = useCallback(
+    (force = false) => {
+      if (!force && questionCount > 0 && answeredCount < questionCount) {
+        setShowSubmitWarning(true);
+        return;
+      }
+      void submitTest();
+    },
+    [answeredCount, questionCount, submitTest]
+  );
 
   const buildAnswerPayload = useCallback(() => {
     return allQuestions.map(question => ({
@@ -202,7 +216,7 @@ export default function ReadingPage() {
       pauseTimer();
       await saveReadingProgress(workspaceState, { paused: true });
     },
-    [saveReadingProgress]
+    [pauseTimer, saveReadingProgress]
   );
 
   const handleResume = useCallback(
@@ -210,8 +224,14 @@ export default function ReadingPage() {
       resumeTimer();
       await saveReadingProgress(workspaceState, { paused: false });
     },
-    [saveReadingProgress]
+    [resumeTimer, saveReadingProgress]
   );
+
+  const saveAndPauseForLeave = useCallback(async () => {
+    if (!test || !attemptId || result) return;
+    pauseTimer();
+    await saveReadingProgress(workspaceStateRef.current || undefined, { paused: true });
+  }, [attemptId, pauseTimer, result, saveReadingProgress, test]);
 
   const openAttempt = async (id: string) => {
     setOpeningAttemptId(id);
@@ -272,7 +292,7 @@ export default function ReadingPage() {
     void submitTest();
   }, [attemptId, result, submitTest, test, timerSecondsLeft]);
 
-  useEffect(() => () => stopTimer(), []);
+  useEffect(() => () => stopTimer(), [stopTimer]);
 
   return (
     <div className="space-y-6">
@@ -341,7 +361,7 @@ export default function ReadingPage() {
                 <button
                   type="button"
                   className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white"
-                  onClick={() => void submitTest()}
+                  onClick={() => requestSubmit()}
                   disabled={loading}
                 >
                   {loading ? 'Submitting...' : 'Submit'}
@@ -354,11 +374,14 @@ export default function ReadingPage() {
             test={test}
             answers={answers}
             onChangeAnswers={setAnswers}
-            onSubmit={() => void submitTest()}
+            onSubmit={() => requestSubmit()}
             submitting={loading}
             onSaveProgress={state => saveReadingProgress(state)}
             onPause={handlePause}
             onResume={handleResume}
+            onWorkspaceStateChange={state => {
+              workspaceStateRef.current = state;
+            }}
             timerPaused={isTimerPaused}
             saving={savingProgress}
           />
@@ -474,6 +497,35 @@ export default function ReadingPage() {
           {statusMessage}
         </div>
       ) : null}
+
+      {showSubmitWarning ? (
+        <ModalConfirm
+          title="Submit incomplete reading test?"
+          subtitle="Your band and score will be calculated only from the answers you submitted so far."
+          confirmLabel={loading ? 'Submitting...' : 'Submit Anyway'}
+          cancelLabel="Keep Working"
+          onCancel={() => setShowSubmitWarning(false)}
+          onConfirm={() => {
+            setShowSubmitWarning(false);
+            requestSubmit(true);
+          }}
+          disabled={loading}
+        >
+          <p>
+            You answered <strong>{answeredCount}</strong> of <strong>{questionCount}</strong> questions. Unanswered
+            items will be counted as incorrect.
+          </p>
+        </ModalConfirm>
+      ) : null}
+
+      <ActiveAttemptLeaveGuard
+        enabled={Boolean(test && attemptId && !result)}
+        title="Leave reading test?"
+        subtitle="We will save your current reading attempt and pause the timer so you can resume later."
+        confirmLabel="Save and Leave"
+        cancelLabel="Stay Here"
+        onConfirmLeave={saveAndPauseForLeave}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ObjectiveQuestion, ObjectiveTestPayload } from '@/lib/types';
 
@@ -22,6 +22,7 @@ type ReadingEngineProps = {
   onSaveProgress?: (state: ReadingWorkspaceState) => void | Promise<void>;
   onPause?: (state: ReadingWorkspaceState) => void | Promise<void>;
   onResume?: (state: ReadingWorkspaceState) => void | Promise<void>;
+  onWorkspaceStateChange?: (state: ReadingWorkspaceState) => void;
   timerPaused?: boolean;
   saving?: boolean;
   compact?: boolean;
@@ -98,6 +99,7 @@ export default function ReadingEngine({
   onSaveProgress,
   onPause,
   onResume,
+  onWorkspaceStateChange,
   timerPaused = false,
   saving = false,
   compact = false
@@ -109,6 +111,7 @@ export default function ReadingEngine({
   const [flaggedQuestionIds, setFlaggedQuestionIds] = useState<string[]>([]);
 
   const activeSection = sections.find(section => section.sectionId === activeSectionId) || sections[0];
+  const currentSectionIndex = sections.findIndex(section => section.sectionId === activeSection.sectionId);
   const activeQuestion = activeSection?.questions[activeQuestionIndex];
   const allQuestions = sections.flatMap(section => section.questions);
 
@@ -120,6 +123,21 @@ export default function ReadingEngine({
     activeQuestionIndex,
     flaggedQuestionIds,
     reviewMode
+  };
+
+  useEffect(() => {
+    onWorkspaceStateChange?.({
+      activeSectionId: activeSection.sectionId,
+      activeQuestionIndex,
+      flaggedQuestionIds,
+      reviewMode
+    });
+  }, [activeQuestionIndex, activeSection.sectionId, flaggedQuestionIds, onWorkspaceStateChange, reviewMode]);
+
+  const selectSection = (sectionId: 'p1' | 'p2' | 'p3') => {
+    setActiveSectionId(sectionId);
+    setActiveQuestionIndex(0);
+    setReviewMode(false);
   };
 
   const setAnswer = (questionId: string, value: AnswerValue) => {
@@ -236,11 +254,7 @@ export default function ReadingEngine({
             <button
               key={section.sectionId}
               type="button"
-              onClick={() => {
-                setActiveSectionId(section.sectionId);
-                setActiveQuestionIndex(0);
-                setReviewMode(false);
-              }}
+              onClick={() => selectSection(section.sectionId)}
               className={`rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
                 active
                   ? 'border-violet-500 bg-violet-600 text-white'
@@ -340,6 +354,50 @@ export default function ReadingEngine({
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {activeSection.questions.length} questions
               </span>
+            </div>
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              {sections.map((section, index) => {
+                const sectionAnswered = section.questions.filter(question => isAnswered(answers[question.questionId])).length;
+                const active = section.sectionId === activeSection.sectionId;
+                return (
+                  <button
+                    key={`navigator-${section.sectionId}`}
+                    type="button"
+                    onClick={() => selectSection(section.sectionId)}
+                    className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                      active
+                        ? 'border-violet-500 bg-violet-600 text-white'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    P{index + 1} ({sectionAnswered}/{section.questions.length})
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  if (currentSectionIndex <= 0) return;
+                  selectSection(sections[currentSectionIndex - 1].sectionId);
+                }}
+                disabled={currentSectionIndex <= 0}
+              >
+                Prev Passage
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  if (currentSectionIndex >= sections.length - 1) return;
+                  selectSection(sections[currentSectionIndex + 1].sectionId);
+                }}
+                disabled={currentSectionIndex >= sections.length - 1}
+              >
+                Next Passage
+              </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {activeSection.questions.map((question, index) => (

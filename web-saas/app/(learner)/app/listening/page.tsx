@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
+import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
+import { ModalConfirm, SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
 import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { ObjectiveAttempt, ObjectiveQuestion, ObjectiveTestPayload } from '@/lib/types';
 
@@ -11,6 +12,19 @@ type StartListeningResponse = {
   attemptId: string;
   test: ObjectiveTestPayload;
 };
+
+type ListeningResumeSnapshot = {
+  attemptId: string;
+  track: 'academic' | 'general';
+  test: ObjectiveTestPayload;
+  answers: Record<string, string>;
+  activeQuestionIndex: number;
+  timerSecondsLeft: number;
+  elapsedSeconds: number;
+  savedAt: string;
+};
+
+const listeningResumeStorageKey = 'spokio.web.listening.resume';
 
 const formatCountdown = (secondsLeft: number) => {
   const mins = Math.floor(secondsLeft / 60);
@@ -31,7 +45,9 @@ export default function ListeningPage() {
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSubmitWarning, setShowSubmitWarning] = useState(false);
 
   const questionCount = useMemo(() => test?.questions.length || 0, [test]);
 
@@ -43,22 +59,25 @@ export default function ListeningPage() {
   const activeQuestion = test?.questions[activeQuestionIndex];
   const activeQuestionAnswer = activeQuestion ? answers[activeQuestion.questionId] || '' : '';
 
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  };
+  }, []);
 
-  const startTimer = (seconds: number) => {
+  const startTimer = useCallback((seconds: number, elapsed = 0) => {
     stopTimer();
     setTimerSecondsLeft(seconds);
-    setElapsedSeconds(0);
+    setElapsedSeconds(elapsed);
+    if (seconds <= 0) {
+      return;
+    }
     timerRef.current = window.setInterval(() => {
       setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
-  };
+  }, [stopTimer]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -71,6 +90,7 @@ export default function ListeningPage() {
 
   const startTest = async () => {
     setError('');
+    setStatusMessage('');
     setLoading(true);
     try {
       const started = await apiRequest<StartListeningResponse>('/listening/tests/start', {
@@ -85,6 +105,8 @@ export default function ListeningPage() {
       setReviewMode(false);
       setActiveQuestionIndex(0);
       startTimer((started.test.suggestedTimeMinutes || 20) * 60);
+      window.localStorage.removeItem(listeningResumeStorageKey);
+      setStatusMessage('Listening test started.');
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start listening test');
@@ -115,6 +137,8 @@ export default function ListeningPage() {
       const detail = await apiRequest<ObjectiveAttempt>(`/listening/tests/${attemptId}`);
       setResult(detail);
       stopTimer();
+      window.localStorage.removeItem(listeningResumeStorageKey);
+      setStatusMessage('Listening test submitted successfully.');
       await loadHistory();
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
@@ -122,7 +146,35 @@ export default function ListeningPage() {
     } finally {
       setLoading(false);
     }
-  }, [answers, attemptId, elapsedSeconds, loadHistory, test]);
+  }, [answers, attemptId, elapsedSeconds, loadHistory, stopTimer, test]);
+
+  const requestSubmit = useCallback(
+    (force = false) => {
+      if (!force && questionCount > 0 && answeredCount < questionCount) {
+        setShowSubmitWarning(true);
+        return;
+      }
+      void submitTest();
+    },
+    [answeredCount, questionCount, submitTest]
+  );
+
+  const saveListeningSnapshot = useCallback(() => {
+    if (!test || !attemptId || result) return;
+    const snapshot: ListeningResumeSnapshot = {
+      attemptId,
+      track,
+      test,
+      answers,
+      activeQuestionIndex,
+      timerSecondsLeft,
+      elapsedSeconds,
+      savedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(listeningResumeStorageKey, JSON.stringify(snapshot));
+    stopTimer();
+    setStatusMessage('Listening attempt saved. You can resume it later.');
+  }, [activeQuestionIndex, answers, attemptId, elapsedSeconds, result, stopTimer, test, timerSecondsLeft, track]);
 
   const openAttempt = async (id: string) => {
     try {
@@ -143,6 +195,42 @@ export default function ListeningPage() {
   }, [loadHistory]);
 
   useEffect(() => {
+    const raw = window.localStorage.getItem(listeningResumeStorageKey);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as ListeningResumeSnapshot;
+      if (!parsed?.attemptId || !parsed?.test) return;
+
+      setTrack(parsed.track || 'academic');
+      setAttemptId(parsed.attemptId);
+      setTest(parsed.test);
+      setAnswers(parsed.answers || {});
+      setActiveQuestionIndex(parsed.activeQuestionIndex || 0);
+      setResult(null);
+      startTimer(Math.max(0, parsed.timerSecondsLeft || 0), Math.max(0, parsed.elapsedSeconds || 0));
+      setStatusMessage('Recovered saved listening attempt. Continue from where you left off.');
+    } catch {
+      window.localStorage.removeItem(listeningResumeStorageKey);
+    }
+  }, [startTimer]);
+
+  useEffect(() => {
+    if (!test || !attemptId || result) return;
+    const snapshot: ListeningResumeSnapshot = {
+      attemptId,
+      track,
+      test,
+      answers,
+      activeQuestionIndex,
+      timerSecondsLeft,
+      elapsedSeconds,
+      savedAt: new Date().toISOString()
+    };
+    window.localStorage.setItem(listeningResumeStorageKey, JSON.stringify(snapshot));
+  }, [activeQuestionIndex, answers, attemptId, elapsedSeconds, result, test, timerSecondsLeft, track]);
+
+  useEffect(() => {
     if (timerSecondsLeft > 0) return;
     if (!attemptId || !test) return;
     if (result) return;
@@ -151,7 +239,7 @@ export default function ListeningPage() {
 
   useEffect(() => {
     return () => stopTimer();
-  }, []);
+  }, [stopTimer]);
 
   return (
     <div className="space-y-6">
@@ -251,8 +339,8 @@ export default function ListeningPage() {
                     ))}
                   </ul>
                   <div className="flex gap-2">
-                    <button className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => setReviewMode(false)}>Back</button>
-                    <button className="flex-1 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50" onClick={() => void submitTest()} disabled={loading}>{loading ? 'Submitting...' : 'Submit Listening Test'}</button>
+                  <button className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => setReviewMode(false)}>Back</button>
+                    <button className="flex-1 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50" onClick={() => requestSubmit()} disabled={loading}>{loading ? 'Submitting...' : 'Submit Listening Test'}</button>
                   </div>
                 </article>
               ) : activeQuestion ? (
@@ -407,6 +495,36 @@ export default function ListeningPage() {
       </SectionCard>
 
       {error ? <div className="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">{error}</div> : null}
+      {statusMessage ? <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/25 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">{statusMessage}</div> : null}
+
+      {showSubmitWarning ? (
+        <ModalConfirm
+          title="Submit incomplete listening test?"
+          subtitle="Your grade will be calculated based on the answers submitted so far."
+          confirmLabel={loading ? 'Submitting...' : 'Submit Anyway'}
+          cancelLabel="Keep Working"
+          onCancel={() => setShowSubmitWarning(false)}
+          onConfirm={() => {
+            setShowSubmitWarning(false);
+            requestSubmit(true);
+          }}
+          disabled={loading}
+        >
+          <p>
+            You answered <strong>{answeredCount}</strong> of <strong>{questionCount}</strong> questions. Missing
+            questions will be marked incorrect.
+          </p>
+        </ModalConfirm>
+      ) : null}
+
+      <ActiveAttemptLeaveGuard
+        enabled={Boolean(test && attemptId && !result)}
+        title="Leave listening test?"
+        subtitle="We will save your current listening attempt so you can resume later."
+        confirmLabel="Save and Leave"
+        cancelLabel="Stay Here"
+        onConfirmLeave={saveListeningSnapshot}
+      />
     </div>
   );
 }

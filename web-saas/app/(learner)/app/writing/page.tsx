@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
 import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
 import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { WritingSubmission, WritingTask } from '@/lib/types';
@@ -560,6 +561,15 @@ export default function WritingPage() {
     syncDraftSnapshots();
   };
 
+  const saveDraftForNavigation = useCallback(async () => {
+    if (!task) return;
+    const serialized = serializeStoredDraftPayload(task, responseText, 'manual');
+    window.localStorage.setItem(draftStorageKey(task.taskId), serialized);
+    pauseTimer();
+    setLastPersistedFingerprint(buildEssayFingerprint(task.taskId, responseText));
+    setStatusMessage('Draft saved before leaving. You can resume this writing attempt later.');
+  }, [pauseTimer, responseText, task]);
+
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
@@ -1114,6 +1124,15 @@ export default function WritingPage() {
           {error}
         </div>
       ) : null}
+
+      <ActiveAttemptLeaveGuard
+        enabled={Boolean(task && !result)}
+        title="Leave writing attempt?"
+        subtitle="We will save your current draft and pause the timer so you can resume later."
+        confirmLabel="Save and Leave"
+        cancelLabel="Stay Here"
+        onConfirmLeave={saveDraftForNavigation}
+      />
     </div>
   );
 }
