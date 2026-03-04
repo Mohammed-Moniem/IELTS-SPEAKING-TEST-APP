@@ -135,7 +135,7 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        {/* Account */}
+        {/* Rewards – hidden until feature is ready
         <div className="mb-6">
           <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Rewards
@@ -149,6 +149,7 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
         </div>
+        */}
 
         {/* Account */}
         <div className="mb-6">
