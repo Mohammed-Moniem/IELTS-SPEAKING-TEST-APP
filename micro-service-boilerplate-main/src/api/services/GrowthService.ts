@@ -1844,8 +1844,17 @@ export class GrowthService {
     }
     if (query.topic) filter.topic = { $regex: this.escapeRegex(query.topic.trim()), $options: 'i' };
     if (query.module) filter.module = query.module;
-    if (query.cefr) filter.cefr = query.cefr;
-    if (query.difficulty) filter.difficulty = query.difficulty;
+    if (query.cefr) {
+      filter.cefr = query.cefr;
+    } else if (query.difficulty) {
+      const cefrMap: Record<string, string[]> = {
+        beginner: ['A2', 'B1'],
+        intermediate: ['B2'],
+        advanced: ['C1', 'C2']
+      };
+      const cefrValues = cefrMap[query.difficulty];
+      if (cefrValues) filter.cefr = { $in: cefrValues };
+    }
     return filter;
   }
 
