@@ -186,7 +186,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const search = typeof window !== 'undefined' ? window.location.search : '';
-    const route = search ? `${pathname}${search}` : pathname;
+    // Guard against rare client/router transitional states where pathname can be empty.
+    const safePathname = pathname || '/';
+    const route = search ? `${safePathname}${search}` : safePathname;
     const routeArea = route.startsWith('/admin')
       ? 'admin'
       : route.startsWith('/app/advertiser')

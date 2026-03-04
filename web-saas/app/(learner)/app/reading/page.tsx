@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import ReadingEngine from '@/components/reading/ReadingEngine';
+import ReadingEngine, { ReadingWorkspaceState } from '@/components/reading/ReadingEngine';
 import { SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
 import { apiRequest, ApiError, handleUsageLimitRedirect } from '@/lib/api/client';
 import { ObjectiveAttempt, ObjectiveTestPayload } from '@/lib/types';
@@ -38,8 +38,12 @@ export default function ReadingPage() {
   const [history, setHistory] = useState<ObjectiveAttempt[]>([]);
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [openingAttemptId, setOpeningAttemptId] = useState('');
 
   const allQuestions = useMemo(() => {
     if (!test) return [];
@@ -64,10 +68,25 @@ export default function ReadingPage() {
     }
   };
 
-  const startTimer = (seconds: number) => {
+  const startTimer = (seconds: number, elapsed = 0) => {
     stopTimer();
     setTimerSecondsLeft(seconds);
-    setElapsedSeconds(0);
+    setElapsedSeconds(elapsed);
+    setIsTimerPaused(false);
+    timerRef.current = window.setInterval(() => {
+      setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+  };
+
+  const pauseTimer = () => {
+    stopTimer();
+    setIsTimerPaused(true);
+  };
+
+  const resumeTimer = () => {
+    if (timerRef.current || timerSecondsLeft <= 0 || result) return;
+    setIsTimerPaused(false);
     timerRef.current = window.setInterval(() => {
       setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
       setElapsedSeconds(prev => prev + 1);
@@ -85,6 +104,7 @@ export default function ReadingPage() {
 
   const startTest = async () => {
     setError('');
+    setStatusMessage('');
     setLoading(true);
     try {
       const started = await apiRequest<StartReadingResponse>('/reading/tests/start', {
@@ -95,7 +115,9 @@ export default function ReadingPage() {
       setTest(started.test);
       setAnswers({});
       setResult(null);
+      setIsTimerPaused(false);
       startTimer((started.test.suggestedTimeMinutes || 60) * 60);
+      setStatusMessage('Reading test started.');
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start reading test');
@@ -107,6 +129,7 @@ export default function ReadingPage() {
   const submitTest = useCallback(async () => {
     if (!attemptId || !test) return;
     setError('');
+    setStatusMessage('');
     setLoading(true);
     try {
       const payload = {
@@ -124,6 +147,8 @@ export default function ReadingPage() {
       const detail = await apiRequest<ObjectiveAttempt>(`/reading/tests/${attemptId}`);
       setResult(detail);
       stopTimer();
+      setIsTimerPaused(false);
+      setStatusMessage('Reading test submitted successfully.');
       await loadHistory();
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
@@ -133,13 +158,107 @@ export default function ReadingPage() {
     }
   }, [allQuestions, answers, attemptId, elapsedSeconds, loadHistory, test]);
 
+  const buildAnswerPayload = useCallback(() => {
+    return allQuestions.map(question => ({
+      questionId: question.questionId,
+      sectionId: question.sectionId,
+      answer: answers[question.questionId] ?? ''
+    }));
+  }, [allQuestions, answers]);
+
+  const saveReadingProgress = useCallback(
+    async (workspaceState?: ReadingWorkspaceState, options?: { paused?: boolean }) => {
+      if (!attemptId || !test) return;
+
+      setError('');
+      setSavingProgress(true);
+      try {
+        const paused = options?.paused === true;
+        const endpoint = paused ? `/reading/tests/${attemptId}/pause` : `/reading/tests/${attemptId}/save`;
+        await apiRequest<ObjectiveAttempt>(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({
+            answers: buildAnswerPayload(),
+            durationSeconds: elapsedSeconds,
+            activeSectionId: workspaceState?.activeSectionId,
+            activeQuestionIndex: workspaceState?.activeQuestionIndex,
+            flaggedQuestionIds: workspaceState?.flaggedQuestionIds,
+            isPaused: paused
+          })
+        });
+        setStatusMessage(paused ? 'Timer paused. Progress saved.' : 'Progress saved.');
+      } catch (err) {
+        if (handleUsageLimitRedirect(err)) return;
+        setError(err instanceof ApiError ? err.message : 'Failed to save progress');
+      } finally {
+        setSavingProgress(false);
+      }
+    },
+    [attemptId, buildAnswerPayload, elapsedSeconds, test]
+  );
+
+  const handlePause = useCallback(
+    async (workspaceState: ReadingWorkspaceState) => {
+      pauseTimer();
+      await saveReadingProgress(workspaceState, { paused: true });
+    },
+    [saveReadingProgress]
+  );
+
+  const handleResume = useCallback(
+    async (workspaceState: ReadingWorkspaceState) => {
+      resumeTimer();
+      await saveReadingProgress(workspaceState, { paused: false });
+    },
+    [saveReadingProgress]
+  );
+
   const openAttempt = async (id: string) => {
+    setOpeningAttemptId(id);
+    setError('');
+    setStatusMessage('');
     try {
       const detail = await apiRequest<ObjectiveAttempt>(`/reading/tests/${id}`);
-      setResult(detail);
+      const testPayload = (() => {
+        if (detail.test) return detail.test;
+        if (detail.testId && typeof detail.testId === 'object') return detail.testId as ObjectiveTestPayload;
+        return null;
+      })();
+
+      if (testPayload) {
+        setTest(testPayload);
+        setAttemptId(detail._id);
+      }
+
+      const persistedAnswers =
+        detail.workspaceState?.answers ||
+        (detail.answers || []).reduce<Record<string, AnswerValue>>((acc, item) => {
+          acc[item.questionId] = item.answer;
+          return acc;
+        }, {});
+      setAnswers(persistedAnswers || {});
+      setResult(detail.status === 'completed' ? detail : null);
+
+      if (detail.status === 'in_progress' && testPayload) {
+        const elapsed = detail.workspaceState?.durationSeconds ?? detail.durationSeconds ?? 0;
+        const totalSeconds = (testPayload.suggestedTimeMinutes || 60) * 60;
+        const remaining = Math.max(0, totalSeconds - elapsed);
+        setElapsedSeconds(elapsed);
+        setTimerSecondsLeft(remaining);
+        if (detail.workspaceState?.isPaused || remaining === 0) {
+          stopTimer();
+          setIsTimerPaused(true);
+          setStatusMessage('Loaded saved attempt in paused state.');
+        } else {
+          startTimer(remaining, elapsed);
+          setStatusMessage('Loaded saved attempt and resumed timer.');
+        }
+      }
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to load attempt');
+    } finally {
+      setOpeningAttemptId('');
     }
   };
 
@@ -199,14 +318,35 @@ export default function ReadingPage() {
             completionLabel={`${questionCount ? Math.round((answeredCount / questionCount) * 100) : 0}% complete`}
             unsolvedLabel={`${Math.max(0, questionCount - answeredCount)} unsolved`}
             actions={
-              <button
-                type="button"
-                className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white"
-                onClick={() => void submitTest()}
-                disabled={loading}
-              >
-                {loading ? 'Submitting...' : 'Submit'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                  onClick={() => {
+                    if (isTimerPaused) resumeTimer();
+                    else pauseTimer();
+                  }}
+                  disabled={!test || loading}
+                >
+                  {isTimerPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                  onClick={() => void saveReadingProgress()}
+                  disabled={!test || loading || savingProgress}
+                >
+                  {savingProgress ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white"
+                  onClick={() => void submitTest()}
+                  disabled={loading}
+                >
+                  {loading ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
             }
           />
 
@@ -216,6 +356,11 @@ export default function ReadingPage() {
             onChangeAnswers={setAnswers}
             onSubmit={() => void submitTest()}
             submitting={loading}
+            onSaveProgress={state => saveReadingProgress(state)}
+            onPause={handlePause}
+            onResume={handleResume}
+            timerPaused={isTimerPaused}
+            saving={savingProgress}
           />
         </div>
       ) : (
@@ -305,7 +450,7 @@ export default function ReadingPage() {
                         className="text-sm font-semibold text-violet-600 hover:underline dark:text-violet-400"
                         onClick={() => void openAttempt(item._id)}
                       >
-                        Open
+                        {openingAttemptId === item._id ? 'Opening…' : 'Open'}
                       </button>
                       <Link href={`/app/reading/history/${item._id}`} className="text-sm font-semibold text-violet-600 hover:underline dark:text-violet-400">
                         Detail
@@ -322,6 +467,11 @@ export default function ReadingPage() {
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
           {error}
+        </div>
+      ) : null}
+      {statusMessage ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+          {statusMessage}
         </div>
       ) : null}
     </div>

@@ -6,12 +6,24 @@ import { ObjectiveQuestion, ObjectiveTestPayload } from '@/lib/types';
 
 type AnswerValue = string | string[] | Record<string, string>;
 
+export type ReadingWorkspaceState = {
+  activeSectionId: 'p1' | 'p2' | 'p3';
+  activeQuestionIndex: number;
+  flaggedQuestionIds: string[];
+  reviewMode: boolean;
+};
+
 type ReadingEngineProps = {
   test: ObjectiveTestPayload;
   answers: Record<string, AnswerValue>;
   onChangeAnswers: (next: Record<string, AnswerValue>) => void;
   onSubmit: () => void | Promise<void>;
   submitting?: boolean;
+  onSaveProgress?: (state: ReadingWorkspaceState) => void | Promise<void>;
+  onPause?: (state: ReadingWorkspaceState) => void | Promise<void>;
+  onResume?: (state: ReadingWorkspaceState) => void | Promise<void>;
+  timerPaused?: boolean;
+  saving?: boolean;
   compact?: boolean;
 };
 
@@ -83,6 +95,11 @@ export default function ReadingEngine({
   onChangeAnswers,
   onSubmit,
   submitting = false,
+  onSaveProgress,
+  onPause,
+  onResume,
+  timerPaused = false,
+  saving = false,
   compact = false
 }: ReadingEngineProps) {
   const sections = useMemo(() => buildSections(test), [test]);
@@ -97,12 +114,25 @@ export default function ReadingEngine({
 
   const answeredCount = allQuestions.reduce((count, question) => (isAnswered(answers[question.questionId]) ? count + 1 : count), 0);
   const totalCount = allQuestions.length;
+  const activeQuestionFlagged = flaggedQuestionIds.includes(activeQuestion?.questionId || '');
+  const workspaceState: ReadingWorkspaceState = {
+    activeSectionId: activeSection.sectionId,
+    activeQuestionIndex,
+    flaggedQuestionIds,
+    reviewMode
+  };
 
   const setAnswer = (questionId: string, value: AnswerValue) => {
     onChangeAnswers({
       ...answers,
       [questionId]: value
     });
+  };
+
+  const toggleFlag = (questionId: string) => {
+    setFlaggedQuestionIds(prev =>
+      prev.includes(questionId) ? prev.filter(id => id !== questionId) : [...prev, questionId]
+    );
   };
 
   const renderInput = (question: QuestionWithSection) => {
@@ -291,15 +321,9 @@ export default function ReadingEngine({
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
                       : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
                   }`}
-                  onClick={() =>
-                    setFlaggedQuestionIds(prev =>
-                      prev.includes(activeQuestion.questionId)
-                        ? prev.filter(id => id !== activeQuestion.questionId)
-                        : [...prev, activeQuestion.questionId]
-                    )
-                  }
+                  onClick={() => toggleFlag(activeQuestion.questionId)}
                 >
-                  {flaggedQuestionIds.includes(activeQuestion.questionId) ? 'Flagged' : 'Flag'}
+                  {flaggedQuestionIds.includes(activeQuestion.questionId) ? 'Marked' : 'Mark'}
                 </button>
               </div>
               <p className="mb-2 text-sm font-semibold text-gray-800 dark:text-gray-200">{activeQuestion.prompt}</p>
@@ -329,15 +353,90 @@ export default function ReadingEngine({
                   className={`h-8 w-8 rounded-lg text-xs font-bold ${
                     index === activeQuestionIndex
                       ? 'bg-violet-600 text-white'
-                      : isAnswered(answers[question.questionId])
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                      : flaggedQuestionIds.includes(question.questionId)
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                        : isAnswered(answers[question.questionId])
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
                   }`}
                 >
                   {index + 1}
                 </button>
               ))}
             </div>
+            <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
+              Green: answered • Amber: marked • Purple: current
+            </p>
+          </article>
+
+          <article className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">Quick Controls</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => setActiveQuestionIndex(prev => Math.max(0, prev - 1))}
+                disabled={activeQuestionIndex === 0}
+              >
+                Previous Q
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => setActiveQuestionIndex(prev => Math.min(activeSection.questions.length - 1, prev + 1))}
+                disabled={activeQuestionIndex >= activeSection.questions.length - 1}
+              >
+                Next Q
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                  activeQuestionFlagged
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                }`}
+                onClick={() => toggleFlag(activeQuestion.questionId)}
+              >
+                {activeQuestionFlagged ? 'Unmark' : 'Mark Question'}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => setReviewMode(true)}
+              >
+                Submit
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => void onSaveProgress?.(workspaceState)}
+                disabled={!onSaveProgress || saving}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                onClick={() => {
+                  if (timerPaused) {
+                    void onResume?.(workspaceState);
+                    return;
+                  }
+                  void onPause?.(workspaceState);
+                }}
+                disabled={timerPaused ? !onResume : !onPause}
+              >
+                {timerPaused ? 'Resume' : 'Pause'}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+              onClick={() => void onSubmit()}
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit Test'}
+            </button>
           </article>
         </aside>
       </div>
@@ -357,7 +456,7 @@ export default function ReadingEngine({
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             onClick={() => setReviewMode(true)}
           >
-            Review
+            Review & Submit
           </button>
           <button
             type="button"

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Body, Get, HttpCode, JsonController, Param, Post, QueryParams, Req, Res, UseBefore } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
-import { ReadingHistoryQuery, StartReadingTestRequest, SubmitReadingTestRequest } from '@dto/ReadingDto';
+import { ReadingHistoryQuery, SaveReadingProgressRequest, StartReadingTestRequest, SubmitReadingTestRequest } from '@dto/ReadingDto';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
@@ -56,6 +56,56 @@ export class ReadingController {
         headers
       );
       return StandardResponse.success(res, attempt, 'Reading test submitted', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/tests/:attemptId/save')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async saveProgress(
+    @Param('attemptId') attemptId: string,
+    @Body() body: SaveReadingProgressRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'reading-save-progress');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const attempt = await this.readingService.saveProgress(req.currentUser.id, attemptId, body, headers);
+      return StandardResponse.success(res, attempt, 'Reading progress saved', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/tests/:attemptId/pause')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async pauseProgress(
+    @Param('attemptId') attemptId: string,
+    @Body() body: SaveReadingProgressRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'reading-pause-progress');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const payload: SaveReadingProgressRequest = {
+        ...body,
+        isPaused: true
+      };
+      const attempt = await this.readingService.saveProgress(req.currentUser.id, attemptId, payload, headers);
+      return StandardResponse.success(res, attempt, 'Reading timer paused', HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }

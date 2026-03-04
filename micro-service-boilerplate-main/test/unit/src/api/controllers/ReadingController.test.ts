@@ -54,4 +54,77 @@ describe('ReadingController', () => {
       to: '2026-01-31'
     });
   });
+
+  it('saves in-progress reading state without submitting', async () => {
+    const mockService = {
+      saveProgress: jest.fn().mockResolvedValue({
+        _id: 'reading-attempt-1',
+        status: 'in_progress'
+      })
+    };
+
+    Container.set({ id: ReadingService, value: mockService as unknown as ReadingService });
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/reading/tests/reading-attempt-1/save')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Unique-Reference-Code', 'reading-save-progress-test')
+      .send({
+        answers: [{ questionId: 'p1_q1', sectionId: 'p1', answer: 'i' }],
+        durationSeconds: 212,
+        activeSectionId: 'p1',
+        activeQuestionIndex: 0,
+        flaggedQuestionIds: ['p1_q1'],
+        isPaused: false
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(mockService.saveProgress).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      'reading-attempt-1',
+      expect.objectContaining({
+        durationSeconds: 212,
+        isPaused: false
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it('pauses reading timer state for in-progress attempt', async () => {
+    const mockService = {
+      saveProgress: jest.fn().mockResolvedValue({
+        _id: 'reading-attempt-1',
+        status: 'in_progress'
+      })
+    };
+
+    Container.set({ id: ReadingService, value: mockService as unknown as ReadingService });
+    const app = createApp();
+
+    const response = await request(app)
+      .post('/api/v1/reading/tests/reading-attempt-1/pause')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Unique-Reference-Code', 'reading-pause-progress-test')
+      .send({
+        durationSeconds: 305,
+        activeSectionId: 'p1',
+        activeQuestionIndex: 3,
+        flaggedQuestionIds: ['p1_q2'],
+        answers: [{ questionId: 'p1_q2', sectionId: 'p1', answer: 'True' }]
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(mockService.saveProgress).toHaveBeenCalledWith(
+      '507f1f77bcf86cd799439011',
+      'reading-attempt-1',
+      expect.objectContaining({
+        durationSeconds: 305,
+        isPaused: true
+      }),
+      expect.any(Object)
+    );
+  });
 });

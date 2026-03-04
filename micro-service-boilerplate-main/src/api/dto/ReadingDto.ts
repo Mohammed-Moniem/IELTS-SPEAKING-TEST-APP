@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsDefined, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StartReadingTestRequest {
@@ -29,6 +29,37 @@ export class SubmitReadingTestRequest {
   @IsInt()
   @Min(0)
   durationSeconds?: number;
+}
+
+export class SaveReadingProgressRequest {
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReadingAnswerInput)
+  answers?: ReadingAnswerInput[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  durationSeconds?: number;
+
+  @IsOptional()
+  @IsIn(['p1', 'p2', 'p3'])
+  activeSectionId?: 'p1' | 'p2' | 'p3';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  activeQuestionIndex?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  flaggedQuestionIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isPaused?: boolean;
 }
 
 export class ReadingHistoryQuery {

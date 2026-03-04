@@ -89,4 +89,16 @@ describe('ReadingService quality guards', () => {
 
     expect(titles.size).toBeGreaterThan(1);
   });
+
+  it('normalizes malformed objective feedback payloads without crashing', () => {
+    const service = createService() as any;
+    const normalized = service.normalizeObjectiveEvaluation({}, 12, 40, ['matching_headings']);
+
+    expect(normalized.normalizedBand).toBe(2.7);
+    expect(normalized.feedback.summary).toContain('12 out of 40');
+    expect(normalized.feedback.suggestions.length).toBeGreaterThan(0);
+    expect(normalized.feedback.strengths.length).toBeGreaterThan(0);
+    expect(normalized.feedback.improvements[0]).toContain('matching_headings');
+    expect(normalized.model).toBe('fallback-local');
+  });
 });

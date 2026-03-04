@@ -27,6 +27,16 @@ export interface IReadingQuestionTypeStat {
   total: number;
 }
 
+export interface IReadingWorkspaceState {
+  answers?: Record<string, string | string[] | Record<string, string>>;
+  activeSectionId?: 'p1' | 'p2' | 'p3';
+  activeQuestionIndex?: number;
+  flaggedQuestionIds?: string[];
+  isPaused?: boolean;
+  durationSeconds?: number;
+  updatedAt?: Date;
+}
+
 export interface IReadingAttempt {
   userId: Types.ObjectId;
   testId: Types.ObjectId;
@@ -37,6 +47,7 @@ export interface IReadingAttempt {
   sectionProgress?: IReadingSectionProgress[];
   questionTypeStats?: IReadingQuestionTypeStat[];
   sectionStats?: Array<{ sectionId: 'p1' | 'p2' | 'p3'; score: number; total: number }>;
+  workspaceState?: IReadingWorkspaceState;
   score: number;
   totalQuestions: number;
   normalizedBand: number;
@@ -160,6 +171,10 @@ const ReadingAttemptSchema = new Schema<IReadingAttempt>(
     sectionStats: {
       type: [Schema.Types.Mixed],
       default: []
+    },
+    workspaceState: {
+      type: Schema.Types.Mixed,
+      default: {}
     },
     score: {
       type: Number,

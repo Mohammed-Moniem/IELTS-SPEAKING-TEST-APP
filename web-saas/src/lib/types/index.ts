@@ -457,6 +457,15 @@ export interface ObjectiveAttempt {
     correct: number;
     total: number;
   }>;
+  workspaceState?: {
+    answers?: Record<string, string | string[] | Record<string, string>>;
+    activeSectionId?: 'p1' | 'p2' | 'p3';
+    activeQuestionIndex?: number;
+    flaggedQuestionIds?: string[];
+    isPaused?: boolean;
+    durationSeconds?: number;
+    updatedAt?: string;
+  };
   normalizedBand?: number;
   score?: number;
   totalQuestions?: number;

@@ -21,6 +21,15 @@ type ReadingAnswerInput = {
   answer: AnswerValue;
 };
 
+type SaveReadingProgressInput = {
+  answers?: ReadingAnswerInput[];
+  durationSeconds?: number;
+  activeSectionId?: 'p1' | 'p2' | 'p3';
+  activeQuestionIndex?: number;
+  flaggedQuestionIds?: string[];
+  isPaused?: boolean;
+};
+
 type MarkedAnswer = {
   questionId: string;
   sectionId: 'p1' | 'p2' | 'p3';
@@ -214,6 +223,7 @@ export class ReadingService {
         plan: await this.getUserPlan(userId)
       }
     );
+    const normalizedEvaluation = this.normalizeObjectiveEvaluation(feedback, score, totalQuestions, incorrectTypes);
 
     attempt.schemaVersion = 'v2';
     attempt.feedbackVersion = 'v2';
@@ -223,17 +233,12 @@ export class ReadingService {
     attempt.questionTypeStats = questionTypeStats;
     attempt.score = score;
     attempt.totalQuestions = totalQuestions;
-    attempt.normalizedBand = feedback.normalizedBand;
+    attempt.normalizedBand = normalizedEvaluation.normalizedBand;
     attempt.durationSeconds = Math.max(0, Math.round(durationSeconds || 0));
-    attempt.feedback = {
-      summary: feedback.feedback.summary,
-      suggestions: feedback.feedback.suggestions,
-      strengths: feedback.feedback.strengths,
-      improvements: feedback.feedback.improvements
-    };
+    attempt.feedback = normalizedEvaluation.feedback;
     attempt.deepFeedbackReady = false;
     attempt.deepFeedback = {};
-    attempt.model = feedback.model;
+    attempt.model = normalizedEvaluation.model;
     attempt.status = 'completed';
     await attempt.save();
 
@@ -264,6 +269,128 @@ export class ReadingService {
 
     this.log.info(`${logMessage} :: Completed reading attempt ${attempt._id}`);
 
+    return attempt;
+  }
+
+  private normalizeObjectiveEvaluation(
+    raw: unknown,
+    score: number,
+    totalQuestions: number,
+    incorrectTypes: string[]
+  ): {
+    normalizedBand: number;
+    model: string;
+    feedback: {
+      summary: string;
+      suggestions: string[];
+      strengths: string[];
+      improvements: string[];
+    };
+  } {
+    const payload = (raw || {}) as Record<string, any>;
+    const feedback = (payload.feedback || {}) as Record<string, any>;
+    const defaultSummary = `You answered ${score} out of ${totalQuestions}.`;
+
+    const summary = this.readNonEmptyString(feedback.summary) || this.readNonEmptyString(payload.summary) || defaultSummary;
+    const strengths = this.readStringArray(feedback.strengths, [
+      'Completed the section under timed conditions.',
+      'Demonstrated persistence across question types.'
+    ]);
+    const improvements = this.readStringArray(
+      feedback.improvements,
+      incorrectTypes.length > 0 ? [`Focus on ${incorrectTypes.join(', ')}.`] : ['Maintain consistency under time pressure.']
+    );
+    const suggestions = this.readStringArray(feedback.suggestions, [
+      'Review error patterns before your next attempt.',
+      'Practice timed reading sets to improve pacing and evidence checks.'
+    ]);
+    const normalizedBand = this.resolveBand(payload.normalizedBand, score, totalQuestions);
+    const model = this.readNonEmptyString(payload.model) || 'fallback-local';
+
+    return {
+      normalizedBand,
+      model,
+      feedback: {
+        summary,
+        suggestions,
+        strengths,
+        improvements
+      }
+    };
+  }
+
+  private readNonEmptyString(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private readStringArray(value: unknown, fallback: string[]): string[] {
+    if (!Array.isArray(value)) return fallback;
+    const cleaned = value
+      .map(item => (typeof item === 'string' ? item.trim() : ''))
+      .filter(item => item.length > 0);
+    return cleaned.length > 0 ? cleaned : fallback;
+  }
+
+  private resolveBand(rawBand: unknown, score: number, totalQuestions: number): number {
+    if (typeof rawBand === 'number' && Number.isFinite(rawBand)) {
+      return Number(Math.min(9, Math.max(0, rawBand)).toFixed(1));
+    }
+    if (totalQuestions <= 0) return 0;
+    const mapped = 9 * (score / totalQuestions);
+    return Number(Math.min(9, Math.max(0, mapped)).toFixed(1));
+  }
+
+  public async saveProgress(
+    userId: string,
+    attemptId: string,
+    payload: SaveReadingProgressInput,
+    headers: IRequestHeaders
+  ) {
+    const logMessage = constructLogMessage(__filename, 'saveProgress', headers);
+    const attempt = await ReadingAttemptModel.findOne({ _id: attemptId, userId });
+    if (!attempt) {
+      throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'Reading attempt not found');
+    }
+
+    if (attempt.status === 'completed') {
+      throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, 'Cannot update a completed reading attempt');
+    }
+
+    const previousWorkspace = (attempt.workspaceState || {}) as Record<string, unknown>;
+    const answersMap: Record<string, AnswerValue> = payload.answers
+      ? payload.answers.reduce<Record<string, AnswerValue>>((acc, answer) => {
+          acc[answer.questionId] = answer.answer;
+          return acc;
+        }, {})
+      : ((previousWorkspace.answers as Record<string, AnswerValue>) || {});
+
+    attempt.workspaceState = {
+      answers: answersMap,
+      activeSectionId:
+        payload.activeSectionId || (previousWorkspace.activeSectionId as 'p1' | 'p2' | 'p3' | undefined),
+      activeQuestionIndex:
+        typeof payload.activeQuestionIndex === 'number'
+          ? payload.activeQuestionIndex
+          : (previousWorkspace.activeQuestionIndex as number | undefined),
+      flaggedQuestionIds:
+        payload.flaggedQuestionIds || (previousWorkspace.flaggedQuestionIds as string[] | undefined) || [],
+      isPaused:
+        typeof payload.isPaused === 'boolean' ? payload.isPaused : (previousWorkspace.isPaused as boolean | undefined) || false,
+      durationSeconds:
+        typeof payload.durationSeconds === 'number'
+          ? payload.durationSeconds
+          : (previousWorkspace.durationSeconds as number | undefined) || attempt.durationSeconds || 0,
+      updatedAt: new Date()
+    };
+
+    if (typeof payload.durationSeconds === 'number') {
+      attempt.durationSeconds = Math.max(0, Math.round(payload.durationSeconds));
+    }
+
+    await attempt.save();
+    this.log.info(`${logMessage} :: Saved in-progress state for reading attempt ${attempt._id}`);
     return attempt;
   }
 
