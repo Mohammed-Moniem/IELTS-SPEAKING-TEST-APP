@@ -27,6 +27,7 @@
     "test:e2e:cleanup": "npm run db:cleanup",
     "test:full": "npm run test:e2e:setup && npm test && npm run test:e2e:cleanup",
     "seed:achievements": "ts-node scripts/seedAchievements.ts",
+    "seed:blog": "ts-node scripts/seed-blog-posts.ts",
     "perf:checkpoint6": "bash scripts/perf/run_checkpoint6_load.sh"
   },
   "keywords": [
