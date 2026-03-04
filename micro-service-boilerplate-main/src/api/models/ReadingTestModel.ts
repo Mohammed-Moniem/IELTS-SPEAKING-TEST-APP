@@ -49,6 +49,7 @@ export interface IReadingTest {
   track: IELTSModuleTrack;
   title: string;
   schemaVersion?: 'v1' | 'v2';
+  qualityTier?: 'legacy' | 'exam_v2';
   sectionCount?: number;
   sections?: IReadingSection[];
   passageTitle?: string;
@@ -152,6 +153,12 @@ const ReadingTestSchema = new Schema<IReadingTest>(
       enum: ['v1', 'v2'],
       default: 'v2'
     },
+    qualityTier: {
+      type: String,
+      enum: ['legacy', 'exam_v2'],
+      default: 'legacy',
+      index: true
+    },
     sectionCount: {
       type: Number,
       default: 3,
@@ -200,6 +207,6 @@ const ReadingTestSchema = new Schema<IReadingTest>(
   }
 );
 
-ReadingTestSchema.index({ track: 1, active: 1, autoPublished: 1, schemaVersion: 1, updatedAt: -1 });
+ReadingTestSchema.index({ track: 1, active: 1, autoPublished: 1, schemaVersion: 1, qualityTier: 1, updatedAt: -1 });
 
 export const ReadingTestModel = model<IReadingTest>('ReadingTest', ReadingTestSchema);

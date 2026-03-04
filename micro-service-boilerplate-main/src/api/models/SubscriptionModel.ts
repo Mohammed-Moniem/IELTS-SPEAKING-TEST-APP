@@ -29,7 +29,7 @@ const SubscriptionSchema = new Schema<ISubscription>(
     },
     planType: {
       type: String,
-      enum: ['free', 'premium', 'pro', 'team'],
+      enum: ['free', 'starter', 'premium', 'pro', 'team'],
       default: 'free'
     },
     stripeCustomerId: {

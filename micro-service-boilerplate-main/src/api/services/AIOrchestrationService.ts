@@ -110,6 +110,7 @@ export type ListeningTaskGenerationResult = {
 
 const PLAN_TOKEN_CAP: Record<SubscriptionPlan, number> = {
   free: 3000,
+  starter: 5000,
   premium: 8000,
   pro: 14000,
   team: 22000

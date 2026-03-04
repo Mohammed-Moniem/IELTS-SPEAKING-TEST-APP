@@ -55,59 +55,72 @@ const PLAN_METADATA: Record<SubscriptionPlan, PlanMetadata> = {
     headline: 'Build your IELTS baseline',
     description: 'Start with structured practice and progress tracking before upgrading.',
     features: [
-      '3 speaking practice sessions / month',
+      '3 practice sessions / week (12 per month baseline)',
       '1 speaking simulation / month',
       '2 writing submissions / month',
       '2 reading and 2 listening attempts / month'
     ]
   },
+  starter: {
+    label: 'Starter',
+    headline: 'Affordable foundation with guided feedback',
+    description: 'Bridge plan for price-sensitive learners with basic AI feedback and essential practice coverage.',
+    features: [
+      'Basic AI feedback across all IELTS modules',
+      'Structured daily practice without advanced analytics',
+      'Core progress tracking for consistency'
+    ]
+  },
   premium: {
     label: 'Premium',
     headline: 'Consistent learner momentum',
-    description: 'Best fit for daily solo prep across all IELTS modules with richer feedback depth.',
+    description: 'Full AI evaluation across all modules with deeper analytics and progress insights.',
     features: [
-      'Expanded usage across speaking, writing, reading, and listening',
-      'Detailed AI scoring with actionable feedback',
-      'Full progress history with cross-module tracking'
+      'Full AI evaluation for speaking, writing, reading, and listening',
+      'Detailed rubric feedback and targeted weaknesses',
+      'Progress tracking and cross-module history'
     ]
   },
   pro: {
     label: 'Pro',
-    headline: 'Serious exam acceleration',
-    description: 'For high-intensity prep with priority processing and deeper exam simulation cadence.',
+    headline: 'Advanced acceleration with personalized strategy',
+    description: 'Advanced analytics, priority AI scoring, custom study plans, and score prediction for exam sprints.',
     features: [
-      'Everything in Premium',
-      'Priority scoring queue during peak usage',
-      'Advanced analytics and full mock readiness'
+      'Everything in Premium with priority scoring throughput',
+      'Advanced analytics and full mock readiness',
+      'Custom study plans and score prediction',
+      'Band Score Improvement Guarantee included'
     ]
   },
   team: {
     label: 'Team',
     headline: 'Small cohorts and coaching teams',
-    description: 'Shared operational plan for mentors or training cohorts with higher throughput.',
+    description: 'Coach dashboard and student management for mentor-led cohorts and institutions.',
     features: [
-      'Everything in Pro',
-      'Higher throughput for coach-assisted programs',
-      'Priority billing and operational support lane'
+      'Everything in Pro with shared throughput',
+      'Coach dashboard and student management',
+      'Group analytics and operational support'
     ]
   }
 };
 
 const PLAN_PRICE_BOOK: Record<Exclude<SubscriptionPlan, 'free'>, { monthly: number; annual: number }> = {
-  premium: { monthly: 14, annual: 140 },
-  pro: { monthly: 29, annual: 290 },
-  team: { monthly: 79, annual: 790 }
+  starter: { monthly: 9, annual: 90 },
+  premium: { monthly: 24, annual: 240 },
+  pro: { monthly: 49, annual: 490 },
+  team: { monthly: 99, annual: 990 }
 };
 
 const PLAN_AUDIENCE: Record<SubscriptionPlan, string> = {
   free: 'New learners evaluating the platform',
+  starter: 'Price-sensitive learners needing guided daily prep',
   premium: 'Daily independent IELTS learners',
   pro: 'High-frequency learners targeting faster band gains',
   team: 'Coaches, institutions, and study cohorts'
 };
 
 const PLAN_LIMITS: PlanCatalogEntry['limits'] = {
-  practiceSessionsPerMonth: 3,
+  practiceSessionsPerMonth: 12,
   simulationSessionsPerMonth: 1,
   writingSubmissionsPerMonth: 2,
   readingAttemptsPerMonth: 2,
@@ -157,6 +170,10 @@ export class SubscriptionService {
     const enabled = this.stripeService.isConfigured();
     const mode = this.stripeService.getMode();
     const priceMatrix = {
+      starter: {
+        monthly: this.stripeService.getPriceId('starter', 'monthly'),
+        annual: this.stripeService.getPriceId('starter', 'annual')
+      },
       premium: {
         monthly: this.stripeService.getPriceId('premium', 'monthly'),
         annual: this.stripeService.getPriceId('premium', 'annual')
@@ -178,6 +195,7 @@ export class SubscriptionService {
       portalEnabled: enabled && mode !== 'disabled',
       billingPortalReturnUrl: env.payments?.stripe?.billingPortalReturnUrl,
       prices: {
+        starter: priceMatrix.starter.monthly,
         premium: priceMatrix.premium.monthly,
         pro: priceMatrix.pro.monthly,
         team: priceMatrix.team.monthly

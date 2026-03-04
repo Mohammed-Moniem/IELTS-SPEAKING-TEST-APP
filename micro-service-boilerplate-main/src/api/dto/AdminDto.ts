@@ -70,8 +70,8 @@ export class AdminUsersQuery extends AdminPaginationQuery {
   query?: string;
 
   @IsOptional()
-  @IsIn(['free', 'premium', 'pro', 'team'])
-  plan?: 'free' | 'premium' | 'pro' | 'team';
+  @IsIn(['free', 'starter', 'premium', 'pro', 'team'])
+  plan?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
 
   @IsOptional()
   @IsIn(['active', 'idle', 'unverified'])
@@ -104,8 +104,8 @@ export class AdminSubscriptionsQuery extends AdminPaginationQuery {
   status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
 
   @IsOptional()
-  @IsIn(['free', 'premium', 'pro', 'team'])
-  plan?: 'free' | 'premium' | 'pro' | 'team';
+  @IsIn(['free', 'starter', 'premium', 'pro', 'team'])
+  plan?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
 
   @IsOptional()
   @IsDateString()
@@ -122,8 +122,8 @@ export class AdminSubscriptionStatusUpdateRequest {
 }
 
 export class AdminSubscriptionPlanUpdateRequest {
-  @IsIn(['free', 'premium', 'pro', 'team'])
-  planType!: 'free' | 'premium' | 'pro' | 'team';
+  @IsIn(['free', 'starter', 'premium', 'pro', 'team'])
+  planType!: 'free' | 'starter' | 'premium' | 'pro' | 'team';
 }
 
 export class AdminSubscriptionRefundNoteRequest {

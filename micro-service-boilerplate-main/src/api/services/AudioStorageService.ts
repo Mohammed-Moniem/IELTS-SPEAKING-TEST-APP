@@ -81,7 +81,7 @@ export class AudioStorageService {
     testPart?: string;
     overallBand?: number;
     scores?: AudioRecording['scores'];
-    userTier?: 'free' | 'premium' | 'pro' | 'team';
+    userTier?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
   }): Promise<AudioRecording> {
     const fileSizeMB = params.audioBuffer.length / (1024 * 1024);
     if (fileSizeMB > env.storage.maxFileSizeMB) {

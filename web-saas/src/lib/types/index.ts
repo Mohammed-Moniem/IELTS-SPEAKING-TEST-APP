@@ -1,4 +1,4 @@
-export type SubscriptionPlan = 'free' | 'premium' | 'pro' | 'team';
+export type SubscriptionPlan = 'free' | 'starter' | 'premium' | 'pro' | 'team';
 export type BillingCycle = 'monthly' | 'annual';
 
 export type AdminRole = 'superadmin' | 'content_manager' | 'support_agent';
@@ -201,6 +201,7 @@ export interface StripeConfiguration {
   portalEnabled: boolean;
   billingPortalReturnUrl?: string;
   prices: {
+    starter?: string;
     premium?: string;
     pro?: string;
     team?: string;
@@ -1013,7 +1014,7 @@ export interface AdminAnalyticsView {
     conversionFromPreviousPercent: number;
   }>;
   cohortSlices: {
-    plan: Record<'free' | 'premium' | 'pro' | 'team', number>;
+    plan: Record<'free' | 'starter' | 'premium' | 'pro' | 'team', number>;
     modulePreference: Record<'speaking' | 'writing' | 'reading' | 'listening', number>;
     acquisitionChannel: Record<'direct' | 'partner_register' | 'partner_checkout' | 'partner_manual', number>;
   };

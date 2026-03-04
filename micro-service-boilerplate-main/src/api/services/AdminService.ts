@@ -103,7 +103,7 @@ export class AdminService {
     offset: number,
     filters?: {
       query?: string;
-      plan?: 'free' | 'premium' | 'pro' | 'team';
+      plan?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
       status?: 'active' | 'idle' | 'unverified';
       country?: string;
       dateFrom?: string;
@@ -193,7 +193,7 @@ export class AdminService {
     filters?: {
       query?: string;
       status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
-      plan?: 'free' | 'premium' | 'pro' | 'team';
+      plan?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
       renewalFrom?: string;
       renewalTo?: string;
     }
@@ -328,7 +328,7 @@ export class AdminService {
 
   public async updateSubscriptionPlan(
     subscriptionId: string,
-    planType: 'free' | 'premium' | 'pro' | 'team',
+    planType: 'free' | 'starter' | 'premium' | 'pro' | 'team',
     actorUserId: string
   ) {
     if (!Types.ObjectId.isValid(subscriptionId)) {
@@ -411,7 +411,7 @@ export class AdminService {
       WritingSubmissionModel.countDocuments({}),
       ReadingAttemptModel.countDocuments({ status: 'completed' }),
       ListeningAttemptModel.countDocuments({ status: 'completed' }),
-      SubscriptionModel.countDocuments({ planType: { $in: ['premium', 'pro', 'team'] }, status: 'active' }),
+      SubscriptionModel.countDocuments({ planType: { $in: ['starter', 'premium', 'pro', 'team'] }, status: 'active' }),
       this.featureFlagService.listFlags()
     ]);
 

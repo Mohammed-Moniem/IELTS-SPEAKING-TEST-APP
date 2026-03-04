@@ -40,9 +40,10 @@ type UnifiedAttempt = {
 
 const PLAN_MONTHLY_PRICE: Record<SubscriptionPlan, number> = {
   free: 0,
-  premium: 14,
-  pro: 29,
-  team: 79
+  starter: 9,
+  premium: 24,
+  pro: 49,
+  team: 99
 };
 
 @Service()
@@ -694,7 +695,7 @@ export class WebViewService {
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       },
-      { free: 0, premium: 0, pro: 0, team: 0 } as Record<SubscriptionPlan, number>
+      { free: 0, starter: 0, premium: 0, pro: 0, team: 0 } as Record<SubscriptionPlan, number>
     );
 
     const moduleActivityByUser = new Map<string, Record<IELTSModule, number>>();

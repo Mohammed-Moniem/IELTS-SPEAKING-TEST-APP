@@ -8,7 +8,7 @@ import type { AdminSubscriptionListResponse, AdminSubscriptionRecord, Subscripti
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ModalConfirm } from '@/components/ui/v2';
 
-const plans: SubscriptionPlan[] = ['free', 'premium', 'pro', 'team'];
+const plans: SubscriptionPlan[] = ['free', 'starter', 'premium', 'pro', 'team'];
 
 export default function AdminSubscriptionsPage() {
   const searchParams = useSearchParams();

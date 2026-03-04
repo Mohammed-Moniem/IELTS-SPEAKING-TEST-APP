@@ -92,6 +92,10 @@ export const env = {
       defaultCancelUrl: getOsEnv('STRIPE_DEFAULT_CANCEL_URL'),
       billingPortalReturnUrl: getOsEnv('STRIPE_BILLING_PORTAL_RETURN_URL'),
       priceIds: {
+        starter: {
+          monthly: getOsEnv('STRIPE_PRICE_STARTER_MONTHLY') || getOsEnv('STRIPE_PRICE_STARTER'),
+          annual: getOsEnv('STRIPE_PRICE_STARTER_ANNUAL')
+        },
         premium: {
           monthly: getOsEnv('STRIPE_PRICE_PREMIUM_MONTHLY') || getOsEnv('STRIPE_PRICE_PREMIUM'),
           annual: getOsEnv('STRIPE_PRICE_PREMIUM_ANNUAL')
@@ -217,7 +221,7 @@ export const env = {
     targetReconcileCheckIntervalMs: toNumber(getOsEnv('PARTNER_TARGET_RECONCILE_CHECK_INTERVAL_MS')) || 15 * 60 * 1000
   },
   usage: {
-    freePracticeLimit: toNumber(getOsEnv('FREE_PRACTICE_LIMIT')) || 10,
+    freePracticeLimit: toNumber(getOsEnv('FREE_PRACTICE_LIMIT')) || 12,
     freeTestLimit: toNumber(getOsEnv('FREE_TEST_LIMIT')) || 3,
     freeWritingLimit: toNumber(getOsEnv('FREE_WRITING_LIMIT')) || 20,
     freeReadingLimit: toNumber(getOsEnv('FREE_READING_LIMIT')) || 20,

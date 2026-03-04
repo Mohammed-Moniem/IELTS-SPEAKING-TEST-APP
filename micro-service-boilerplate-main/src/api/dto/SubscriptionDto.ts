@@ -2,7 +2,7 @@ import { SubscriptionPlan } from '@models/UserModel';
 import { IsIn, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateCheckoutSessionRequest {
-  @IsIn(['premium', 'pro', 'team'])
+  @IsIn(['starter', 'premium', 'pro', 'team'])
   planType!: SubscriptionPlan;
 
   @IsOptional()
@@ -27,7 +27,7 @@ export class CreateCheckoutSessionRequest {
 }
 
 export class ActivatePlanRequest {
-  @IsIn(['free', 'premium', 'pro', 'team'])
+  @IsIn(['free', 'starter', 'premium', 'pro', 'team'])
   planType!: SubscriptionPlan;
 }
 

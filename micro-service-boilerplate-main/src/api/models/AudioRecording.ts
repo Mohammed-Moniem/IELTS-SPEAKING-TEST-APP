@@ -95,11 +95,14 @@ export class AudioRecordingModel {
   /**
    * Calculate expiration date based on tier
    */
-  static calculateExpiryDate(tier: 'free' | 'premium' | 'pro' | 'team'): Date | undefined {
+  static calculateExpiryDate(tier: 'free' | 'starter' | 'premium' | 'pro' | 'team'): Date | undefined {
     const now = new Date();
 
-    // Free: 30 days, Premium: 1 year, Pro: never expires
+    // Free/Starter: 30 days, Premium: 1 year, Pro/Team: never expires
     if (tier === 'free') {
+      now.setDate(now.getDate() + 30);
+      return now;
+    } else if (tier === 'starter') {
       now.setDate(now.getDate() + 30);
       return now;
     } else if (tier === 'premium') {

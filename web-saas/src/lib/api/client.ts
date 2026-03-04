@@ -370,7 +370,7 @@ export const webApi = {
   listAdminSubscriptions(params?: {
     query?: string;
     status?: 'active' | 'canceled' | 'past_due' | 'incomplete';
-    plan?: 'free' | 'premium' | 'pro' | 'team';
+    plan?: 'free' | 'starter' | 'premium' | 'pro' | 'team';
     renewalFrom?: string;
     renewalTo?: string;
     limit?: number;
@@ -397,7 +397,7 @@ export const webApi = {
   },
   updateAdminSubscriptionPlan(
     subscriptionId: string,
-    payload: { planType: 'free' | 'premium' | 'pro' | 'team' }
+    payload: { planType: 'free' | 'starter' | 'premium' | 'pro' | 'team' }
   ) {
     return apiRequest(`/admin/subscriptions/${subscriptionId}/plan`, {
       method: 'PATCH',

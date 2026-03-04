@@ -10,14 +10,14 @@ import { siteConfig } from '@/lib/seo/site';
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Compare Spokio IELTS plans across Free, Premium, Pro, and Team packages with monthly and annual billing options.',
+    'Compare Spokio IELTS plans across Free, Starter, Premium, Pro, and Team packages with monthly and annual billing options.',
   alternates: {
     canonical: '/pricing'
   },
   openGraph: {
     title: 'Spokio Pricing | IELTS Plans',
     description:
-      'Compare Spokio IELTS plans across Free, Premium, Pro, and Team packages with monthly and annual billing options.',
+      'Compare Spokio IELTS plans across Free, Starter, Premium, Pro, and Team packages with monthly and annual billing options.',
     url: '/pricing'
   }
 };
@@ -28,48 +28,61 @@ const plans = [
     name: 'Free',
     priceMonthly: '$0',
     priceAnnual: 'N/A',
-    note: 'Best for onboarding and baseline IELTS diagnostics',
+    note: 'Keep as acquisition funnel with a 3 practice sessions/week cap',
     bullets: [
       'One free full test with feedback and results',
-      '3 speaking practice sessions + 1 simulation each month',
-      'Unified account, progress, and entitlement foundation'
+      '3 practice sessions/week baseline',
+      'Baseline diagnostics and account foundation',
+      'Upgrade when you need more volume and deeper scoring'
+    ]
+  },
+  {
+    tier: 'starter',
+    name: 'Starter',
+    priceMonthly: '$9/mo',
+    priceAnnual: '$90/yr',
+    note: 'Bridge tier for price-sensitive learners',
+    bullets: [
+      'Basic AI feedback across modules',
+      'Core practice workflow without advanced analytics',
+      'Ideal first paid step before Premium'
     ]
   },
   {
     tier: 'premium',
     name: 'Premium',
-    priceMonthly: '$14/mo',
-    priceAnnual: '$140/yr',
-    note: 'For consistent daily prep across all modules',
+    priceMonthly: '$24/mo',
+    priceAnnual: '$240/yr',
+    note: 'Full AI evaluation across all 4 modules with progress tracking',
     bullets: [
-      'Expanded usage for speaking, writing, reading, and listening',
-      'Detailed AI rubric feedback with actionable weaknesses',
+      'Full AI evaluation across all IELTS modules',
+      'Detailed rubric feedback with actionable weaknesses',
       'Cross-module history and progress drill-down'
     ]
   },
   {
     tier: 'pro',
     name: 'Pro',
-    priceMonthly: '$29/mo',
-    priceAnnual: '$290/yr',
-    note: 'Recommended for high-intensity exam preparation',
+    priceMonthly: '$49/mo',
+    priceAnnual: '$490/yr',
+    note: 'Advanced analytics, priority AI, and custom study plans',
     bullets: [
       'Everything in Premium with priority scoring throughput',
-      'Higher-frequency full mocks and readiness analytics',
-      'Built for rapid band-improvement cycles',
+      'Advanced analytics and score prediction',
+      'Custom study plans for rapid band-improvement cycles',
       'Band Score Improvement Guarantee included'
     ]
   },
   {
     tier: 'team',
     name: 'Team',
-    priceMonthly: '$79/mo',
-    priceAnnual: '$790/yr',
-    note: 'For coaches and cohort-based IELTS programs',
+    priceMonthly: '$99/mo',
+    priceAnnual: '$990/yr per seat (min 5)',
+    note: 'Coach dashboard, student management, and group analytics',
     bullets: [
       'Everything in Pro with higher shared throughput',
-      'Operational support lane for billing and account management',
-      'Suitable for mentor-led programs and small institutions'
+      'Coach dashboard and student management controls',
+      'Group analytics for cohort-based IELTS programs'
     ]
   }
 ];
@@ -198,7 +211,7 @@ export default async function PricingPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-5 space-y-2">
             <p className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Long Runway</p>
-            <h4 className="font-semibold text-gray-900 dark:text-white">Free or Premium</h4>
+            <h4 className="font-semibold text-gray-900 dark:text-white">Free or Starter</h4>
             <p className="text-sm text-gray-500 dark:text-gray-400">Best when exam date is far and you are building stable habits.</p>
           </div>
           <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-5 space-y-2">
