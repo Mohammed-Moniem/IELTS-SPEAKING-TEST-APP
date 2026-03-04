@@ -809,9 +809,10 @@ export class WritingService {
     return doc as T;
   }
 
-  private hasRenderableTask(task: { title?: string; prompt?: string } | null | undefined) {
-    if (!task) return false;
-    return Boolean(task.title?.trim() && task.prompt?.trim());
+  private hasRenderableTask(task: unknown) {
+    if (!task || typeof task !== 'object') return false;
+    const candidate = task as { title?: string; prompt?: string };
+    return Boolean(candidate.title?.trim() && candidate.prompt?.trim());
   }
 
   private buildTaskPromptFingerprint(title: string, prompt: string, track: WritingTrack, taskType: WritingTaskType) {

@@ -68,3 +68,39 @@ ul {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Shared marketing hero surface (non-home pages) ───────────── */
+.marketing-hero-surface {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgba(196, 181, 253, 0.45);
+  background:
+    radial-gradient(120% 150% at 0% 100%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 42%),
+    radial-gradient(95% 120% at 100% 0%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 48%),
+    linear-gradient(135deg, #4c1d95 0%, #6d28d9 52%, #8b5cf6 100%);
+  box-shadow:
+    0 24px 56px rgba(76, 29, 149, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.marketing-hero-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.16) 0.7px, transparent 0.7px);
+  background-size: 26px 26px;
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.hero-elegant-title {
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  text-shadow: 0 6px 24px rgba(31, 4, 63, 0.28);
+}
+
+.hero-elegant-copy {
+  color: rgba(255, 255, 255, 0.88);
+}

@@ -14,11 +14,16 @@ import {
   Min,
   MinLength
 } from 'class-validator';
+import { GuideContentClass, GuideModule, GuidePageType, GuideState } from '@models/GuidePageModel';
 
 export class BlogListQuery {
   @IsOptional()
   @IsString()
   cluster?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 
   @IsOptional()
   @IsIn(['idea', 'outline', 'draft', 'qa_passed', 'pending_review', 'published', 'archived'])
@@ -309,4 +314,224 @@ export class AdvertiserCheckoutSessionRequest {
   @IsOptional()
   @IsString()
   couponCode?: string;
+}
+
+export class GuideTreeQuery {
+  @IsOptional()
+  @IsIn([
+    'speaking',
+    'writing',
+    'reading',
+    'listening',
+    'vocabulary',
+    'exam-strategy',
+    'band-scores',
+    'resources',
+    'faq',
+    'updates',
+    'offers',
+    'membership'
+  ])
+  module?: GuideModule;
+
+  @IsOptional()
+  @IsIn(['class_a_core_learning', 'class_b_reference', 'class_c_updates_promo'])
+  contentClass?: GuideContentClass;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class GuidePageQuery {
+  @IsOptional()
+  @IsString()
+  path?: string;
+}
+
+export class GuideSearchQuery {
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsIn([
+    'speaking',
+    'writing',
+    'reading',
+    'listening',
+    'vocabulary',
+    'exam-strategy',
+    'band-scores',
+    'resources',
+    'faq',
+    'updates',
+    'offers',
+    'membership'
+  ])
+  module?: GuideModule;
+
+  @IsOptional()
+  @IsIn([
+    'module_hub',
+    'question_bank',
+    'lesson',
+    'model_answer',
+    'faq_reference',
+    'update',
+    'offer',
+    'membership_info'
+  ])
+  pageType?: GuidePageType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class AdminGuidePagesQuery {
+  @IsOptional()
+  @IsIn(['inventory', 'mapped', 'outline_ready', 'drafting', 'review', 'qa_passed', 'published', 'archived'])
+  state?: GuideState;
+
+  @IsOptional()
+  @IsIn([
+    'speaking',
+    'writing',
+    'reading',
+    'listening',
+    'vocabulary',
+    'exam-strategy',
+    'band-scores',
+    'resources',
+    'faq',
+    'updates',
+    'offers',
+    'membership'
+  ])
+  module?: GuideModule;
+
+  @IsOptional()
+  @IsIn(['class_a_core_learning', 'class_b_reference', 'class_c_updates_promo'])
+  contentClass?: GuideContentClass;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class ImportGuideSitemapRequest {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  sitemaps?: string[];
+
+  @IsOptional()
+  @IsDateString()
+  inventoryDate?: string;
+}
+
+export class GenerateGuideOutlineRequest {
+  @IsOptional()
+  @IsString()
+  strategyHint?: string;
+}
+
+export class UpdateGuidePageRequest {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  metaTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  metaDescription?: string;
+
+  @IsOptional()
+  @IsString()
+  excerpt?: string;
+
+  @IsOptional()
+  @IsString()
+  bodyMarkdown?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  keyTakeaways?: string[];
+
+  @IsOptional()
+  @IsArray()
+  sourceUrls?: Array<Record<string, unknown> | string>;
+
+  @IsOptional()
+  @IsObject()
+  practiceBlocks?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  ctaConfig?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsIn(['inventory', 'mapped', 'outline_ready', 'drafting', 'review', 'qa_passed', 'published', 'archived'])
+  state?: GuideState;
+}
+
+export class ReviewGuidePageRequest {
+  @IsIn(['approved', 'rejected', 'changes_requested'])
+  decision!: 'approved' | 'rejected' | 'changes_requested';
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class GuideRefreshQueueRequest {
+  @IsOptional()
+  @IsIn([
+    'speaking',
+    'writing',
+    'reading',
+    'listening',
+    'vocabulary',
+    'exam-strategy',
+    'band-scores',
+    'resources',
+    'faq',
+    'updates',
+    'offers',
+    'membership'
+  ])
+  module?: GuideModule;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  limit?: number;
 }

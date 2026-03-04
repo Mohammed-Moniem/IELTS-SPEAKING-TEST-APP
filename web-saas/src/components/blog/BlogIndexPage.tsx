@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 
 import { ApiError, webApi } from '@/lib/api/client';
 import { listFallbackBlogPosts } from '@/lib/seo/blogFallback';
-import type { BlogPostSummary } from '@/lib/types';
+import type { BlogPostListResponse, BlogPostSummary } from '@/lib/types';
 import { EmptyState, ErrorState, SkeletonSet, StatusBadge } from '@/components/ui/v2';
 
-const POSTS_PER_PAGE = 24;
+const POSTS_PER_PAGE = 10;
 
 const ALL_CLUSTERS = [
   'all',
@@ -61,83 +61,154 @@ const formatDate = (value?: string) => {
   });
 };
 
+const buildQueryKey = (cluster: string, search: string) => `${cluster}::${search.toLowerCase()}`;
+const buildPageKey = (cluster: string, search: string, page: number) => `${buildQueryKey(cluster, search)}::${page}`;
+
 export function BlogIndexPage() {
-  const [allPosts, setAllPosts] = useState<BlogPostSummary[]>([]);
   const [cluster, setCluster] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pageCache, setPageCache] = useState<Record<string, BlogPostListResponse>>({});
+  const [queryMeta, setQueryMeta] = useState<Record<string, { total: number; totalPages: number }>>({});
 
-  const loadPosts = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const PAGE_SIZE = 100;
-      let offset = 0;
-      let accumulated: BlogPostSummary[] = [];
-      let hasMore = true;
-
-      while (hasMore) {
-        const payload = await webApi.listBlogPosts({ limit: PAGE_SIZE, offset });
-        accumulated = [...accumulated, ...payload.posts];
-        hasMore = payload.hasMore && payload.posts.length === PAGE_SIZE;
-        offset += PAGE_SIZE;
-      }
-
-      if (accumulated.length > 0) {
-        setAllPosts(accumulated);
-        return;
-      }
-      setAllPosts(listFallbackBlogPosts());
-    } catch (err) {
-      const fallback = listFallbackBlogPosts();
-      if (fallback.length > 0) {
-        setAllPosts(fallback);
-      } else {
-        setError(err instanceof ApiError ? err.message : 'Failed to load blog posts');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const cacheRef = useRef(pageCache);
+  const inFlightRef = useRef<Map<string, Promise<void>>>(new Map());
 
   useEffect(() => {
-    void loadPosts();
-  }, [loadPosts]);
+    cacheRef.current = pageCache;
+  }, [pageCache]);
 
-  const filtered = useMemo(() => {
-    let result = allPosts;
-    if (cluster !== 'all') {
-      result = result.filter(p => p.cluster === cluster);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        p =>
-          p.title.toLowerCase().includes(q) ||
-          (p.excerpt && p.excerpt.toLowerCase().includes(q)) ||
-          p.tags.some(tag => tag.toLowerCase().includes(q))
-      );
-    }
-    return result;
-  }, [allPosts, cluster, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / POSTS_PER_PAGE));
-  const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (currentPage - 1) * POSTS_PER_PAGE,
-    currentPage * POSTS_PER_PAGE
-  );
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 280);
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
 
   useEffect(() => {
     setPage(1);
   }, [cluster, search]);
 
-  const handleCluster = (c: string) => {
-    setCluster(c);
+  const queryKey = useMemo(() => buildQueryKey(cluster, search), [cluster, search]);
+  const currentPageKey = useMemo(() => buildPageKey(cluster, search, page), [cluster, search, page]);
+
+  const currentPayload = pageCache[currentPageKey];
+  const total = queryMeta[queryKey]?.total ?? currentPayload?.total ?? 0;
+  const totalPages = queryMeta[queryKey]?.totalPages ?? (currentPayload ? Math.max(1, Math.ceil(currentPayload.total / POSTS_PER_PAGE)) : 1);
+
+  const hydrateFallbackPage = useCallback(
+    (targetPage: number): BlogPostListResponse => {
+      const fallback = listFallbackBlogPosts();
+      let filtered = fallback;
+
+      if (cluster !== 'all') {
+        filtered = filtered.filter(post => post.cluster === cluster);
+      }
+
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(
+          post =>
+            post.title.toLowerCase().includes(q) ||
+            (post.excerpt && post.excerpt.toLowerCase().includes(q)) ||
+            post.tags.some(tag => tag.toLowerCase().includes(q))
+        );
+      }
+
+      const offset = (targetPage - 1) * POSTS_PER_PAGE;
+      const posts = filtered.slice(offset, offset + POSTS_PER_PAGE);
+      const result: BlogPostListResponse = {
+        posts,
+        total: filtered.length,
+        limit: POSTS_PER_PAGE,
+        offset,
+        hasMore: offset + posts.length < filtered.length
+      };
+
+      return result;
+    },
+    [cluster, search]
+  );
+
+  const loadPage = useCallback(
+    async (targetPage: number) => {
+      const pageKey = buildPageKey(cluster, search, targetPage);
+      if (cacheRef.current[pageKey]) return;
+
+      const existingRequest = inFlightRef.current.get(pageKey);
+      if (existingRequest) {
+        await existingRequest;
+        return;
+      }
+
+      const request = (async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+          const payload = await webApi.listBlogPosts({
+            cluster: cluster === 'all' ? undefined : cluster,
+            search: search || undefined,
+            limit: POSTS_PER_PAGE,
+            offset: (targetPage - 1) * POSTS_PER_PAGE
+          });
+
+          setPageCache(prev => ({
+            ...prev,
+            [pageKey]: payload
+          }));
+          setQueryMeta(prev => ({
+            ...prev,
+            [queryKey]: {
+              total: payload.total,
+              totalPages: Math.max(1, Math.ceil(payload.total / POSTS_PER_PAGE))
+            }
+          }));
+        } catch (err) {
+          const fallback = hydrateFallbackPage(targetPage);
+          if (fallback.total > 0) {
+            setPageCache(prev => ({
+              ...prev,
+              [pageKey]: fallback
+            }));
+            setQueryMeta(prev => ({
+              ...prev,
+              [queryKey]: {
+                total: fallback.total,
+                totalPages: Math.max(1, Math.ceil(fallback.total / POSTS_PER_PAGE))
+              }
+            }));
+            return;
+          }
+
+          setError(err instanceof ApiError ? err.message : 'Failed to load blog posts');
+        } finally {
+          inFlightRef.current.delete(pageKey);
+          setLoading(false);
+        }
+      })();
+
+      inFlightRef.current.set(pageKey, request);
+      await request;
+    },
+    [cluster, search, queryKey, hydrateFallbackPage]
+  );
+
+  useEffect(() => {
+    void loadPage(page);
+  }, [page, loadPage]);
+
+  const handleCluster = (nextCluster: string) => {
+    setCluster(nextCluster);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const hasCurrentPageData = Boolean(currentPayload);
+  const posts = currentPayload?.posts ?? [];
+  const showEmpty = !loading && !error && hasCurrentPageData && posts.length === 0;
 
   return (
     <div className="space-y-6" data-testid="marketing-blog-index">
@@ -153,7 +224,6 @@ export function BlogIndexPage() {
         </p>
       </section>
 
-      {/* Search */}
       <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="relative">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-gray-400">
@@ -161,15 +231,14 @@ export function BlogIndexPage() {
           </span>
           <input
             type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
             placeholder="Search articles by title, topic, or keyword…"
             className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
       </section>
 
-      {/* Cluster filter */}
       <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex flex-wrap items-center gap-2">
           {ALL_CLUSTERS.map(item => (
@@ -189,35 +258,34 @@ export function BlogIndexPage() {
         </div>
       </section>
 
-      {/* Results count */}
-      {!loading && !error && (
+      {!error ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Showing {paged.length} of {filtered.length} articles
+          Showing {posts.length} of {total} articles
           {cluster !== 'all' ? ` in ${clusterLabels[cluster] || cluster}` : ''}
-          {search.trim() ? ` matching "${search}"` : ''}
+          {search ? ` matching "${search}"` : ''}
         </p>
-      )}
-
-      {loading ? <SkeletonSet rows={6} /> : null}
-
-      {!loading && error ? (
-        <ErrorState body={error} onRetry={() => void loadPosts()} />
       ) : null}
 
-      {!loading && !error && filtered.length === 0 ? (
+      {loading && !hasCurrentPageData ? <SkeletonSet rows={6} /> : null}
+
+      {!loading && error && !hasCurrentPageData ? (
+        <ErrorState body={error} onRetry={() => void loadPage(page)} />
+      ) : null}
+
+      {showEmpty ? (
         <EmptyState
           title="No articles found"
           body={
-            search.trim()
+            search
               ? `No articles match "${search}". Try a different keyword or clear the search.`
               : 'No blog posts in this category yet. Check back shortly.'
           }
         />
       ) : null}
 
-      {!loading && !error && paged.length > 0 ? (
+      {!error && posts.length > 0 ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {paged.map(post => (
+          {posts.map(post => (
             <article
               key={post.id}
               className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3"
@@ -261,17 +329,16 @@ export function BlogIndexPage() {
         </section>
       ) : null}
 
-      {/* Pagination */}
-      {!loading && !error && totalPages > 1 ? (
+      {!error && totalPages > 1 ? (
         <nav
           className="flex items-center justify-center gap-2 pt-4"
           aria-label="Blog pagination"
         >
           <button
             type="button"
-            disabled={currentPage <= 1}
+            disabled={page <= 1 || loading}
             onClick={() => {
-              setPage(p => p - 1);
+              setPage(p => Math.max(1, p - 1));
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -279,13 +346,13 @@ export function BlogIndexPage() {
             Previous
           </button>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            Page {currentPage} of {totalPages}
+            Page {page} of {totalPages}
           </span>
           <button
             type="button"
-            disabled={currentPage >= totalPages}
+            disabled={loading || page >= totalPages || !currentPayload?.hasMore}
             onClick={() => {
-              setPage(p => p + 1);
+              setPage(p => Math.min(totalPages, p + 1));
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

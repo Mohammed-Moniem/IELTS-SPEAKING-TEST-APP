@@ -8,6 +8,16 @@ import { apiRequest, ApiError } from '@/lib/api/client';
 import { PageHeader, SectionCard, MetricCard, StatusBadge } from '@/components/ui/v2';
 import { ObjectiveAttempt } from '@/lib/types';
 
+const formatAnswerValue = (value: string | string[] | Record<string, string> | undefined) => {
+  if (typeof value === 'string') return value.trim() || '(empty)';
+  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '(empty)';
+  if (value && typeof value === 'object') {
+    const pairs = Object.entries(value).map(([key, entry]) => `${key}: ${entry}`);
+    return pairs.length > 0 ? pairs.join(', ') : '(empty)';
+  }
+  return '(empty)';
+};
+
 export default function ListeningHistoryDetailPage() {
   const params = useParams<{ attemptId: string }>();
   const [attempt, setAttempt] = useState<ObjectiveAttempt | null>(null);
@@ -68,7 +78,7 @@ export default function ListeningHistoryDetailPage() {
                       {answer.questionId}
                     </span>
                     <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">
-                      {answer.answer || '(empty)'}
+                      {formatAnswerValue(answer.answer)}
                     </span>
                     {answer.isCorrect === true ? (
                       <StatusBadge tone="success">✓ Correct</StatusBadge>

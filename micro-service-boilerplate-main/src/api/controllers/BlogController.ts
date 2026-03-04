@@ -21,6 +21,7 @@ export class BlogController {
     try {
       const data = await this.growthService.listPublicBlogPosts({
         cluster: query.cluster,
+        search: query.search,
         limit: query.limit,
         offset: query.offset
       });

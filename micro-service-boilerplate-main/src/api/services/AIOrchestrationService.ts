@@ -26,6 +26,88 @@ type CacheEntry = {
   value: unknown;
 };
 
+export type WritingTaskGenerationResult = {
+  title: string;
+  prompt: string;
+  instructions: string[];
+  suggestedTimeMinutes: number;
+  minimumWords: number;
+  tags: string[];
+  taskType: 'task1' | 'task2';
+};
+
+type ReadingQuestionType =
+  | 'multiple_choice_single'
+  | 'multiple_choice_multiple'
+  | 'true_false_not_given'
+  | 'yes_no_not_given'
+  | 'matching_headings'
+  | 'matching_information'
+  | 'matching_features'
+  | 'matching_sentence_endings'
+  | 'sentence_completion'
+  | 'summary_completion'
+  | 'note_table_flow_completion'
+  | 'diagram_label_completion'
+  | 'short_answer';
+
+export type ReadingGeneratedQuestion = {
+  questionId: string;
+  sectionId: 'p1' | 'p2' | 'p3';
+  type: ReadingQuestionType;
+  prompt: string;
+  explanation: string;
+  options?: string[];
+  answerSpec: {
+    kind: 'single' | 'multi' | 'ordered' | 'map';
+    value: string | string[] | Record<string, string>;
+    caseSensitive?: boolean;
+    maxWords?: number;
+  };
+};
+
+export type ReadingTaskGenerationResult = {
+  title: string;
+  schemaVersion: 'v2';
+  sectionCount: number;
+  sections: Array<{
+    sectionId: 'p1' | 'p2' | 'p3';
+    title: string;
+    passageText: string;
+    suggestedMinutes: number;
+    questions: ReadingGeneratedQuestion[];
+  }>;
+  passageTitle: string;
+  passageText: string;
+  suggestedTimeMinutes: number;
+  questions: Array<{
+    questionId: string;
+    type: ReadingQuestionType;
+    prompt: string;
+    options: string[];
+    correctAnswer: string;
+    explanation: string;
+  }>;
+  tags: string[];
+};
+
+export type ListeningTaskGenerationResult = {
+  title: string;
+  sectionTitle: string;
+  transcript: string;
+  audioUrl: string;
+  suggestedTimeMinutes: number;
+  questions: Array<{
+    questionId: string;
+    type: string;
+    prompt: string;
+    options?: string[];
+    correctAnswer: string;
+    explanation: string;
+  }>;
+  tags: string[];
+};
+
 const PLAN_TOKEN_CAP: Record<SubscriptionPlan, number> = {
   free: 3000,
   premium: 8000,
@@ -436,6 +518,103 @@ Constraints:
     });
   }
 
+  public async generateReadingDeepFeedback(
+    input: {
+      track: 'academic' | 'general';
+      score: number;
+      totalQuestions: number;
+      sectionStats: Array<{ sectionId: 'p1' | 'p2' | 'p3'; score: number; total: number }>;
+      questionTypeStats: Array<{ type: string; correct: number; total: number }>;
+      mistakes: Array<{
+        sectionId: 'p1' | 'p2' | 'p3';
+        questionId: string;
+        type: string;
+        userAnswer: string | string[] | Record<string, string>;
+        expectedAnswer: string | string[] | Record<string, string>;
+        feedbackHint?: string;
+      }>;
+      testTitle?: string;
+    },
+    options: { userId?: string; plan?: SubscriptionPlan }
+  ) {
+    return this.runStructuredTask({
+      userId: options.userId,
+      module: 'reading',
+      operation: 'evaluate-reading-deep',
+      plan: options.plan,
+      systemPrompt:
+        `You are an IELTS Reading tutor. Return strict JSON with keys:
+overallSummary, sectionCoaching[], questionTypeCoaching[], top5Fixes[], next24hPlan[], next7dPlan[].
+sectionCoaching[] item keys: sectionId, focusAreas[], traps[], drills[].
+questionTypeCoaching[] item keys: type, whyWrong[], fixes[], drills[].
+Use concrete, exam-practical language. Keep JSON valid with no markdown.`,
+      userPrompt: JSON.stringify(input),
+      fallback: () => {
+        const accuracy = input.totalQuestions > 0 ? (input.score / input.totalQuestions) * 100 : 0;
+        return {
+          overallSummary: `Estimated reading accuracy ${accuracy.toFixed(0)}%. Raise consistency by targeting your weakest question families first, then tightening passage evidence tracking.`,
+          sectionCoaching: input.sectionStats.map(section => ({
+            sectionId: section.sectionId,
+            focusAreas: [
+              `Section accuracy: ${section.score}/${section.total}`,
+              'Identify exact evidence lines before selecting an answer.'
+            ],
+            traps: [
+              'Answering from memory instead of passage text.',
+              'Rushing without checking qualifier words (only, mainly, except).'
+            ],
+            drills: [
+              '2 timed passages with evidence-underlining before answer commit.',
+              'Post-test error log by question type and trap reason.'
+            ]
+          })),
+          questionTypeCoaching: input.questionTypeStats.map(stat => ({
+            type: stat.type,
+            whyWrong:
+              stat.correct < stat.total
+                ? [
+                    'Misread keyword constraints in prompt/options.',
+                    'Insufficient elimination strategy for close distractors.'
+                  ]
+                : ['Performance is stable; maintain process discipline.'],
+            fixes: [
+              'Underline anchor words in both question and passage.',
+              'Use elimination before final answer selection.'
+            ],
+            drills: ['10-question focused set on this type with immediate review.']
+          })),
+          top5Fixes: [
+            'Match answers to exact passage evidence, not assumptions.',
+            'Prioritize accuracy in headings and matching groups.',
+            'Use a second-pass check for True/False/Not Given logic.',
+            'Cap time spent per hard question and return later.',
+            'Track recurring errors by type after every attempt.'
+          ],
+          next24hPlan: [
+            'Complete one timed mini-test and annotate evidence lines per answer.',
+            'Review all incorrect answers and classify by trap pattern.'
+          ],
+          next7dPlan: [
+            'Do 5 mixed reading sets and monitor type-level accuracy.',
+            'Repeat weakest two question families until >=80% accuracy.'
+          ]
+        };
+      }
+    });
+  }
+
+  public async generateModuleTask(
+    input: { module: 'writing'; track: 'academic' | 'general'; hints?: string[] },
+    options: { userId?: string; plan?: SubscriptionPlan }
+  ): Promise<WritingTaskGenerationResult>;
+  public async generateModuleTask(
+    input: { module: 'reading'; track: 'academic' | 'general'; hints?: string[] },
+    options: { userId?: string; plan?: SubscriptionPlan }
+  ): Promise<ReadingTaskGenerationResult>;
+  public async generateModuleTask(
+    input: { module: 'listening'; track: 'academic' | 'general'; hints?: string[] },
+    options: { userId?: string; plan?: SubscriptionPlan }
+  ): Promise<ListeningTaskGenerationResult>;
   public async generateModuleTask(
     input: {
       module: 'writing' | 'reading' | 'listening';
@@ -443,7 +622,7 @@ Constraints:
       hints?: string[];
     },
     options: { userId?: string; plan?: SubscriptionPlan }
-  ) {
+  ): Promise<WritingTaskGenerationResult | ReadingTaskGenerationResult | ListeningTaskGenerationResult> {
     return this.runStructuredTask({
       userId: options.userId,
       module: input.module,
@@ -632,35 +811,128 @@ Constraints:
           return pool[pickIndex];
         }
 
-        const questions = [
-          {
-            questionId: 'q1',
-            type: 'multiple_choice',
-            prompt: 'What is the main idea of the passage?',
-            options: ['A', 'B', 'C', 'D'],
-            correctAnswer: 'A',
-            explanation: 'Option A best matches the central argument.'
-          },
-          {
-            questionId: 'q2',
-            type: 'short_answer',
-            prompt: 'According to the text, what is one key challenge?',
-            correctAnswer: 'Limited access to resources',
-            explanation: 'The passage explicitly names resource access as a challenge.'
-          }
-        ];
-
         if (input.module === 'reading') {
+          const sectionTypes: ReadingQuestionType[] = [
+            'matching_headings',
+            'multiple_choice_single',
+            'true_false_not_given',
+            'summary_completion',
+            'short_answer',
+            'multiple_choice_multiple',
+            'matching_information',
+            'yes_no_not_given',
+            'sentence_completion',
+            'matching_features',
+            'matching_sentence_endings',
+            'note_table_flow_completion',
+            'diagram_label_completion'
+          ];
+          const makeQuestion = (sectionId: 'p1' | 'p2' | 'p3', index: number): ReadingGeneratedQuestion => {
+            const type = sectionTypes[(index - 1) % sectionTypes.length];
+            const base = {
+              questionId: `${sectionId}_q${index}`,
+              sectionId,
+              type,
+              prompt: `(${sectionId.toUpperCase()}-${index}) Answer based on the passage evidence.`,
+              explanation: 'Locate the exact sentence span that supports your answer.'
+            };
+            if (type === 'multiple_choice_single' || type === 'multiple_choice_multiple') {
+              return {
+                ...base,
+                options: ['A', 'B', 'C', 'D'],
+                answerSpec: {
+                  kind: type === 'multiple_choice_multiple' ? 'multi' : 'single',
+                  value: type === 'multiple_choice_multiple' ? ['A', 'C'] : 'A'
+                }
+              };
+            }
+            if (type === 'matching_features' || type === 'matching_information') {
+              return {
+                ...base,
+                options: ['A', 'B', 'C', 'D', 'E'],
+                answerSpec: { kind: 'single', value: 'B' }
+              };
+            }
+            if (type === 'matching_sentence_endings') {
+              return {
+                ...base,
+                options: ['i', 'ii', 'iii', 'iv', 'v', 'vi'],
+                answerSpec: { kind: 'single', value: 'iii' }
+              };
+            }
+            if (type === 'true_false_not_given' || type === 'yes_no_not_given') {
+              return {
+                ...base,
+                options: type === 'true_false_not_given' ? ['True', 'False', 'Not Given'] : ['Yes', 'No', 'Not Given'],
+                answerSpec: { kind: 'single', value: 'Not Given' }
+              };
+            }
+            return {
+              ...base,
+              answerSpec: { kind: 'single', value: 'sample answer', caseSensitive: false, maxWords: 3 }
+            };
+          };
+
+          const buildSection = (sectionId: 'p1' | 'p2' | 'p3', start: number, count: number) => ({
+            sectionId,
+            title: `Passage ${sectionId === 'p1' ? 1 : sectionId === 'p2' ? 2 : 3}`,
+            passageText:
+              sectionId === 'p1'
+                ? 'Passage 1 discusses public policy implementation and evidence-based decision making in urban infrastructure.'
+                : sectionId === 'p2'
+                  ? 'Passage 2 examines contrasting expert viewpoints and case studies across education and workforce transitions.'
+                  : 'Passage 3 provides advanced analytical arguments with competing interpretations and nuanced claims.',
+            suggestedMinutes: 20,
+            questions: Array.from({ length: count }, (_, offset) => makeQuestion(sectionId, start + offset))
+          });
+
+          const sections: ReadingTaskGenerationResult['sections'] = [
+            buildSection('p1', 1, 13),
+            buildSection('p2', 14, 13),
+            buildSection('p3', 27, 14)
+          ];
+
+          const questions = sections.flatMap(section =>
+            section.questions.map(question => ({
+              questionId: question.questionId,
+              type: question.type,
+              prompt: question.prompt,
+              options: Array.isArray(question.options) ? question.options : [],
+              correctAnswer: typeof question.answerSpec?.value === 'string' ? question.answerSpec.value : '',
+              explanation: question.explanation || ''
+            }))
+          );
+
           return {
             title: `${input.track.toUpperCase()} Reading Practice`,
-            passageTitle: 'Urban Planning and Livability',
-            passageText:
-              'Cities are increasingly balancing growth with sustainability. Policy makers now evaluate transportation, housing, and public space in integrated frameworks.',
-            suggestedTimeMinutes: 20,
+            schemaVersion: 'v2',
+            sectionCount: 3,
+            sections,
+            passageTitle: sections[0].title,
+            passageText: sections[0].passageText,
+            suggestedTimeMinutes: 60,
             questions,
             tags: ['urban', 'policy']
           };
         }
+
+        const questions = [
+          {
+            questionId: 'q1',
+            type: 'multiple_choice',
+            prompt: 'What is the main idea of the section?',
+            options: ['A', 'B', 'C', 'D'],
+            correctAnswer: 'A',
+            explanation: 'Option A best matches the central idea.'
+          },
+          {
+            questionId: 'q2',
+            type: 'short_answer',
+            prompt: 'According to the audio, what is one key challenge?',
+            correctAnswer: 'Limited access to resources',
+            explanation: 'The section explicitly names resource access as a challenge.'
+          }
+        ];
 
         return {
           title: `${input.track.toUpperCase()} Listening Practice`,

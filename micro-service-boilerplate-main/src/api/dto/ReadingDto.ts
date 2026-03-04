@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsDefined, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StartReadingTestRequest {
@@ -11,8 +11,12 @@ export class ReadingAnswerInput {
   @IsString()
   questionId!: string;
 
-  @IsString()
-  answer!: string;
+  @IsOptional()
+  @IsIn(['p1', 'p2', 'p3'])
+  sectionId?: 'p1' | 'p2' | 'p3';
+
+  @IsDefined()
+  answer!: string | string[] | Record<string, string>;
 }
 
 export class SubmitReadingTestRequest {

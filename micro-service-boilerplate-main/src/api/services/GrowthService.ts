@@ -68,6 +68,7 @@ export class GrowthService {
 
   public async listPublicBlogPosts(query: {
     cluster?: string;
+    search?: string;
     limit?: number;
     offset?: number;
   }) {
@@ -80,6 +81,16 @@ export class GrowthService {
 
     if (query.cluster) {
       filter.cluster = query.cluster;
+    }
+    const searchTerm = query.search?.trim();
+    if (searchTerm) {
+      const safePattern = this.escapeRegex(searchTerm);
+      filter.$or = [
+        { title: { $regex: safePattern, $options: 'i' } },
+        { excerpt: { $regex: safePattern, $options: 'i' } },
+        { body: { $regex: safePattern, $options: 'i' } },
+        { tags: { $regex: safePattern, $options: 'i' } }
+      ];
     }
 
     const [rows, total] = await Promise.all([

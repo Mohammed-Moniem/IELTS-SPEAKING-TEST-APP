@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import ReadingEngine from '@/components/reading/ReadingEngine';
 import { ModalConfirm, SessionStatusStrip, PageHeader, SectionCard, StatusBadge } from '@/components/ui/v2';
 import { apiRequest, ApiError, handleUsageLimitRedirect, webApi } from '@/lib/api/client';
 import {
@@ -19,6 +20,8 @@ type ObjectiveStartResponse = {
   test: ObjectiveTestPayload;
 };
 
+type AnswerValue = string | string[] | Record<string, string>;
+
 const examStorageKey = 'spokio.web.full-exam.resume';
 
 const moduleOrder: IELTSModule[] = ['speaking', 'writing', 'reading', 'listening'];
@@ -35,6 +38,13 @@ const isEditableTarget = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
   return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
+};
+
+const isAnswered = (value: AnswerValue | undefined) => {
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === 'object') return Object.keys(value).length > 0;
+  return false;
 };
 
 const moduleMeta: Record<IELTSModule, { title: string; duration: string; description: string; chips: string[]; icon: string }> = {
@@ -95,10 +105,8 @@ export default function TestsPage() {
   const [reading, setReading] = useState<{
     attemptId: string;
     test: ObjectiveTestPayload | null;
-    answers: Record<string, string>;
+    answers: Record<string, AnswerValue>;
   }>({ attemptId: '', test: null, answers: {} });
-  const [readingActiveQuestionIndex, setReadingActiveQuestionIndex] = useState(0);
-  const [readingFlaggedQuestionIds, setReadingFlaggedQuestionIds] = useState<string[]>([]);
 
   const [listening, setListening] = useState<{
     attemptId: string;
@@ -120,12 +128,23 @@ export default function TestsPage() {
   );
   const writingMinimumWords = writing.task?.minimumWords || 0;
 
-  const readingQuestionCount = reading.test?.questions.length || 0;
-  const readingAnsweredCount = reading.test
-    ? reading.test.questions.reduce((count, question) => (reading.answers[question.questionId] ? count + 1 : count), 0)
-    : 0;
-  const readingUnsolvedCount = Math.max(0, readingQuestionCount - readingAnsweredCount);
-  const readingCurrentQuestionId = reading.test?.questions[readingActiveQuestionIndex]?.questionId;
+  const readingQuestions = reading.test
+    ? (reading.test.sections?.length
+      ? reading.test.sections.flatMap(section =>
+        section.questions.map(question => ({
+          ...question,
+          sectionId: question.sectionId || section.sectionId
+        }))
+      )
+      : reading.test.questions)
+    : [];
+  const readingQuestionCountResolved = readingQuestions.length;
+  const readingQuestionCount = readingQuestionCountResolved;
+  const readingAnsweredCount = readingQuestions.reduce(
+    (count, question) => (isAnswered(reading.answers[question.questionId]) ? count + 1 : count),
+    0
+  );
+  const readingUnsolvedCount = Math.max(0, readingQuestionCountResolved - readingAnsweredCount);
 
   const listeningQuestionCount = listening.test?.questions.length || 0;
   const listeningAnsweredCount = listening.test
@@ -406,8 +425,6 @@ export default function TestsPage() {
         body: JSON.stringify({ track })
       });
       setReading({ attemptId: started.attemptId, test: started.test, answers: {} });
-      setReadingActiveQuestionIndex(0);
-      setReadingFlaggedQuestionIds([]);
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to start reading section');
@@ -422,11 +439,13 @@ export default function TestsPage() {
     setError('');
     setLoading(true);
     try {
+      const questions = readingQuestions;
       const submission = await apiRequest<{ normalizedBand?: number }>(`/reading/tests/${reading.attemptId}/submit`, {
         method: 'POST',
         body: JSON.stringify({
-          answers: reading.test.questions.map(question => ({
+          answers: questions.map(question => ({
             questionId: question.questionId,
+            sectionId: question.sectionId,
             answer: reading.answers[question.questionId] || ''
           })),
           durationSeconds: 0
@@ -496,7 +515,7 @@ export default function TestsPage() {
       return (
         <select className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40" value={value} onChange={event => onChange(event.target.value)}>
           <option value="">Select</option>
-          {question.options.map(option => (
+          {question.options.map((option: string) => (
             <option key={option} value={option}>
               {option}
             </option>
@@ -508,64 +527,42 @@ export default function TestsPage() {
     return <input className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40" value={value} onChange={event => onChange(event.target.value)} placeholder="Answer" />;
   };
 
-  const goToNextQuestion = () => {
-    if (activeModule === 'reading' && readingQuestionCount > 0) {
-      setReadingActiveQuestionIndex(prev => Math.min(readingQuestionCount - 1, prev + 1));
-    } else if (activeModule === 'listening' && listeningQuestionCount > 0) {
+  const goToNextQuestion = useCallback(() => {
+    if (activeModule === 'listening' && listeningQuestionCount > 0) {
       setListeningActiveQuestionIndex(prev => Math.min(listeningQuestionCount - 1, prev + 1));
     }
-  };
+  }, [activeModule, listeningQuestionCount]);
 
-  const goToPreviousQuestion = () => {
-    if (activeModule === 'reading' && readingQuestionCount > 0) {
-      setReadingActiveQuestionIndex(prev => Math.max(0, prev - 1));
-    } else if (activeModule === 'listening' && listeningQuestionCount > 0) {
+  const goToPreviousQuestion = useCallback(() => {
+    if (activeModule === 'listening' && listeningQuestionCount > 0) {
       setListeningActiveQuestionIndex(prev => Math.max(0, prev - 1));
     }
-  };
+  }, [activeModule, listeningQuestionCount]);
 
-  const toggleCurrentQuestionFlag = () => {
-    if (activeModule === 'reading' && readingCurrentQuestionId) {
-      setReadingFlaggedQuestionIds(prev =>
-        prev.includes(readingCurrentQuestionId)
-          ? prev.filter(id => id !== readingCurrentQuestionId)
-          : [...prev, readingCurrentQuestionId]
-      );
-    } else if (activeModule === 'listening' && listeningCurrentQuestionId) {
+  const toggleCurrentQuestionFlag = useCallback(() => {
+    if (activeModule === 'listening' && listeningCurrentQuestionId) {
       setListeningFlaggedQuestionIds(prev =>
         prev.includes(listeningCurrentQuestionId)
           ? prev.filter(id => id !== listeningCurrentQuestionId)
           : [...prev, listeningCurrentQuestionId]
       );
     }
-  };
+  }, [activeModule, listeningCurrentQuestionId]);
 
-  const triggerSubmitReview = () => {
-    const canReview =
-      (activeModule === 'reading' && !!reading.test) ||
-      (activeModule === 'listening' && !!listening.test);
+  const triggerSubmitReview = useCallback(() => {
+    const canReview = activeModule === 'listening' && !!listening.test;
 
     if (canReview) {
       setShowSubmitReviewModal(true);
     }
-  };
+  }, [activeModule, listening.test]);
 
   const confirmSubmitReview = async () => {
     setShowSubmitReviewModal(false);
-    if (activeModule === 'reading') {
-      await submitReadingSection();
-      return;
-    }
     if (activeModule === 'listening') {
       await submitListeningSection();
     }
   };
-
-  useEffect(() => {
-    if (!reading.test) return;
-    if (readingActiveQuestionIndex < reading.test.questions.length) return;
-    setReadingActiveQuestionIndex(Math.max(0, reading.test.questions.length - 1));
-  }, [reading.test, readingActiveQuestionIndex]);
 
   useEffect(() => {
     if (!listening.test) return;
@@ -574,9 +571,7 @@ export default function TestsPage() {
   }, [listening.test, listeningActiveQuestionIndex]);
 
   useEffect(() => {
-    const hasQuestionFlow =
-      (activeModule === 'reading' && !!reading.test) ||
-      (activeModule === 'listening' && !!listening.test);
+    const hasQuestionFlow = activeModule === 'listening' && !!listening.test;
     if (!hasQuestionFlow) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -611,7 +606,7 @@ export default function TestsPage() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [activeModule, reading.test, listening.test, readingActiveQuestionIndex, listeningActiveQuestionIndex, readingCurrentQuestionId, listeningCurrentQuestionId]);
+  }, [activeModule, listening.test, goToNextQuestion, goToPreviousQuestion, toggleCurrentQuestionFlag, triggerSubmitReview]);
 
   // Resume hydration intentionally runs once on mount; it restores the last saved exam context.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -807,7 +802,7 @@ export default function TestsPage() {
                       : `${listeningUnsolvedCount} unsolved`
               }
               actions={
-                activeModule === 'reading' || activeModule === 'listening' ? (
+                activeModule === 'listening' ? (
                   <>
                     <button
                       type="button"
@@ -838,12 +833,21 @@ export default function TestsPage() {
                       Review
                     </button>
                   </>
+                ) : activeModule === 'reading' && reading.test ? (
+                  <button
+                    type="button"
+                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                    onClick={() => void submitReadingSection()}
+                    disabled={loading}
+                  >
+                    {loading ? 'Submitting...' : 'Submit'}
+                  </button>
                 ) : null
               }
             />
           ) : null}
 
-          {activeModule === 'reading' || activeModule === 'listening' ? (
+          {activeModule === 'listening' ? (
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Shortcuts: <strong>N</strong>/<strong>→</strong> next, <strong>P</strong>/<strong>←</strong> previous,{' '}
               <strong>F</strong> flag, <strong>Ctrl/Cmd + Enter</strong> submit review.
@@ -951,55 +955,14 @@ export default function TestsPage() {
                   <button className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 disabled:opacity-50 disabled:hover:translate-y-0" onClick={() => void startReadingSection()} disabled={loading}>Start Reading Section</button>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    {reading.test.questions.map((question, index) => {
-                      const isActive = index === readingActiveQuestionIndex;
-                      const isFlagged = readingFlaggedQuestionIds.includes(question.questionId);
-                      return (
-                        <label
-                          key={question.questionId}
-                          className={`block space-y-3 rounded-2xl border p-5 transition-all duration-300 shadow-sm ${isActive
-                            ? 'border-violet-300 bg-violet-50/80 shadow-md ring-4 ring-violet-50 dark:border-violet-500/40 dark:bg-violet-500/10 dark:ring-violet-900/20 scale-[1.01]'
-                            : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 opacity-80 hover:opacity-100'
-                            }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800/60 pb-3">
-                            <span className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-widest ${isActive ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
-                              Question {index + 1}
-                            </span>
-                            {isFlagged ? (
-                              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                                <span className="material-symbols-outlined text-[14px]">flag</span> Flagged
-                              </span>
-                            ) : null}
-                          </div>
-                          <span className="block text-base font-semibold leading-relaxed text-gray-800 dark:text-gray-200">{question.prompt}</span>
-                          <div
-                            onFocusCapture={() => setReadingActiveQuestionIndex(index)}
-                            onClick={() => setReadingActiveQuestionIndex(index)}
-                            className="pt-1"
-                          >
-                            {renderObjectiveQuestionInput(question, reading.answers[question.questionId] || '', value =>
-                              setReading(prev => ({
-                                ...prev,
-                                answers: {
-                                  ...prev.answers,
-                                  [question.questionId]: value
-                                }
-                              }))
-                            )}
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <button className="flex items-center gap-2 rounded-xl bg-violet-600 px-8 py-3 text-sm font-bold text-white shadow-xl shadow-violet-500/20 transition-all hover:-translate-y-0.5 hover:bg-violet-700 disabled:opacity-50 disabled:hover:translate-y-0" onClick={triggerSubmitReview} disabled={loading}>
-                      <span className="material-symbols-outlined text-[20px]">fact_check</span>  Open Reading Review
-                    </button>
-                  </div>
-                </div>
+                <ReadingEngine
+                  compact
+                  test={reading.test}
+                  answers={reading.answers}
+                  onChangeAnswers={next => setReading(prev => ({ ...prev, answers: next }))}
+                  onSubmit={() => void submitReadingSection()}
+                  submitting={loading}
+                />
               )}
             </SectionCard>
           ) : null}
@@ -1094,8 +1057,8 @@ export default function TestsPage() {
 
       {showSubmitReviewModal ? (
         <ModalConfirm
-          title="Submit Section Review"
-          subtitle="Confirm unanswered and flagged items before submitting."
+          title="Submit Listening Review"
+          subtitle="Confirm unanswered and flagged listening items before submitting."
           confirmLabel="Submit Section"
           cancelLabel="Keep Reviewing"
           onCancel={() => setShowSubmitReviewModal(false)}
@@ -1103,14 +1066,6 @@ export default function TestsPage() {
           disabled={loading}
         >
           <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
-            {activeModule === 'reading' ? (
-              <>
-                <p>
-                  Reading: {readingAnsweredCount}/{readingQuestionCount} answered, {readingUnsolvedCount} unsolved.
-                </p>
-                <p>Flagged questions: {readingFlaggedQuestionIds.length}</p>
-              </>
-            ) : null}
             {activeModule === 'listening' ? (
               <>
                 <p>

@@ -485,9 +485,10 @@ export const webApi = {
   getPayoutBatchDetail(batchId: string) {
     return apiRequest<PayoutBatchDetail>(`/admin/partners/payout-batches/${batchId}`);
   },
-  listBlogPosts(params?: { cluster?: string; limit?: number; offset?: number }) {
+  listBlogPosts(params?: { cluster?: string; search?: string; limit?: number; offset?: number }) {
     const query = new URLSearchParams();
     if (params?.cluster) query.set('cluster', params.cluster);
+    if (params?.search) query.set('search', params.search);
     if (typeof params?.limit === 'number') query.set('limit', String(params.limit));
     if (typeof params?.offset === 'number') query.set('offset', String(params.offset));
     return apiRequest<BlogPostListResponse>(`/blog/posts${query.toString() ? `?${query.toString()}` : ''}`, {

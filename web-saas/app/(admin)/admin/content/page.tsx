@@ -32,6 +32,30 @@ export default function AdminContentPage() {
     title: '',
     subtitle: '',
     bodyText: '',
+    sectionsJson:
+      '[\n' +
+      '  {\n' +
+      '    "sectionId": "p1",\n' +
+      '    "title": "Passage 1",\n' +
+      '    "passageText": "",\n' +
+      '    "suggestedMinutes": 20,\n' +
+      '    "questions": []\n' +
+      '  },\n' +
+      '  {\n' +
+      '    "sectionId": "p2",\n' +
+      '    "title": "Passage 2",\n' +
+      '    "passageText": "",\n' +
+      '    "suggestedMinutes": 20,\n' +
+      '    "questions": []\n' +
+      '  },\n' +
+      '  {\n' +
+      '    "sectionId": "p3",\n' +
+      '    "title": "Passage 3",\n' +
+      '    "passageText": "",\n' +
+      '    "suggestedMinutes": 20,\n' +
+      '    "questions": []\n' +
+      '  }\n' +
+      ']',
     transcript: '',
     audioUrl: '',
     suggestedTimeMinutes: '20',
@@ -66,8 +90,17 @@ export default function AdminContentPage() {
     } as Record<string, unknown>;
 
     if (moduleName === 'reading') {
-      base.passageTitle = objectiveForm.subtitle.trim();
-      base.passageText = objectiveForm.bodyText.trim();
+      const sections = JSON.parse(objectiveForm.sectionsJson || '[]');
+      const firstSection = Array.isArray(sections) ? sections[0] : null;
+      const flattenedQuestions = Array.isArray(sections)
+        ? sections.flatMap((section: any) => (Array.isArray(section?.questions) ? section.questions : []))
+        : [];
+      base.schemaVersion = 'v2';
+      base.sectionCount = Array.isArray(sections) ? sections.length : 0;
+      base.sections = sections;
+      base.passageTitle = firstSection?.title || objectiveForm.subtitle.trim() || 'Passage 1';
+      base.passageText = firstSection?.passageText || objectiveForm.bodyText.trim();
+      base.questions = flattenedQuestions;
     } else {
       base.sectionTitle = objectiveForm.subtitle.trim();
       base.transcript = objectiveForm.transcript.trim();
@@ -92,6 +125,22 @@ export default function AdminContentPage() {
       return 'Title is required.';
     }
 
+    if (moduleName === 'reading') {
+      try {
+        const sections = JSON.parse(objectiveForm.sectionsJson || '[]');
+        if (!Array.isArray(sections) || sections.length === 0) {
+          return 'Reading sections JSON must include at least one section.';
+        }
+        const hasQuestions = sections.some((section: any) => Array.isArray(section?.questions) && section.questions.length > 0);
+        if (!hasQuestions) {
+          return 'Reading sections must include questions.';
+        }
+      } catch {
+        return 'Reading sections JSON is invalid.';
+      }
+      return '';
+    }
+
     try {
       const parsed = JSON.parse(objectiveForm.questionsJson || '[]');
       if (!Array.isArray(parsed) || parsed.length === 0) {
@@ -99,10 +148,6 @@ export default function AdminContentPage() {
       }
     } catch {
       return 'Questions JSON is invalid.';
-    }
-
-    if (moduleName === 'reading' && !objectiveForm.bodyText.trim()) {
-      return 'Passage text is required for reading content.';
     }
 
     return '';
@@ -195,6 +240,21 @@ export default function AdminContentPage() {
       title: record.title || '',
       subtitle: record.passageTitle || record.sectionTitle || '',
       bodyText: record.passageText || '',
+      sectionsJson: JSON.stringify(
+        Array.isArray(record.sections) && record.sections.length > 0
+          ? record.sections
+          : [
+              {
+                sectionId: 'p1',
+                title: record.passageTitle || 'Passage 1',
+                passageText: record.passageText || '',
+                suggestedMinutes: 20,
+                questions: record.questions || []
+              }
+            ],
+        null,
+        2
+      ),
       transcript: record.transcript || '',
       audioUrl: record.audioUrl || '',
       suggestedTimeMinutes: String(record.suggestedTimeMinutes || 20),
@@ -318,8 +378,8 @@ export default function AdminContentPage() {
             </label>
             {moduleName === 'reading' ? (
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Passage text</span>
-                <textarea className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-h-[100px]" value={objectiveForm.bodyText} onChange={event => setObjectiveForm(prev => ({ ...prev, bodyText: event.target.value }))} />
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sections JSON (p1/p2/p3)</span>
+                <textarea className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 min-h-[220px]" value={objectiveForm.sectionsJson} onChange={event => setObjectiveForm(prev => ({ ...prev, sectionsJson: event.target.value }))} />
               </label>
             ) : (
               <>

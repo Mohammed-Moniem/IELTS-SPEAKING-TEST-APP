@@ -352,17 +352,54 @@ export interface WritingSubmission {
 
 export interface ObjectiveQuestion {
   questionId: string;
-  type: string;
+  sectionId?: 'p1' | 'p2' | 'p3';
+  groupId?: string;
+  type:
+    | 'multiple_choice'
+    | 'multiple_choice_single'
+    | 'multiple_choice_multiple'
+    | 'true_false_not_given'
+    | 'yes_no_not_given'
+    | 'matching_headings'
+    | 'matching_information'
+    | 'matching_features'
+    | 'matching_sentence_endings'
+    | 'sentence_completion'
+    | 'summary_completion'
+    | 'note_table_flow_completion'
+    | 'diagram_label_completion'
+    | 'short_answer'
+    | string;
   prompt: string;
+  instructions?: string;
   options?: string[];
+  answerSpec?: {
+    kind: 'single' | 'multi' | 'ordered' | 'map';
+    value: string | string[] | Record<string, string>;
+    caseSensitive?: boolean;
+    maxWords?: number;
+  };
+  explanation?: string;
   correctAnswer?: string;
+}
+
+export interface ObjectivePassageSection {
+  sectionId: 'p1' | 'p2' | 'p3';
+  title: string;
+  passageText: string;
+  suggestedMinutes: number;
+  questions: ObjectiveQuestion[];
 }
 
 export interface ObjectiveTestPayload {
   testId: string;
   title: string;
   track: IELTSModuleTrack;
+  schemaVersion?: 'v1' | 'v2';
+  sectionCount?: number;
+  sections?: ObjectivePassageSection[];
   questions: ObjectiveQuestion[];
+  passageTitle?: string;
   passageText?: string;
   transcript?: string;
   audioUrl?: string;
@@ -371,13 +408,54 @@ export interface ObjectiveTestPayload {
 
 export interface ObjectiveAnswer {
   questionId: string;
-  answer: string;
+  sectionId?: 'p1' | 'p2' | 'p3';
+  answer: string | string[] | Record<string, string>;
   isCorrect?: boolean;
+  questionType?: string;
+  expectedAnswer?: string | string[] | Record<string, string>;
+  feedbackHint?: string;
 }
 
 export interface ObjectiveAttempt {
   _id: string;
   attemptId?: string;
+  schemaVersion?: 'v1' | 'v2';
+  feedbackVersion?: 'v1' | 'v2';
+  deepFeedbackReady?: boolean;
+  deepFeedback?: {
+    overallSummary?: string;
+    sectionCoaching?: Array<{
+      sectionId: 'p1' | 'p2' | 'p3';
+      focusAreas?: string[];
+      traps?: string[];
+      drills?: string[];
+    }>;
+    questionTypeCoaching?: Array<{
+      type: string;
+      whyWrong?: string[];
+      fixes?: string[];
+      drills?: string[];
+    }>;
+    top5Fixes?: string[];
+    next24hPlan?: string[];
+    next7dPlan?: string[];
+  };
+  sectionProgress?: Array<{
+    sectionId: 'p1' | 'p2' | 'p3';
+    answeredCount: number;
+    totalCount: number;
+    correctCount: number;
+  }>;
+  sectionStats?: Array<{
+    sectionId: 'p1' | 'p2' | 'p3';
+    score: number;
+    total: number;
+  }>;
+  questionTypeStats?: Array<{
+    type: string;
+    correct: number;
+    total: number;
+  }>;
   normalizedBand?: number;
   score?: number;
   totalQuestions?: number;
