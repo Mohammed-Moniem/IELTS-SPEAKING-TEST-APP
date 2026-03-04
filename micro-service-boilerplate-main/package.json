@@ -20,6 +20,7 @@
     "db:check": "ts-node -e \"require('./test/utils/mongodb-setup').MongoDBSetup.checkConnection()\"",
     "db:migrate:supabase": "ts-node scripts/migrate-mongo-to-supabase.ts",
     "db:verify:parity": "ts-node scripts/verify-mongo-supabase-parity.ts",
+    "seed:writing-bank": "ts-node -r tsconfig-paths/register scripts/seedWritingTaskBank.ts",
     "partners:backfill:influencers": "ts-node -r tsconfig-paths/register scripts/backfill-influencer-coupons-to-partners.ts",
     "partners:reconcile:targets": "ts-node -r tsconfig-paths/register scripts/reconcile-partner-targets.ts",
     "test:e2e:setup": "npm run db:setup",

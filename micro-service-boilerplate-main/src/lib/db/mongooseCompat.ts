@@ -2,7 +2,7 @@ import { env } from '@env';
 import { Logger } from '@lib/logger';
 import { Aggregator, Query } from 'mingo';
 import { ObjectId as MongoObjectId } from 'mongodb';
-import { deleteRowsByIds, loadTableRows, upsertRow } from './documentStore';
+import { countTableRows, deleteRowsByIds, loadTableRows, queryTableRows, upsertRow } from './documentStore';
 import { generateMongoStyleId, isMongoStyleId, normalizeMongoStyleId } from './id';
 import { checkPgConnection } from './pgClient';
 import { MODEL_TABLE_MAP } from './tableMappings';
@@ -57,6 +57,14 @@ interface FindOptions {
   limit?: number;
   populate?: PopulateSpec[];
   lean?: boolean;
+}
+
+interface QueryRowsOptions {
+  filter: PlainObject;
+  sort?: SortSpec;
+  skip?: number;
+  limit?: number;
+  single?: boolean;
 }
 
 const isObject = (value: unknown): value is PlainObject => {
@@ -1082,12 +1090,13 @@ class CompatQuery<T = any> implements PromiseLike<T> {
       const populated: PlainObject[] = [];
 
       for (const entry of current) {
-        const normalizedId = normalizeMongoStyleId(String(normalizeQueryValue(entry)));
-        if (!normalizedId) {
+        const rawId = String(normalizeQueryValue(entry) || '').trim();
+        if (!rawId) {
           continue;
         }
+        const lookupId = normalizeMongoStyleId(rawId) || rawId;
 
-        const refDoc = await refModel.findById(normalizedId).lean().exec();
+        const refDoc = await refModel.findById(lookupId).lean().exec();
         if (!refDoc) continue;
 
         populated.push(applyProjection(refDoc, projection, refModel.schema.getMetadata().hiddenFields, false));
@@ -1097,12 +1106,13 @@ class CompatQuery<T = any> implements PromiseLike<T> {
       return;
     }
 
-    const normalizedId = normalizeMongoStyleId(String(normalizeQueryValue(current)));
-    if (!normalizedId) {
+    const rawId = String(normalizeQueryValue(current) || '').trim();
+    if (!rawId) {
       return;
     }
+    const lookupId = normalizeMongoStyleId(rawId) || rawId;
 
-    const refDoc = await refModel.findById(normalizedId).lean().exec();
+    const refDoc = await refModel.findById(lookupId).lean().exec();
     if (!refDoc) {
       return;
     }
@@ -1112,13 +1122,23 @@ class CompatQuery<T = any> implements PromiseLike<T> {
 
   public async exec(): Promise<any> {
     const metadata: SchemaMetadata = this.model.schema.getMetadata();
-    const rows = await this.model.__loadRows();
-    const filtered = rows.filter((row: PlainObject) => matchesFilter(row, this.options.filter || {}));
-    const sorted = applySort(filtered, this.sortSpec);
+    const queriedRows = await this.model.__queryRows({
+      filter: this.options.filter || {},
+      sort: this.sortSpec,
+      skip: this.skipCount,
+      limit: this.limitCount,
+      single: this.options.single
+    } as QueryRowsOptions);
 
-    const skip = this.skipCount || 0;
-    const limit = this.limitCount;
-    const sliced = sorted.slice(skip, limit !== undefined ? skip + limit : undefined);
+    let sliced = queriedRows;
+    if (!sliced) {
+      const rows = await this.model.__loadRows();
+      const filtered = rows.filter((row: PlainObject) => matchesFilter(row, this.options.filter || {}));
+      const sorted = applySort(filtered, this.sortSpec);
+      const skip = this.skipCount || 0;
+      const limit = this.limitCount;
+      sliced = sorted.slice(skip, limit !== undefined ? skip + limit : undefined);
+    }
 
     const hydrated = sliced.map((raw: PlainObject) => {
       const value = hydrateValue(raw, '', metadata.mapFields) as PlainObject;
@@ -1199,6 +1219,10 @@ const createDocumentClass = (name: string, schema: Schema): any => {
       void getEffectiveReadMode();
 
       const rows = await loadTableRows(this.tableName);
+      return this.__mapStoredRows(rows);
+    }
+
+    private static __mapStoredRows(rows: Array<{ id: string; data: PlainObject; createdAt: string; updatedAt: string }>): PlainObject[] {
       return rows.map(row => {
         const data = cloneDeep(row.data || {});
         data._id = row.id;
@@ -1216,6 +1240,25 @@ const createDocumentClass = (name: string, schema: Schema): any => {
 
         return data;
       });
+    }
+
+    public static async __queryRows(options: QueryRowsOptions): Promise<PlainObject[] | null> {
+      void getEffectiveReadMode();
+
+      const rows = await queryTableRows(this.tableName, {
+        filter: options.filter || {},
+        sort: options.sort,
+        skip: options.skip,
+        limit: options.limit,
+        single: options.single
+      });
+      if (!rows) return null;
+      return this.__mapStoredRows(rows);
+    }
+
+    public static async __countRows(filter: PlainObject = {}): Promise<number | null> {
+      void getEffectiveReadMode();
+      return countTableRows(this.tableName, filter || {});
     }
 
     public static async __saveDocument(document: CompatDocument): Promise<void> {
@@ -1443,6 +1486,11 @@ const createDocumentClass = (name: string, schema: Schema): any => {
 
     public static countDocuments(filter: PlainObject = {}): ExecOperation<number> {
       return new ExecOperation(async () => {
+        const pushedCount = await this.__countRows(filter || {});
+        if (pushedCount !== null) {
+          return pushedCount;
+        }
+
         const rows = await this.__loadRows();
         return rows.filter((row: PlainObject) => matchesFilter(row, filter || {})).length;
       });
@@ -1467,6 +1515,11 @@ const createDocumentClass = (name: string, schema: Schema): any => {
 
     public static exists(filter: PlainObject = {}): ExecOperation<boolean> {
       return new ExecOperation(async () => {
+        const pushedCount = await this.__countRows(filter || {});
+        if (pushedCount !== null) {
+          return pushedCount > 0;
+        }
+
         const rows = await this.__loadRows();
         return rows.some((row: PlainObject) => matchesFilter(row, filter || {}));
       });

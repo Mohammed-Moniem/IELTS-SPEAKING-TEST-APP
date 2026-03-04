@@ -34,6 +34,13 @@ type DraftSnapshot = {
   savedAt: string;
 };
 
+type Task1GraphPoint = {
+  label: string;
+  seriesA: number;
+  seriesB: number;
+  seriesC: number;
+};
+
 const formatCountdown = (secondsLeft: number) => {
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
@@ -44,6 +51,49 @@ const normalizeEssayText = (value: string) => value.trim().replace(/\s+/g, ' ');
 
 const buildEssayFingerprint = (taskId?: string, responseText = '') =>
   `${taskId || 'no-task'}::${normalizeEssayText(responseText)}`;
+
+const buildStableSeed = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash || 1;
+};
+
+const createSeededNumber = (seed: number, min: number, max: number, step = 1) => {
+  const next = (seed * 1664525 + 1013904223) % 4294967296;
+  const normalized = next / 4294967296;
+  const raw = min + normalized * (max - min);
+  const snapped = Math.round(raw / step) * step;
+  return { nextSeed: next || 1, value: snapped };
+};
+
+const deriveTask1GraphPoints = (task: WritingTask): Task1GraphPoint[] => {
+  const yearMatches = task.prompt.match(/\b(19|20)\d{2}\b/g) || [];
+  const uniqueYears = Array.from(new Set(yearMatches)).slice(0, 6);
+  const labels =
+    uniqueYears.length >= 4
+      ? uniqueYears
+      : ['2012', '2014', '2016', '2018', '2020', '2022'];
+
+  let seed = buildStableSeed(`${task.taskId}:${task.title}:${task.prompt}`);
+  const points: Task1GraphPoint[] = [];
+
+  labels.forEach((label, index) => {
+    const a = createSeededNumber(seed + index * 13, 35, 95, 1);
+    const b = createSeededNumber(a.nextSeed + index * 17, 20, 85, 1);
+    const c = createSeededNumber(b.nextSeed + index * 19, 15, 75, 1);
+    seed = c.nextSeed;
+    points.push({
+      label,
+      seriesA: a.value,
+      seriesB: b.value,
+      seriesC: c.value
+    });
+  });
+
+  return points;
+};
 
 const parseStoredDraftPayload = (raw: string | null): StoredDraftPayload | null => {
   if (!raw) return null;
@@ -179,6 +229,7 @@ export default function WritingPage() {
   const [loading, setLoading] = useState(false);
   const [loadingSubmissionId, setLoadingSubmissionId] = useState<string | null>(null);
   const [isAutosaved, setIsAutosaved] = useState(false);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [baselineFingerprint, setBaselineFingerprint] = useState('');
   const [lastPersistedFingerprint, setLastPersistedFingerprint] = useState('');
@@ -249,9 +300,14 @@ export default function WritingPage() {
   const canSubmit =
     Boolean(task) &&
     wordCount >= Math.min(task?.minimumWords || 0, 30) &&
-    hasChangedSinceLoaded &&
-    hasChangedSincePersisted &&
     !loading;
+  const task1GraphPoints = useMemo(
+    () =>
+      task && task.track === 'academic' && task.taskType === 'task1'
+        ? deriveTask1GraphPoints(task)
+        : [],
+    [task]
+  );
 
   const weakestWritingCriterion = useMemo(() => {
     if (!selectedSubmission) return '';
@@ -275,11 +331,31 @@ export default function WritingPage() {
     stopTimer();
     setTimerSecondsLeft(seconds);
     setElapsedSeconds(0);
+    setIsTimerPaused(false);
     timerRef.current = window.setInterval(() => {
       setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
   }, [stopTimer]);
+
+  const pauseTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsTimerPaused(true);
+  }, []);
+
+  const resumeTimer = useCallback(() => {
+    if (timerRef.current || !task || timerSecondsLeft <= 0) {
+      return;
+    }
+    setIsTimerPaused(false);
+    timerRef.current = window.setInterval(() => {
+      setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+  }, [task, timerSecondsLeft]);
 
   const readDraftSnapshots = useCallback((): DraftSnapshot[] => {
     const raw = window.localStorage.getItem(draftSnapshotStorageKey);
@@ -386,10 +462,6 @@ export default function WritingPage() {
 
   const submitResponse = async () => {
     if (!task) return;
-    if (!hasChangedSincePersisted || !hasChangedSinceLoaded) {
-      setError('No changes detected. Update your essay before submitting again.');
-      return;
-    }
     if (responseText.trim().length < 20) {
       setError('Response is too short. Please provide a complete essay.');
       return;
@@ -477,7 +549,8 @@ export default function WritingPage() {
     });
     setBaselineFingerprint(currentFingerprint);
     setLastPersistedFingerprint(currentFingerprint);
-    setStatusMessage('Draft saved locally. Reopen it from Saved Draft Snapshots below.');
+    pauseTimer();
+    setStatusMessage('Draft saved locally and timer paused. Reopen it from Saved Draft Snapshots below.');
     setIsAutosaved(true);
     window.setTimeout(() => setIsAutosaved(false), 900);
   };
@@ -549,7 +622,7 @@ export default function WritingPage() {
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
                     track === 'academic'
-                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                      ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500 dark:text-white'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                   onClick={() => setTrack('academic')}
@@ -561,7 +634,7 @@ export default function WritingPage() {
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
                     track === 'general'
-                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                      ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500 dark:text-white'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                   onClick={() => setTrack('general')}
@@ -578,7 +651,7 @@ export default function WritingPage() {
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
                     taskType === 'task1'
-                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                      ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500 dark:text-white'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                   onClick={() => setTaskType('task1')}
@@ -590,7 +663,7 @@ export default function WritingPage() {
                   type="button"
                   className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
                     taskType === 'task2'
-                      ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
+                      ? 'bg-violet-600 text-white shadow-sm dark:bg-violet-500 dark:text-white'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                   onClick={() => setTaskType('task2')}
@@ -629,6 +702,14 @@ export default function WritingPage() {
                 <button
                   type="button"
                   className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                  onClick={isTimerPaused ? resumeTimer : pauseTimer}
+                  disabled={!task || loading || timerSecondsLeft <= 0}
+                >
+                  {isTimerPaused ? 'Resume Timer' : 'Pause Timer'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 disabled:opacity-50"
                   onClick={saveDraftNow}
                   disabled={!canSaveDraft}
                 >
@@ -655,11 +736,85 @@ export default function WritingPage() {
               </div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">{task.title?.trim() || taskDisplayFallback.title}</h2>
               <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{task.prompt?.trim() || taskDisplayFallback.prompt}</p>
-              <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
-                <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
-                <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
-                <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
-              </div>
+              {task.track === 'academic' && task.taskType === 'task1' && task1GraphPoints.length > 0 ? (
+                <article className="rounded-xl border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 p-3 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+                    Visual Data Snapshot
+                  </p>
+                  <svg viewBox="0 0 300 130" className="w-full h-[130px] rounded-lg bg-white/80 dark:bg-gray-900/70 border border-violet-100 dark:border-violet-500/20">
+                    <line x1="22" y1="106" x2="286" y2="106" stroke="currentColor" className="text-violet-200/80 dark:text-violet-400/40" />
+                    <line x1="22" y1="22" x2="22" y2="106" stroke="currentColor" className="text-violet-200/80 dark:text-violet-400/40" />
+                    {[0, 1, 2, 3].map(level => (
+                      <line
+                        key={level}
+                        x1="22"
+                        x2="286"
+                        y1={26 + level * 20}
+                        y2={26 + level * 20}
+                        stroke="currentColor"
+                        className="text-violet-100/90 dark:text-violet-500/15"
+                      />
+                    ))}
+                    <polyline
+                      fill="none"
+                      strokeWidth="2.5"
+                      className="text-violet-600 dark:text-violet-300"
+                      stroke="currentColor"
+                      points={task1GraphPoints
+                        .map((point, index) => `${30 + index * (245 / Math.max(1, task1GraphPoints.length - 1))},${106 - point.seriesA * 0.82}`)
+                        .join(' ')}
+                    />
+                    <polyline
+                      fill="none"
+                      strokeWidth="2.5"
+                      className="text-blue-500 dark:text-blue-300"
+                      stroke="currentColor"
+                      points={task1GraphPoints
+                        .map((point, index) => `${30 + index * (245 / Math.max(1, task1GraphPoints.length - 1))},${106 - point.seriesB * 0.82}`)
+                        .join(' ')}
+                    />
+                    <polyline
+                      fill="none"
+                      strokeWidth="2.5"
+                      className="text-emerald-500 dark:text-emerald-300"
+                      stroke="currentColor"
+                      points={task1GraphPoints
+                        .map((point, index) => `${30 + index * (245 / Math.max(1, task1GraphPoints.length - 1))},${106 - point.seriesC * 0.82}`)
+                        .join(' ')}
+                    />
+                    {task1GraphPoints.map((point, index) => {
+                      const x = 30 + index * (245 / Math.max(1, task1GraphPoints.length - 1));
+                      return (
+                        <g key={point.label}>
+                          <text x={x} y="122" textAnchor="middle" className="fill-violet-700 dark:fill-violet-300 text-[9px] font-semibold">
+                            {point.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 text-violet-700 dark:text-violet-200">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-300" />
+                      Series A
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-500/20 px-2 py-0.5 text-blue-700 dark:text-blue-200">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-300" />
+                      Series B
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-emerald-700 dark:text-emerald-200">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-300" />
+                      Series C
+                    </span>
+                  </div>
+                </article>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
+                  <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-8 rounded-lg bg-gray-200 dark:bg-gray-700" />
+                </div>
+              )}
               <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                 <span>Min. words: <strong className="text-gray-700 dark:text-gray-300">{task.minimumWords}</strong></span>
                 <span>Time: <strong className="text-gray-700 dark:text-gray-300">{task.suggestedTimeMinutes} min</strong></span>
@@ -696,7 +851,7 @@ export default function WritingPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="rounded-full bg-violet-100 dark:bg-violet-500/20 px-3 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">{formatCountdown(timerSecondsLeft)}</span>
-                  <span className="text-xs text-gray-400">{isAutosaved ? 'Saved locally' : 'Editing...'}</span>
+                  <span className="text-xs text-gray-400">{isTimerPaused ? 'Paused' : isAutosaved ? 'Saved locally' : 'Editing...'}</span>
                 </div>
               </div>
 
@@ -715,6 +870,13 @@ export default function WritingPage() {
                   <span className={`font-semibold ${wordCount >= task.minimumWords ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>{wordPolicy}</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    onClick={isTimerPaused ? resumeTimer : pauseTimer}
+                    disabled={!task || loading || timerSecondsLeft <= 0}
+                  >
+                    {isTimerPaused ? 'Resume Timer' : 'Pause Timer'}
+                  </button>
                   <button
                     className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                     onClick={saveDraftNow}

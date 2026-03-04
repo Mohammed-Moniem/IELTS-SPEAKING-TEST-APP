@@ -453,16 +453,183 @@ Constraints:
       userPrompt: JSON.stringify(input),
       fallback: () => {
         if (input.module === 'writing') {
-          return {
-            title: input.track === 'academic' ? 'Task 2 Opinion Essay' : 'Task 2 Problem-Solution Essay',
-            prompt:
-              'Some people believe online learning is more effective than classroom learning. Discuss both views and give your opinion.',
-            instructions: ['Write at least 250 words.', 'Support your arguments with clear examples.'],
-            suggestedTimeMinutes: 40,
-            minimumWords: 250,
-            taskType: 'task2',
-            tags: ['education', 'technology']
+          const requestedTaskType = input.hints?.includes('task1') ? 'task1' : 'task2';
+          const taskPools: Record<
+            'academic_task1' | 'general_task1' | 'academic_task2' | 'general_task2',
+            Array<{
+              title: string;
+              prompt: string;
+              instructions: string[];
+              suggestedTimeMinutes: number;
+              minimumWords: number;
+              tags: string[];
+              taskType: 'task1' | 'task2';
+            }>
+          > = {
+            academic_task1: [
+              {
+                title: 'Academic Task 1 Bar Chart Analysis',
+                prompt:
+                  'The bar chart compares the percentage of households using three renewable energy sources (solar, wind, and hydro) in six regions between 2012 and 2022. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Highlight the most significant changes and comparisons.',
+                  'Provide an overview before detailed comparisons.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['energy', 'bar-chart', 'comparison']
+              },
+              {
+                title: 'Academic Task 1 Line Graph Trends',
+                prompt:
+                  'The line graph shows average monthly metro ridership in three cities from 2010 to 2024. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Focus on overall trends and notable fluctuations.',
+                  'Use accurate comparative language.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['transport', 'line-graph', 'trends']
+              },
+              {
+                title: 'Academic Task 1 Table Comparison',
+                prompt:
+                  'The table presents the number of international students enrolled in five university departments in 2015, 2020, and 2025. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Group similar data instead of describing every row separately.',
+                  'Include a clear overview of the largest shifts.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['table', 'education', 'comparison']
+              }
+            ],
+            general_task1: [
+              {
+                title: 'General Task 1 Semi-Formal Letter',
+                prompt:
+                  'You recently attended a short course at a local college. Write a letter to the course coordinator. In your letter: explain what you liked about the course, describe one problem you faced, and suggest one improvement for future students.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Address every bullet point clearly.',
+                  'Use an appropriate semi-formal tone throughout.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['letter', 'semi-formal', 'course']
+              },
+              {
+                title: 'General Task 1 Formal Complaint Letter',
+                prompt:
+                  'You booked a study room at a public library, but it was unavailable when you arrived. Write a letter to the library manager. In your letter: describe what happened, explain how this affected your preparation, and request a suitable solution.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Use a formal and polite tone.',
+                  'Make your request specific and reasonable.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['letter', 'formal', 'complaint']
+              },
+              {
+                title: 'General Task 1 Informal Letter',
+                prompt:
+                  'A friend is planning to move to your city for IELTS preparation. Write a letter to your friend. In your letter: describe the area you recommend, suggest two useful study resources, and explain how to balance study with daily life.',
+                instructions: [
+                  'Write at least 150 words.',
+                  'Use a friendly but clear tone.',
+                  'Cover all three bullet points in separate paragraphs.'
+                ],
+                suggestedTimeMinutes: 20,
+                minimumWords: 150,
+                taskType: 'task1',
+                tags: ['letter', 'informal', 'advice']
+              }
+            ],
+            academic_task2: [
+              {
+                title: 'Academic Task 2 Opinion Essay',
+                prompt:
+                  'Some people believe schools should teach only academic subjects, while others think practical life skills should be equally important. Discuss both views and give your own opinion.',
+                instructions: ['Write at least 250 words.', 'Support your position with clear examples.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['education', 'opinion', 'society']
+              },
+              {
+                title: 'Academic Task 2 Discussion Essay',
+                prompt:
+                  'In many cities, private cars are being restricted in central areas. Some people support this policy, while others oppose it. Discuss both views and give your own opinion.',
+                instructions: ['Write at least 250 words.', 'Develop each viewpoint before your conclusion.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['transport', 'policy', 'discussion']
+              },
+              {
+                title: 'Academic Task 2 Problem-Solution Essay',
+                prompt:
+                  'Many university students struggle to manage stress during exam seasons. What are the causes of this problem, and what measures can universities take to reduce it?',
+                instructions: ['Write at least 250 words.', 'Explain both causes and practical solutions.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['health', 'education', 'problem-solution']
+              }
+            ],
+            general_task2: [
+              {
+                title: 'General Task 2 Opinion Essay',
+                prompt:
+                  'Some people think social media has made communication better, while others believe it has harmed real relationships. Discuss both views and give your own opinion.',
+                instructions: ['Write at least 250 words.', 'Use clear reasoning and specific examples.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['technology', 'relationships', 'opinion']
+              },
+              {
+                title: 'General Task 2 Discussion Essay',
+                prompt:
+                  'Some people prefer working from home, while others prefer working in an office. Discuss both views and give your own opinion.',
+                instructions: ['Write at least 250 words.', 'Compare both perspectives fairly before concluding.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['work', 'lifestyle', 'discussion']
+              },
+              {
+                title: 'General Task 2 Advantage-Disadvantage Essay',
+                prompt:
+                  'More people are choosing to study through online platforms instead of attending in-person classes. What are the advantages and disadvantages of this trend?',
+                instructions: ['Write at least 250 words.', 'Balance both sides with concrete examples.'],
+                suggestedTimeMinutes: 40,
+                minimumWords: 250,
+                taskType: 'task2',
+                tags: ['education', 'technology', 'advantages-disadvantages']
+              }
+            ]
           };
+
+          const poolKey = `${input.track}_${requestedTaskType}` as
+            | 'academic_task1'
+            | 'general_task1'
+            | 'academic_task2'
+            | 'general_task2';
+          const pool = taskPools[poolKey];
+          const seedValue = input.hints?.find(hint => hint.startsWith('seed-')) || `${Date.now()}-${Math.random()}`;
+          const seedHash = createHash('sha1').update(seedValue).digest('hex');
+          const pickIndex = parseInt(seedHash.slice(0, 8), 16) % pool.length;
+          return pool[pickIndex];
         }
 
         const questions = [

@@ -53,6 +53,17 @@ export interface IWritingOverallFeedback {
 export interface IWritingSubmission {
   userId: Types.ObjectId;
   taskId: Types.ObjectId;
+  taskSnapshot?: {
+    taskId: string;
+    track: IELTSModuleTrack;
+    taskType: WritingTaskType;
+    title: string;
+    prompt: string;
+    instructions: string[];
+    suggestedTimeMinutes: number;
+    minimumWords: number;
+    tags: string[];
+  };
   track: IELTSModuleTrack;
   taskType: WritingTaskType;
   responseText: string;
@@ -160,6 +171,23 @@ const WritingSubmissionSchema = new Schema<IWritingSubmission>(
       ref: 'WritingTask',
       required: true,
       index: true
+    },
+    taskSnapshot: {
+      taskId: { type: String, default: '' },
+      track: {
+        type: String,
+        enum: ['academic', 'general']
+      },
+      taskType: {
+        type: String,
+        enum: ['task1', 'task2']
+      },
+      title: { type: String, default: '' },
+      prompt: { type: String, default: '' },
+      instructions: { type: [String], default: [] },
+      suggestedTimeMinutes: { type: Number, default: 0 },
+      minimumWords: { type: Number, default: 0 },
+      tags: { type: [String], default: [] }
     },
     track: {
       type: String,

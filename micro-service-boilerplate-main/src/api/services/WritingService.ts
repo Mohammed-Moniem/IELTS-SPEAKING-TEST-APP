@@ -5,6 +5,7 @@ import { CSError } from '@errors/CSError';
 import { CODES, HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { constructLogMessage } from '@lib/env/helpers';
+import { getPgPool } from '@lib/db/pgClient';
 import { Logger } from '@lib/logger';
 import { UserModel } from '@models/UserModel';
 import {
@@ -14,7 +15,7 @@ import {
   IWritingOverallFeedback,
   WritingSubmissionModel
 } from '@models/WritingSubmissionModel';
-import { WritingTaskModel } from '@models/WritingTaskModel';
+import { WritingTaskDocument, WritingTaskModel } from '@models/WritingTaskModel';
 
 import { AIOrchestrationService } from './AIOrchestrationService';
 import { UsageService } from './UsageService';
@@ -32,12 +33,38 @@ type DetailCacheEntry = {
   submission: unknown;
 };
 
+type WritingTaskSnapshot = {
+  taskId: string;
+  track: WritingTrack;
+  taskType: WritingTaskType;
+  title: string;
+  prompt: string;
+  instructions: string[];
+  suggestedTimeMinutes: number;
+  minimumWords: number;
+  tags: string[];
+};
+
+type WritingTaskRecord = WritingTaskSnapshot & {
+  _id: string;
+  source?: 'bank' | 'ai';
+  active?: boolean;
+  autoPublished?: boolean;
+};
+
 @Service()
 export class WritingService {
   private readonly log = new Logger(__filename);
   private readonly detailCache = new Map<string, DetailCacheEntry>();
+  private readonly taskSnapshotCache = new Map<string, { expiresAt: number; snapshot: WritingTaskSnapshot }>();
   private deepBackfillInProgress = false;
   private deepBackfillScheduled = false;
+  private readonly generatedTaskHistory = new Map<
+    string,
+    { expiresAt: number; taskIds: string[]; promptFingerprints: string[] }
+  >();
+  private readonly GENERATED_TASK_HISTORY_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+  private readonly TASK_SNAPSHOT_CACHE_TTL_MS = 1000 * 60 * 30;
 
   constructor(
     private readonly aiOrchestrationService: AIOrchestrationService,
@@ -50,30 +77,51 @@ export class WritingService {
     headers: IRequestHeaders
   ) {
     const logMessage = constructLogMessage(__filename, 'generateTask', headers);
-    const fallbackContent = this.buildFallbackTaskContent(input.track, input.taskType);
+    const plan = await this.getUserPlan(userId);
 
-    let task = await WritingTaskModel.findOne({
+    // Block writing task generation as soon as the user reaches plan allowance.
+    await this.usageService.assertModuleAllowance(userId, plan, 'writing', headers);
+
+    const seenTaskIds = await this.getSeenTaskIds(userId, input.track, input.taskType);
+    const recentlyGeneratedTaskIds = this.getRecentlyGeneratedTaskIds(userId, input.track, input.taskType);
+    const recentlyGeneratedFingerprints = this.getRecentlyGeneratedFingerprints(userId, input.track, input.taskType);
+    const excludedTaskIds = new Set<string>([...seenTaskIds, ...recentlyGeneratedTaskIds]);
+    const fallbackContent = this.buildFallbackTaskContent(input.track, input.taskType, recentlyGeneratedFingerprints);
+
+    const baseTaskFilter = {
       track: input.track,
       taskType: input.taskType,
       active: true,
       autoPublished: true,
       title: { $exists: true, $nin: ['', null] },
       prompt: { $exists: true, $nin: ['', null] }
-    }).sort({ updatedAt: -1 });
+    };
+    const bankTaskFilter = { ...baseTaskFilter, source: 'bank' as const };
+
+    let task = await this.pickRandomTask(bankTaskFilter, excludedTaskIds, recentlyGeneratedFingerprints);
+    if (!task) {
+      task = await this.pickRandomTask(baseTaskFilter, excludedTaskIds, recentlyGeneratedFingerprints);
+    }
 
     if (!task) {
       const generated = await this.aiOrchestrationService.generateModuleTask(
         {
           module: 'writing',
           track: input.track,
-          hints: [input.taskType]
+          hints: [input.taskType, `seed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`]
         },
-        { userId, plan: await this.getUserPlan(userId) }
+        { userId, plan }
       );
-      const resolvedTaskType =
-        generated.taskType === 'task1' || generated.taskType === 'task2' ? generated.taskType : input.taskType;
+      const resolvedTaskType = input.taskType;
       const hasGeneratedTitle = typeof generated.title === 'string' && generated.title.trim().length > 0;
       const hasGeneratedPrompt = typeof generated.prompt === 'string' && generated.prompt.trim().length > 0;
+      const candidateTitle = hasGeneratedTitle ? generated.title.trim() : fallbackContent.title;
+      const candidatePrompt = hasGeneratedPrompt ? generated.prompt.trim() : fallbackContent.prompt;
+      const candidateFingerprint = this.buildTaskPromptFingerprint(candidateTitle, candidatePrompt, input.track, input.taskType);
+      const shouldRotateFallback = recentlyGeneratedFingerprints.has(candidateFingerprint);
+      const resolvedFallback = shouldRotateFallback
+        ? this.buildFallbackTaskContent(input.track, input.taskType, recentlyGeneratedFingerprints)
+        : fallbackContent;
       const generatedInstructions = Array.isArray(generated.instructions)
         ? generated.instructions.map(instruction => `${instruction ?? ''}`.trim()).filter(Boolean)
         : [];
@@ -81,17 +129,17 @@ export class WritingService {
       task = await WritingTaskModel.create({
         track: input.track,
         taskType: resolvedTaskType,
-        title: hasGeneratedTitle ? generated.title.trim() : fallbackContent.title,
-        prompt: hasGeneratedPrompt ? generated.prompt.trim() : fallbackContent.prompt,
-        instructions: generatedInstructions.length > 0 ? generatedInstructions : fallbackContent.instructions,
+        title: shouldRotateFallback ? resolvedFallback.title : candidateTitle,
+        prompt: shouldRotateFallback ? resolvedFallback.prompt : candidatePrompt,
+        instructions: generatedInstructions.length > 0 ? generatedInstructions : resolvedFallback.instructions,
         suggestedTimeMinutes:
           typeof generated.suggestedTimeMinutes === 'number' && generated.suggestedTimeMinutes > 0
             ? generated.suggestedTimeMinutes
-            : fallbackContent.suggestedTimeMinutes,
+            : resolvedFallback.suggestedTimeMinutes,
         minimumWords:
           typeof generated.minimumWords === 'number' && generated.minimumWords > 0
             ? generated.minimumWords
-            : fallbackContent.minimumWords,
+            : resolvedFallback.minimumWords,
         tags: generated.tags || [],
         source: 'ai',
         autoPublished: true,
@@ -106,10 +154,14 @@ export class WritingService {
       task.suggestedTimeMinutes =
         task.suggestedTimeMinutes > 0 ? task.suggestedTimeMinutes : fallbackContent.suggestedTimeMinutes;
       task.minimumWords = task.minimumWords > 0 ? task.minimumWords : fallbackContent.minimumWords;
-      await task.save();
+
+      if (typeof (task as { save?: unknown }).save === 'function') {
+        await (task as unknown as { save: () => Promise<unknown> }).save();
+      }
     }
 
     this.log.info(`${logMessage} :: Generated writing task ${task._id}`);
+    this.rememberGeneratedTask(userId, input.track, input.taskType, String(task._id), task.title || '', task.prompt || '');
 
     return {
       taskId: task._id,
@@ -122,6 +174,174 @@ export class WritingService {
       minimumWords: task.minimumWords,
       tags: task.tags
     };
+  }
+
+  private async pickRandomTask(
+    filter: Record<string, unknown>,
+    excludedTaskIds: Set<string>,
+    excludedFingerprints: Set<string>
+  ): Promise<WritingTaskRecord | WritingTaskDocument | null> {
+    const localExcludedIds = new Set<string>(excludedTaskIds);
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidates = await this.fetchRandomTaskCandidates(filter, Array.from(localExcludedIds), 64);
+      if (!candidates.length) {
+        return null;
+      }
+
+      for (const picked of candidates) {
+        const fingerprint = this.buildTaskPromptFingerprint(
+          picked.title || '',
+          picked.prompt || '',
+          picked.track as WritingTrack,
+          picked.taskType as WritingTaskType
+        );
+        if (!excludedFingerprints.has(fingerprint)) {
+          return picked;
+        }
+        localExcludedIds.add(String(picked._id));
+      }
+    }
+
+    return null;
+  }
+
+  private async fetchRandomTaskCandidates(
+    filter: Record<string, unknown>,
+    excludedTaskIds: string[],
+    limit: number
+  ): Promise<WritingTaskRecord[]> {
+    const track = filter.track as WritingTrack | undefined;
+    const taskType = filter.taskType as WritingTaskType | undefined;
+    if (!track || !taskType) return [];
+
+    const params: any[] = [track, taskType];
+    let sql = `
+      SELECT id, data, created_at, updated_at
+      FROM writing_tasks
+      WHERE data->>'track' = $1
+        AND data->>'taskType' = $2
+        AND COALESCE((data->>'active')::boolean, false) = true
+        AND COALESCE((data->>'autoPublished')::boolean, false) = true
+        AND COALESCE(data->>'title', '') <> ''
+        AND COALESCE(data->>'prompt', '') <> ''
+    `;
+
+    if (typeof filter.source === 'string' && filter.source.trim().length > 0) {
+      params.push(filter.source);
+      sql += ` AND data->>'source' = $${params.length}`;
+    }
+
+    const exclusionList = excludedTaskIds.filter(Boolean);
+    if (exclusionList.length > 0) {
+      params.push(exclusionList);
+      sql += ` AND id <> ALL($${params.length}::text[])`;
+    }
+
+    params.push(Math.max(1, Math.min(500, limit)));
+    sql += ` ORDER BY RANDOM() LIMIT $${params.length}`;
+
+    const rows = await getPgPool().query(sql, params);
+    return rows.rows.map(row => this.mapTaskRow(row)).filter(task => this.hasRenderableTask(task));
+  }
+
+  private mapTaskRow(row: { id: string; data: Record<string, any> }): WritingTaskRecord {
+    const data = row.data || {};
+    return {
+      _id: row.id,
+      taskId: row.id,
+      track: (data.track || 'academic') as WritingTrack,
+      taskType: (data.taskType || 'task2') as WritingTaskType,
+      title: `${data.title || ''}`.trim(),
+      prompt: `${data.prompt || ''}`.trim(),
+      instructions: Array.isArray(data.instructions) ? data.instructions.map(entry => `${entry ?? ''}`.trim()).filter(Boolean) : [],
+      suggestedTimeMinutes:
+        typeof data.suggestedTimeMinutes === 'number' && data.suggestedTimeMinutes > 0
+          ? data.suggestedTimeMinutes
+          : data.taskType === 'task2'
+            ? 40
+            : 20,
+      minimumWords:
+        typeof data.minimumWords === 'number' && data.minimumWords > 0
+          ? data.minimumWords
+          : data.taskType === 'task2'
+            ? 250
+            : 150,
+      tags: Array.isArray(data.tags) ? data.tags.map(entry => `${entry}`) : [],
+      source: data.source === 'ai' ? 'ai' : 'bank',
+      active: Boolean(data.active),
+      autoPublished: Boolean(data.autoPublished)
+    };
+  }
+
+  private async getSeenTaskIds(userId: string, track: WritingTrack, taskType: WritingTaskType): Promise<Set<string>> {
+    const rows = await getPgPool().query(
+      `
+        SELECT data->>'taskId' AS task_id
+        FROM writing_submissions
+        WHERE data->>'userId' = $1
+          AND data->>'track' = $2
+          AND data->>'taskType' = $3
+          AND COALESCE(data->>'taskId', '') <> ''
+        ORDER BY created_at DESC
+        LIMIT 5000
+      `,
+      [userId, track, taskType]
+    );
+
+    return new Set<string>(rows.rows.map(row => `${row.task_id || ''}`.trim()).filter(Boolean));
+  }
+
+  private getGeneratedTaskHistoryKey(userId: string, track: WritingTrack, taskType: WritingTaskType) {
+    return `${userId}:${track}:${taskType}`;
+  }
+
+  private getRecentlyGeneratedTaskIds(userId: string, track: WritingTrack, taskType: WritingTaskType): Set<string> {
+    const key = this.getGeneratedTaskHistoryKey(userId, track, taskType);
+    const entry = this.generatedTaskHistory.get(key);
+    if (!entry) return new Set();
+    if (entry.expiresAt < Date.now()) {
+      this.generatedTaskHistory.delete(key);
+      return new Set();
+    }
+    return new Set(entry.taskIds);
+  }
+
+  private getRecentlyGeneratedFingerprints(userId: string, track: WritingTrack, taskType: WritingTaskType): Set<string> {
+    const key = this.getGeneratedTaskHistoryKey(userId, track, taskType);
+    const entry = this.generatedTaskHistory.get(key);
+    if (!entry) return new Set();
+    if (entry.expiresAt < Date.now()) {
+      this.generatedTaskHistory.delete(key);
+      return new Set();
+    }
+    return new Set(entry.promptFingerprints || []);
+  }
+
+  private rememberGeneratedTask(
+    userId: string,
+    track: WritingTrack,
+    taskType: WritingTaskType,
+    taskId: string,
+    title: string,
+    prompt: string
+  ) {
+    const key = this.getGeneratedTaskHistoryKey(userId, track, taskType);
+    const existing = this.generatedTaskHistory.get(key);
+    const isFresh = existing?.expiresAt && existing.expiresAt > Date.now();
+    const currentIds = isFresh ? existing.taskIds : [];
+    const currentFingerprints = isFresh ? existing.promptFingerprints || [] : [];
+    const next = [taskId, ...currentIds.filter(id => id !== taskId)].slice(0, 3000);
+    const promptFingerprint = this.buildTaskPromptFingerprint(title, prompt, track, taskType);
+    const nextFingerprints = [promptFingerprint, ...currentFingerprints.filter(fp => fp !== promptFingerprint)].slice(
+      0,
+      3000
+    );
+    this.generatedTaskHistory.set(key, {
+      taskIds: next,
+      promptFingerprints: nextFingerprints,
+      expiresAt: Date.now() + this.GENERATED_TASK_HISTORY_TTL_MS
+    });
   }
 
   public async submitWriting(
@@ -178,6 +398,7 @@ export class WritingService {
     const submission = await WritingSubmissionModel.create({
       userId,
       taskId,
+      taskSnapshot: this.toTaskSnapshot(task),
       track: task.track,
       taskType: task.taskType,
       responseText,
@@ -207,21 +428,30 @@ export class WritingService {
       return cached;
     }
 
-    let submission = await WritingSubmissionModel.findOne({
-      _id: submissionId,
-      userId
-    }).populate('taskId');
+    let submission = await this.fetchSubmissionByIdSql(userId, submissionId);
 
     if (!submission) {
       throw new CSError(HTTP_STATUS_CODES.NOT_FOUND, CODES.NotFound, 'Writing submission not found');
     }
 
-    try {
-      submission = await this.enrichSubmissionDeepFeedback(submission);
-    } catch (error) {
-      this.log.warn(
-        `Lazy deep feedback enrichment failed for ${submissionId}: ${error instanceof Error ? error.message : String(error)}`
-      );
+    if (this.shouldEnrichDeepFeedback(submission)) {
+      try {
+        const doc = await WritingSubmissionModel.findOne({
+          _id: submissionId,
+          userId
+        });
+        if (doc) {
+          await this.enrichSubmissionDeepFeedback(doc);
+          const refreshed = await this.fetchSubmissionByIdSql(userId, submissionId);
+          if (refreshed) {
+            submission = refreshed;
+          }
+        }
+      } catch (error) {
+        this.log.warn(
+          `Lazy deep feedback enrichment failed for ${submissionId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
     this.setDetailCache(userId, submissionId, submission);
 
@@ -238,26 +468,207 @@ export class WritingService {
       to?: string;
     }
   ) {
-    const query: Record<string, unknown> = { userId };
-
-    if (filters?.track) {
-      query.track = filters.track;
-    }
-
-    if (filters?.from || filters?.to) {
-      query.createdAt = {};
-      if (filters.from) {
-        (query.createdAt as Record<string, unknown>).$gte = new Date(filters.from);
-      }
-      if (filters.to) {
-        (query.createdAt as Record<string, unknown>).$lte = new Date(filters.to);
-      }
-    }
-
-    const history = await WritingSubmissionModel.find(query).sort({ createdAt: -1 }).skip(offset).limit(limit);
+    const history = await this.fetchHistorySql(userId, limit, offset, filters);
     this.scheduleDeepFeedbackBackfill();
 
     return history;
+  }
+
+  private shouldEnrichDeepFeedback(submission: any): boolean {
+    if (!env.writing.deepFeedbackV2Enabled) return false;
+    return submission?.feedbackVersion !== 'v2' || submission?.deepFeedbackReady !== true;
+  }
+
+  private toTaskSnapshot(task: {
+    _id?: unknown;
+    taskId?: unknown;
+    track?: unknown;
+    taskType?: unknown;
+    title?: unknown;
+    prompt?: unknown;
+    instructions?: unknown;
+    suggestedTimeMinutes?: unknown;
+    minimumWords?: unknown;
+    tags?: unknown;
+  }): WritingTaskSnapshot {
+    const resolvedTaskType = (task.taskType === 'task1' ? 'task1' : 'task2') as WritingTaskType;
+    return {
+      taskId: String(task.taskId || task._id || ''),
+      track: (task.track === 'general' ? 'general' : 'academic') as WritingTrack,
+      taskType: resolvedTaskType,
+      title: `${task.title || ''}`.trim(),
+      prompt: `${task.prompt || ''}`.trim(),
+      instructions: Array.isArray(task.instructions) ? task.instructions.map(entry => `${entry ?? ''}`.trim()).filter(Boolean) : [],
+      suggestedTimeMinutes:
+        typeof task.suggestedTimeMinutes === 'number' && task.suggestedTimeMinutes > 0
+          ? task.suggestedTimeMinutes
+          : resolvedTaskType === 'task2'
+            ? 40
+            : 20,
+      minimumWords:
+        typeof task.minimumWords === 'number' && task.minimumWords > 0
+          ? task.minimumWords
+          : resolvedTaskType === 'task2'
+            ? 250
+            : 150,
+      tags: Array.isArray(task.tags) ? task.tags.map(entry => `${entry}`) : []
+    };
+  }
+
+  private mapSubmissionRow(row: {
+    id: string;
+    data: Record<string, any>;
+    created_at: Date | string;
+    updated_at: Date | string;
+  }) {
+    const payload = { ...(row.data || {}) };
+    payload._id = row.id;
+    if (!payload.createdAt && row.created_at) {
+      payload.createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString();
+    }
+    if (!payload.updatedAt && row.updated_at) {
+      payload.updatedAt = row.updated_at instanceof Date ? row.updated_at.toISOString() : new Date(row.updated_at).toISOString();
+    }
+    return payload;
+  }
+
+  private resolveSubmissionTaskId(submission: Record<string, any>): string {
+    const raw = submission.taskId;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') {
+      const rawTask = raw as Record<string, unknown>;
+      return `${rawTask.taskId || rawTask._id || ''}`.trim();
+    }
+    return `${raw}`.trim();
+  }
+
+  private async fetchTaskSnapshotsByIds(taskIds: string[]): Promise<Map<string, WritingTaskSnapshot>> {
+    const ids = Array.from(new Set(taskIds.filter(Boolean)));
+    if (!ids.length) return new Map();
+
+    const output = new Map<string, WritingTaskSnapshot>();
+    const missing: string[] = [];
+
+    ids.forEach(id => {
+      const cacheKey = `${id}`;
+      const cached = this.taskSnapshotCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        output.set(id, cached.snapshot);
+        return;
+      }
+      this.taskSnapshotCache.delete(cacheKey);
+      missing.push(id);
+    });
+
+    if (!missing.length) return output;
+
+    const rows = await getPgPool().query(`SELECT id, data FROM writing_tasks WHERE id = ANY($1::text[])`, [missing]);
+
+    rows.rows.forEach(row => {
+      const snapshot = this.toTaskSnapshot(this.mapTaskRow(row));
+      output.set(row.id, snapshot);
+      this.taskSnapshotCache.set(row.id, {
+        snapshot,
+        expiresAt: Date.now() + this.TASK_SNAPSHOT_CACHE_TTL_MS
+      });
+    });
+    return output;
+  }
+
+  private attachTaskSnapshots(submissions: Array<Record<string, any>>, snapshots: Map<string, WritingTaskSnapshot>) {
+    submissions.forEach(submission => {
+      const existingSnapshot = submission.taskSnapshot && typeof submission.taskSnapshot === 'object'
+        ? (submission.taskSnapshot as WritingTaskSnapshot)
+        : null;
+
+      const taskId = this.resolveSubmissionTaskId(submission) || existingSnapshot?.taskId || '';
+      const resolvedSnapshot = existingSnapshot || snapshots.get(taskId);
+      if (!resolvedSnapshot) return;
+
+      submission.taskSnapshot = resolvedSnapshot;
+      submission.taskId = resolvedSnapshot;
+      if (!submission.track) submission.track = resolvedSnapshot.track;
+      if (!submission.taskType) submission.taskType = resolvedSnapshot.taskType;
+    });
+  }
+
+  private async fetchSubmissionByIdSql(userId: string, submissionId: string): Promise<Record<string, any> | null> {
+    const result = await getPgPool().query(
+      `
+        SELECT id, data, created_at, updated_at
+        FROM writing_submissions
+        WHERE id = $1
+          AND data->>'userId' = $2
+        LIMIT 1
+      `,
+      [submissionId, userId]
+    );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    const submission = this.mapSubmissionRow(row);
+    const taskId = this.resolveSubmissionTaskId(submission);
+    if (taskId) {
+      const snapshots = await this.fetchTaskSnapshotsByIds([taskId]);
+      this.attachTaskSnapshots([submission], snapshots);
+    }
+    return submission;
+  }
+
+  private async fetchHistorySql(
+    userId: string,
+    limit: number,
+    offset: number,
+    filters?: {
+      track?: WritingTrack;
+      from?: string;
+      to?: string;
+    }
+  ): Promise<Record<string, any>[]> {
+    const params: any[] = [userId];
+    let sql = `
+      SELECT id, data, created_at, updated_at
+      FROM writing_submissions
+      WHERE data->>'userId' = $1
+    `;
+
+    if (filters?.track) {
+      params.push(filters.track);
+      sql += ` AND data->>'track' = $${params.length}`;
+    }
+
+    if (filters?.from) {
+      const fromDate = new Date(filters.from);
+      if (!Number.isNaN(fromDate.getTime())) {
+        params.push(fromDate.toISOString());
+        sql += ` AND created_at >= $${params.length}::timestamptz`;
+      }
+    }
+
+    if (filters?.to) {
+      const toDate = new Date(filters.to);
+      if (!Number.isNaN(toDate.getTime())) {
+        params.push(toDate.toISOString());
+        sql += ` AND created_at <= $${params.length}::timestamptz`;
+      }
+    }
+
+    params.push(Math.max(1, Math.min(200, limit)));
+    const limitParam = `$${params.length}`;
+    params.push(Math.max(0, offset));
+    const offsetParam = `$${params.length}`;
+
+    sql += ` ORDER BY created_at DESC LIMIT ${limitParam} OFFSET ${offsetParam}`;
+
+    const rows = await getPgPool().query(sql, params);
+    const submissions = rows.rows.map(row => this.mapSubmissionRow(row));
+
+    const taskIds = submissions.map(item => this.resolveSubmissionTaskId(item)).filter(Boolean);
+    const snapshots = await this.fetchTaskSnapshotsByIds(taskIds);
+    this.attachTaskSnapshots(submissions, snapshots);
+    return submissions;
   }
 
   private async getUserPlan(userId: string) {
@@ -403,49 +814,212 @@ export class WritingService {
     return Boolean(task.title?.trim() && task.prompt?.trim());
   }
 
-  private buildFallbackTaskContent(track: WritingTrack, taskType: WritingTaskType) {
+  private buildTaskPromptFingerprint(title: string, prompt: string, track: WritingTrack, taskType: WritingTaskType) {
+    const normalized = `${track}|${taskType}|${(title || '').trim().toLowerCase()}|${(prompt || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')}`;
+    return normalized;
+  }
+
+  private pickFallbackVariant<T extends { title: string; prompt: string }>(
+    variants: T[],
+    track: WritingTrack,
+    taskType: WritingTaskType,
+    excludedFingerprints?: Set<string>
+  ): T {
+    const shuffled = [...variants].sort(() => Math.random() - 0.5);
+    for (const variant of shuffled) {
+      const fingerprint = this.buildTaskPromptFingerprint(variant.title, variant.prompt, track, taskType);
+      if (!excludedFingerprints?.has(fingerprint)) {
+        return variant;
+      }
+    }
+    return shuffled[0] || variants[0];
+  }
+
+  private buildFallbackTaskContent(track: WritingTrack, taskType: WritingTaskType, excludedFingerprints?: Set<string>) {
     if (taskType === 'task1' && track === 'academic') {
-      return {
-        title: 'Academic Task 1 Line Graph',
-        prompt:
-          'The line graph below shows changes in the number of international students in three countries between 2005 and 2025. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
-        instructions: [
-          'Write at least 150 words.',
-          'Include a clear overview of the main trends.',
-          'Use comparative language and accurate data references.'
+      return this.pickFallbackVariant(
+        [
+          {
+            title: 'Academic Task 1 Line Graph',
+            prompt:
+              'The line graph below shows changes in the number of international students in three countries between 2005 and 2025. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+            instructions: [
+              'Write at least 150 words.',
+              'Include a clear overview of the main trends.',
+              'Use comparative language and accurate data references.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          },
+          {
+            title: 'Academic Task 1 Bar Chart',
+            prompt:
+              'The bar chart compares the percentage of graduates employed in six sectors in 2010 and 2025. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+            instructions: [
+              'Write at least 150 words.',
+              'Highlight the biggest rises and falls.',
+              'Use concise comparisons rather than listing all numbers.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          },
+          {
+            title: 'Academic Task 1 Table',
+            prompt:
+              'The table shows average monthly household spending in four categories across three cities in 2015 and 2025. Summarize the information by selecting and reporting the main features, and make comparisons where relevant.',
+            instructions: [
+              'Write at least 150 words.',
+              'Group similar figures into clear comparison points.',
+              'Provide a brief overall summary before details.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          }
         ],
-        suggestedTimeMinutes: 20,
-        minimumWords: 150
-      };
+        track,
+        taskType,
+        excludedFingerprints
+      );
     }
 
     if (taskType === 'task1' && track === 'general') {
-      return {
-        title: 'General Task 1 Formal Letter',
-        prompt:
-          'You recently ordered study materials online, but the package arrived damaged. Write a letter to the store manager. In your letter: describe the problem, explain how it affects your preparation, and say what action you want the store to take.',
-        instructions: [
-          'Write at least 150 words.',
-          'Address all bullet points in a clear paragraph structure.',
-          'Use an appropriate formal tone throughout.'
+      return this.pickFallbackVariant(
+        [
+          {
+            title: 'General Task 1 Formal Letter',
+            prompt:
+              'You recently ordered study materials online, but the package arrived damaged. Write a letter to the store manager. In your letter: describe the problem, explain how it affects your preparation, and say what action you want the store to take.',
+            instructions: [
+              'Write at least 150 words.',
+              'Address all bullet points in a clear paragraph structure.',
+              'Use an appropriate formal tone throughout.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          },
+          {
+            title: 'General Task 1 Semi-Formal Letter',
+            prompt:
+              'A training center where you attend evening IELTS classes has changed its schedule. Write a letter to the coordinator. In your letter: explain your concern, describe how this affects you, and suggest a practical solution.',
+            instructions: [
+              'Write at least 150 words.',
+              'Keep a polite, semi-formal tone.',
+              'Cover all requested points clearly.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          },
+          {
+            title: 'General Task 1 Informal Letter',
+            prompt:
+              'A friend is planning to move to your city for IELTS preparation. Write a letter to your friend. In your letter: recommend an area to live in, suggest two study resources, and explain how to manage study with daily life.',
+            instructions: [
+              'Write at least 150 words.',
+              'Use a friendly, natural tone.',
+              'Organize ideas in clear paragraphs.'
+            ],
+            suggestedTimeMinutes: 20,
+            minimumWords: 150
+          }
         ],
-        suggestedTimeMinutes: 20,
-        minimumWords: 150
-      };
+        track,
+        taskType,
+        excludedFingerprints
+      );
     }
 
-    return {
-      title: track === 'academic' ? 'Academic Task 2 Opinion Essay' : 'General Task 2 Opinion Essay',
-      prompt:
-        'Some people believe governments should invest more in public libraries, while others think digital learning platforms are a better use of public money. Discuss both views and give your own opinion.',
-      instructions: [
-        'Write at least 250 words.',
-        'Present a clear position and support it with specific examples.',
-        'Use cohesive devices to connect your argument logically.'
+    if (track === 'academic') {
+      return this.pickFallbackVariant(
+        [
+          {
+            title: 'Academic Task 2 Opinion Essay',
+            prompt:
+              'Some people believe governments should invest more in public libraries, while others think digital learning platforms are a better use of public money. Discuss both views and give your own opinion.',
+            instructions: [
+              'Write at least 250 words.',
+              'Present a clear position and support it with specific examples.',
+              'Use cohesive devices to connect your argument logically.'
+            ],
+            suggestedTimeMinutes: 40,
+            minimumWords: 250
+          },
+          {
+            title: 'Academic Task 2 Discussion Essay',
+            prompt:
+              'Some people believe university education should be free for everyone, while others think students should pay for their own studies. Discuss both views and give your own opinion.',
+            instructions: [
+              'Write at least 250 words.',
+              'Give balanced treatment to both sides before your conclusion.',
+              'Support your claims with concrete examples.'
+            ],
+            suggestedTimeMinutes: 40,
+            minimumWords: 250
+          },
+          {
+            title: 'Academic Task 2 Problem-Solution Essay',
+            prompt:
+              'Many cities face increasing traffic congestion despite better transport systems. What are the main causes of this problem, and what solutions can be implemented?',
+            instructions: [
+              'Write at least 250 words.',
+              'Explain causes and solutions in separate, well-developed paragraphs.',
+              'Use specific examples to show practical impact.'
+            ],
+            suggestedTimeMinutes: 40,
+            minimumWords: 250
+          }
+        ],
+        track,
+        taskType,
+        excludedFingerprints
+      );
+    }
+
+    return this.pickFallbackVariant(
+      [
+        {
+          title: 'General Task 2 Opinion Essay',
+          prompt:
+            'Some people believe governments should invest more in public libraries, while others think digital learning platforms are a better use of public money. Discuss both views and give your own opinion.',
+          instructions: [
+            'Write at least 250 words.',
+            'Present a clear position and support it with specific examples.',
+            'Use cohesive devices to connect your argument logically.'
+          ],
+          suggestedTimeMinutes: 40,
+          minimumWords: 250
+        },
+        {
+          title: 'General Task 2 Advantages-Disadvantages Essay',
+          prompt:
+            'Many people now choose remote work instead of office-based jobs. What are the advantages and disadvantages of this trend?',
+          instructions: [
+            'Write at least 250 words.',
+            'Discuss both advantages and disadvantages in balance.',
+            'Use examples from real life or common situations.'
+          ],
+          suggestedTimeMinutes: 40,
+          minimumWords: 250
+        },
+        {
+          title: 'General Task 2 Discussion Essay',
+          prompt:
+            'Some people think social media improves communication, while others believe it harms real relationships. Discuss both views and give your own opinion.',
+          instructions: [
+            'Write at least 250 words.',
+            'Develop both sides before stating your final position.',
+            'Maintain clear paragraph structure and linking.'
+          ],
+          suggestedTimeMinutes: 40,
+          minimumWords: 250
+        }
       ],
-      suggestedTimeMinutes: 40,
-      minimumWords: 250
-    };
+      track,
+      taskType,
+      excludedFingerprints
+    );
   }
 
   private normalizeEvaluationPayload(
