@@ -687,10 +687,24 @@ export class GrowthService {
   public async listCollocations(query: LibraryQuery) {
     const { limit, offset } = this.resolvePagination(query.limit, query.offset, 24, 0, 200);
     const filter = this.buildLibraryFilter(query);
-    const [rows, total] = await Promise.all([
-      CollocationEntryModel.find(filter).sort({ qualityScore: -1, frequencyRank: 1, updatedAt: -1 }).skip(offset).limit(limit).lean(),
+    // When no module is selected, default to one representative module to avoid
+    // showing 4 duplicate cards per phrase (one per IELTS module).
+    if (!filter.module) filter.module = 'speaking';
+    // Over-fetch to compensate for deduplication, then take exactly `limit` unique entries.
+    const fetchMultiplier = 3;
+    const [rawRows, rawTotal] = await Promise.all([
+      CollocationEntryModel.find(filter).sort({ qualityScore: -1, updatedAt: -1 }).skip(offset * fetchMultiplier).limit(limit * fetchMultiplier).lean(),
       CollocationEntryModel.countDocuments(filter)
     ]);
+
+    const seen = new Set<string>();
+    const rows = rawRows.filter(row => {
+      const key = row.phrase.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, limit);
+    const estimatedTotal = Math.ceil(rawTotal / fetchMultiplier);
 
     return {
       items: rows.map(row => ({
@@ -705,20 +719,34 @@ export class GrowthService {
         difficulty: this.toDifficulty(row.cefr),
         qualityScore: row.qualityScore
       })),
-      total,
+      total: estimatedTotal,
       limit,
       offset,
-      hasMore: offset + rows.length < total
+      hasMore: offset + rows.length < estimatedTotal
     };
   }
 
   public async listVocabulary(query: LibraryQuery) {
     const { limit, offset } = this.resolvePagination(query.limit, query.offset, 24, 0, 200);
     const filter = this.buildLibraryFilter(query);
-    const [rows, total] = await Promise.all([
-      LexiconEntryModel.find(filter).sort({ qualityScore: -1, frequencyRank: 1, updatedAt: -1 }).skip(offset).limit(limit).lean(),
+    // When no module is selected, default to one representative module to avoid
+    // showing 4 duplicate cards per lemma (one per IELTS module).
+    if (!filter.module) filter.module = 'speaking';
+    // Over-fetch to compensate for deduplication, then take exactly `limit` unique entries.
+    const fetchMultiplier = 3;
+    const [rawRows, rawTotal] = await Promise.all([
+      LexiconEntryModel.find(filter).sort({ qualityScore: -1, updatedAt: -1 }).skip(offset * fetchMultiplier).limit(limit * fetchMultiplier).lean(),
       LexiconEntryModel.countDocuments(filter)
     ]);
+
+    const seen = new Set<string>();
+    const rows = rawRows.filter(row => {
+      const key = row.lemma.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, limit);
+    const estimatedTotal = Math.ceil(rawTotal / fetchMultiplier);
 
     return {
       items: rows.map(row => ({
@@ -733,10 +761,10 @@ export class GrowthService {
         difficulty: this.toDifficulty(row.cefr),
         qualityScore: row.qualityScore
       })),
-      total,
+      total: estimatedTotal,
       limit,
       offset,
-      hasMore: offset + rows.length < total
+      hasMore: offset + rows.length < estimatedTotal
     };
   }
 
