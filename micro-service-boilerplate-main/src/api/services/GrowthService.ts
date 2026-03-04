@@ -71,7 +71,7 @@ export class GrowthService {
     limit?: number;
     offset?: number;
   }) {
-    const { limit, offset } = this.resolvePagination(query.limit, query.offset, 20, 0, 100);
+    const { limit, offset } = this.resolvePagination(query.limit, query.offset, 24, 0, 500);
     const now = new Date();
     const filter: Record<string, unknown> = {
       state: 'published',
