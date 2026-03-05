@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 
 export class GenerateWritingTaskRequest {
   @IsOptional()
@@ -8,6 +8,11 @@ export class GenerateWritingTaskRequest {
   @IsOptional()
   @IsIn(['task1', 'task2'])
   taskType?: 'task1' | 'task2';
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeTaskIds?: string[];
 }
 
 export class SubmitWritingRequest {

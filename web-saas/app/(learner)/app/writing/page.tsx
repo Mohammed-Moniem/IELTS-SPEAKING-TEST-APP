@@ -12,6 +12,7 @@ import { WritingSubmission, WritingTask } from '@/lib/types';
 const draftStorageKey = (taskId?: string) => `spokio.web.writing.draft.${taskId || 'no-task'}`;
 const draftSnapshotStorageKey = 'spokio.web.writing.savedDraftSnapshots';
 const recoveryStorageKey = 'spokio.web.writing.recovery';
+const pendingAttemptStorageKey = 'spokio.web.writing.pendingAttempts';
 const deepFeedbackUiEnabled = (process.env.NEXT_PUBLIC_WRITING_DEEP_FEEDBACK_V2 || 'true') === 'true';
 
 type RecoveryDraft = {
@@ -32,6 +33,15 @@ type DraftSnapshot = {
   id: string;
   task: WritingTask;
   responseText: string;
+  savedAt: string;
+};
+
+type PendingWritingAttempt = {
+  id: string;
+  task: WritingTask;
+  responseText: string;
+  elapsedSeconds: number;
+  timerSecondsLeft: number;
   savedAt: string;
 };
 
@@ -94,24 +104,6 @@ const deriveTask1GraphPoints = (task: WritingTask): Task1GraphPoint[] => {
   });
 
   return points;
-};
-
-const parseStoredDraftPayload = (raw: string | null): StoredDraftPayload | null => {
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as StoredDraftPayload;
-    return {
-      responseText: typeof parsed.responseText === 'string' ? parsed.responseText : '',
-      taskSnapshot: parsed.taskSnapshot,
-      savedAt: parsed.savedAt,
-      source: parsed.source
-    };
-  } catch {
-    return {
-      responseText: raw
-    };
-  }
 };
 
 const serializeStoredDraftPayload = (
@@ -213,15 +205,30 @@ const normalizeSubmissionTask = (submission: WritingSubmission): WritingTask | n
   return null;
 };
 
+const resolveSubmissionTaskId = (submission: WritingSubmission): string => {
+  const taskRef = submission.taskId;
+  if (typeof taskRef === 'string') return taskRef;
+  if (taskRef && typeof taskRef === 'object') {
+    const nestedId = (taskRef.taskId || (taskRef as { _id?: string })._id || '').toString().trim();
+    return nestedId;
+  }
+  return '';
+};
+
 export default function WritingPage() {
   const searchParams = useSearchParams();
   const timerRef = useRef<number | null>(null);
+  const latestTaskRef = useRef<WritingTask | null>(null);
+  const latestResponseTextRef = useRef('');
+  const latestElapsedSecondsRef = useRef(0);
+  const latestTimerSecondsLeftRef = useRef(0);
   const [track, setTrack] = useState<'academic' | 'general'>('academic');
   const [taskType, setTaskType] = useState<'task1' | 'task2'>('task2');
   const [task, setTask] = useState<WritingTask | null>(null);
   const [responseText, setResponseText] = useState('');
   const [result, setResult] = useState<WritingSubmission | null>(null);
   const [history, setHistory] = useState<WritingSubmission[]>([]);
+  const [pendingAttempts, setPendingAttempts] = useState<PendingWritingAttempt[]>([]);
   const [draftSnapshots, setDraftSnapshots] = useState<DraftSnapshot[]>([]);
   const [selectedSubmission, setSelectedSubmission] = useState<WritingSubmission | null>(null);
   const [timerSecondsLeft, setTimerSecondsLeft] = useState(0);
@@ -309,6 +316,22 @@ export default function WritingPage() {
         : [],
     [task]
   );
+  const generationExcludedTaskIds = useMemo(() => {
+    const excluded = new Set<string>();
+    if (task?.taskId) excluded.add(task.taskId);
+
+    pendingAttempts.forEach(item => {
+      if (item.task?.taskId) excluded.add(item.task.taskId);
+      if (item.id) excluded.add(item.id);
+    });
+
+    history.forEach(item => {
+      const taskId = resolveSubmissionTaskId(item);
+      if (taskId) excluded.add(taskId);
+    });
+
+    return Array.from(excluded);
+  }, [task?.taskId, pendingAttempts, history]);
 
   const weakestWritingCriterion = useMemo(() => {
     if (!selectedSubmission) return '';
@@ -346,6 +369,20 @@ export default function WritingPage() {
     }
     setIsTimerPaused(true);
   }, []);
+
+  const resumeTimerFromSnapshot = useCallback(
+    (secondsLeft: number, elapsed: number) => {
+      stopTimer();
+      setTimerSecondsLeft(secondsLeft);
+      setElapsedSeconds(elapsed);
+      setIsTimerPaused(false);
+      timerRef.current = window.setInterval(() => {
+        setTimerSecondsLeft(prev => Math.max(prev - 1, 0));
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    },
+    [stopTimer]
+  );
 
   const resumeTimer = useCallback(() => {
     if (timerRef.current || !task || timerSecondsLeft <= 0) {
@@ -403,6 +440,52 @@ export default function WritingPage() {
     [readDraftSnapshots]
   );
 
+  const readPendingAttempts = useCallback((): PendingWritingAttempt[] => {
+    const raw = window.localStorage.getItem(pendingAttemptStorageKey);
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw) as PendingWritingAttempt[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(
+          item =>
+            Boolean(item?.id) &&
+            Boolean(item?.task?.taskId) &&
+            typeof item?.responseText === 'string' &&
+            typeof item?.elapsedSeconds === 'number' &&
+            typeof item?.timerSecondsLeft === 'number' &&
+            Boolean(item?.savedAt)
+        )
+        .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const syncPendingAttempts = useCallback(() => {
+    setPendingAttempts(readPendingAttempts());
+  }, [readPendingAttempts]);
+
+  const upsertPendingAttempt = useCallback(
+    (attempt: PendingWritingAttempt) => {
+      const existing = readPendingAttempts().filter(item => item.id !== attempt.id);
+      const next = [attempt, ...existing].slice(0, 30);
+      window.localStorage.setItem(pendingAttemptStorageKey, JSON.stringify(next));
+      setPendingAttempts(next);
+    },
+    [readPendingAttempts]
+  );
+
+  const removePendingAttempt = useCallback(
+    (attemptId: string) => {
+      const next = readPendingAttempts().filter(item => item.id !== attemptId);
+      window.localStorage.setItem(pendingAttemptStorageKey, JSON.stringify(next));
+      setPendingAttempts(next);
+    },
+    [readPendingAttempts]
+  );
+
   const loadTaskIntoWorkspace = useCallback(
     (nextTask: WritingTask, nextResponseText: string, message: string) => {
       setTask(nextTask);
@@ -418,6 +501,27 @@ export default function WritingPage() {
       setStatusMessage(message);
     },
     [startTimer]
+  );
+
+  const resumePendingAttempt = useCallback(
+    (attempt: PendingWritingAttempt) => {
+      setTask(attempt.task);
+      setTrack(attempt.task.track);
+      setTaskType(attempt.task.taskType);
+      setResponseText(attempt.responseText);
+      setResult(null);
+      setSelectedSubmission(null);
+      resumeTimerFromSnapshot(
+        Math.max(0, Math.round(attempt.timerSecondsLeft)),
+        Math.max(0, Math.round(attempt.elapsedSeconds))
+      );
+      const fingerprint = buildEssayFingerprint(attempt.task.taskId, attempt.responseText);
+      setBaselineFingerprint(fingerprint);
+      setLastPersistedFingerprint(fingerprint);
+      setStatusMessage('Pending writing attempt loaded. Timer resumed automatically.');
+      removePendingAttempt(attempt.id);
+    },
+    [removePendingAttempt, resumeTimerFromSnapshot]
   );
 
   const loadHistory = useCallback(async () => {
@@ -436,23 +540,18 @@ export default function WritingPage() {
     try {
       const generated = await apiRequest<WritingTask>('/writing/tasks/generate', {
         method: 'POST',
-        body: JSON.stringify({ track, taskType })
+        body: JSON.stringify({ track, taskType, excludeTaskIds: generationExcludedTaskIds })
       });
 
       setTask(generated);
       setResult(null);
       setSelectedSubmission(null);
-
-      const storedDraft = parseStoredDraftPayload(window.localStorage.getItem(draftStorageKey(generated.taskId)));
-      const restoredText = storedDraft?.responseText || '';
-      setResponseText(restoredText);
+      setResponseText('');
       startTimer((generated.suggestedTimeMinutes || 20) * 60);
-      const fingerprint = buildEssayFingerprint(generated.taskId, restoredText);
+      const fingerprint = buildEssayFingerprint(generated.taskId, '');
       setBaselineFingerprint(fingerprint);
       setLastPersistedFingerprint(fingerprint);
-      if (restoredText.trim().length > 0) {
-        setStatusMessage('Recovered your saved draft for this task.');
-      }
+      setStatusMessage('Started a fresh writing task.');
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to generate writing task.');
@@ -491,6 +590,7 @@ export default function WritingPage() {
 
       window.localStorage.removeItem(recoveryStorageKey);
       window.localStorage.removeItem(draftStorageKey(task.taskId));
+      removePendingAttempt(task.taskId);
       setResult(submission);
       setSelectedSubmission(submission);
       stopTimer();
@@ -499,6 +599,7 @@ export default function WritingPage() {
       setStatusMessage('Essay submitted successfully. Open Full Eval for complete scoring details.');
       await loadHistory();
       syncDraftSnapshots();
+      syncPendingAttempts();
     } catch (err) {
       if (handleUsageLimitRedirect(err)) return;
       setError(err instanceof ApiError ? err.message : 'Failed to submit writing response.');
@@ -562,13 +663,25 @@ export default function WritingPage() {
   };
 
   const saveDraftForNavigation = useCallback(async () => {
-    if (!task) return;
-    const serialized = serializeStoredDraftPayload(task, responseText, 'manual');
-    window.localStorage.setItem(draftStorageKey(task.taskId), serialized);
+    const activeTask = latestTaskRef.current;
+    if (!activeTask) return;
+    const activeResponseText = latestResponseTextRef.current;
+    const elapsed = latestElapsedSecondsRef.current;
+    const timerLeft = latestTimerSecondsLeftRef.current;
+    const serialized = serializeStoredDraftPayload(activeTask, activeResponseText, 'manual');
+    window.localStorage.setItem(draftStorageKey(activeTask.taskId), serialized);
+    upsertPendingAttempt({
+      id: activeTask.taskId,
+      task: activeTask,
+      responseText: activeResponseText,
+      elapsedSeconds: elapsed,
+      timerSecondsLeft: timerLeft,
+      savedAt: new Date().toISOString()
+    });
     pauseTimer();
-    setLastPersistedFingerprint(buildEssayFingerprint(task.taskId, responseText));
+    setLastPersistedFingerprint(buildEssayFingerprint(activeTask.taskId, activeResponseText));
     setStatusMessage('Draft saved before leaving. You can resume this writing attempt later.');
-  }, [pauseTimer, responseText, task]);
+  }, [pauseTimer, upsertPendingAttempt]);
 
   useEffect(() => {
     void loadHistory();
@@ -588,6 +701,26 @@ export default function WritingPage() {
   useEffect(() => {
     syncDraftSnapshots();
   }, [syncDraftSnapshots]);
+
+  useEffect(() => {
+    syncPendingAttempts();
+  }, [syncPendingAttempts]);
+
+  useEffect(() => {
+    latestTaskRef.current = task;
+  }, [task]);
+
+  useEffect(() => {
+    latestResponseTextRef.current = responseText;
+  }, [responseText]);
+
+  useEffect(() => {
+    latestElapsedSecondsRef.current = elapsedSeconds;
+  }, [elapsedSeconds]);
+
+  useEffect(() => {
+    latestTimerSecondsLeftRef.current = timerSecondsLeft;
+  }, [timerSecondsLeft]);
 
   useEffect(() => {
     if (!task) return;
@@ -838,8 +971,11 @@ export default function WritingPage() {
               </article>
               {(task.instructions || []).length > 0 ? (
                 <ul className="space-y-1.5">
-                  {(task.instructions || []).slice(0, 3).map(rule => (
-                    <li key={rule} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  {(task.instructions || []).slice(0, 3).map((rule, index) => (
+                    <li
+                      key={`${task.taskId || 'task'}-instruction-${index}-${rule}`}
+                      className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400"
+                    >
                       <span className="material-symbols-outlined text-[14px] text-violet-500 mt-0.5">check_circle</span>
                       {rule}
                     </li>
@@ -1031,7 +1167,11 @@ export default function WritingPage() {
       {/* ── History table ── */}
       <SectionCard
         title="Recent Writing History"
-        actions={<span className="text-xs text-gray-500 dark:text-gray-400">{history.length} submissions</span>}
+        actions={
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {pendingAttempts.length} pending · {history.length} submissions
+          </span>
+        }
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px]">
@@ -1046,6 +1186,38 @@ export default function WritingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {pendingAttempts.map(item => (
+                <tr
+                  key={`pending-${item.id}`}
+                  className="bg-amber-50/60 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+                >
+                  <td className="px-5 py-3.5 text-sm font-mono text-gray-600 dark:text-gray-400">{`${item.id.slice(0, 8)}…`}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300">{item.task.track || '-'}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300">
+                    {item.task.taskType === 'task1' ? 'Task 1' : item.task.taskType === 'task2' ? 'Task 2' : '-'}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm font-semibold text-amber-700 dark:text-amber-300">Pending resume</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400">{new Date(item.savedAt).toLocaleString()}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-sm font-semibold text-violet-600 dark:text-violet-400 hover:underline"
+                        onClick={() => resumePendingAttempt(item)}
+                      >
+                        Resume
+                      </button>
+                      <button
+                        type="button"
+                        className="text-sm font-semibold text-gray-600 dark:text-gray-300 hover:underline"
+                        onClick={() => removePendingAttempt(item.id)}
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
               {history.map(item => (
                 <tr key={item._id || `${item.createdAt || ''}-${item.overallBand || 0}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-5 py-3.5 text-sm font-mono text-gray-600 dark:text-gray-400">{typeof item._id === 'string' ? `${item._id.slice(0, 8)}…` : 'n/a'}</td>
@@ -1063,6 +1235,13 @@ export default function WritingPage() {
                   </td>
                 </tr>
               ))}
+              {pendingAttempts.length === 0 && history.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No writing activity yet. Generate a task to begin.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

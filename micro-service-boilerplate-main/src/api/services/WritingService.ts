@@ -73,7 +73,7 @@ export class WritingService {
 
   public async generateTask(
     userId: string,
-    input: { track: WritingTrack; taskType: WritingTaskType },
+    input: { track: WritingTrack; taskType: WritingTaskType; excludeTaskIds?: string[] },
     headers: IRequestHeaders
   ) {
     const logMessage = constructLogMessage(__filename, 'generateTask', headers);
@@ -85,7 +85,12 @@ export class WritingService {
     const seenTaskIds = await this.getSeenTaskIds(userId, input.track, input.taskType);
     const recentlyGeneratedTaskIds = this.getRecentlyGeneratedTaskIds(userId, input.track, input.taskType);
     const recentlyGeneratedFingerprints = this.getRecentlyGeneratedFingerprints(userId, input.track, input.taskType);
-    const excludedTaskIds = new Set<string>([...seenTaskIds, ...recentlyGeneratedTaskIds]);
+    const requestExcludedTaskIds = (input.excludeTaskIds || []).map(value => `${value || ''}`.trim()).filter(Boolean);
+    const excludedTaskIds = new Set<string>([
+      ...seenTaskIds,
+      ...recentlyGeneratedTaskIds,
+      ...requestExcludedTaskIds
+    ]);
     const fallbackContent = this.buildFallbackTaskContent(input.track, input.taskType, recentlyGeneratedFingerprints);
 
     const baseTaskFilter = {

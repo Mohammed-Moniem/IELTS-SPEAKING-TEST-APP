@@ -27,7 +27,11 @@ export class WritingController {
     try {
       const track = body.track || 'academic';
       const taskType = body.taskType || 'task2';
-      const task = await this.writingService.generateTask(req.currentUser.id, { track, taskType }, headers);
+      const task = await this.writingService.generateTask(
+        req.currentUser.id,
+        { track, taskType, excludeTaskIds: body.excludeTaskIds || [] },
+        headers
+      );
       return StandardResponse.success(res, task, undefined, HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
