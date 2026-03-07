@@ -188,6 +188,16 @@ describe('TestSimulationService runtime contract', () => {
         ])
       })
     );
+    expect((result as any).telemetry).toEqual(
+      expect.objectContaining({
+        packageBuildDurationMs: expect.any(Number),
+        baseAudioAssetHits: 1,
+        baseAudioAssetMisses: 0,
+        followUpCacheHits: 0,
+        followUpCacheMisses: 0,
+        examinerProfileId: 'british'
+      })
+    );
     expect(result.runtime).toEqual(
       expect.objectContaining({
         state: 'intro-examiner',
@@ -312,6 +322,13 @@ describe('TestSimulationService runtime contract', () => {
         })
       ])
     );
+    expect((followUp as any).telemetry).toEqual(
+      expect.objectContaining({
+        examinerProfileId: 'british',
+        followUpCacheHits: 0,
+        followUpCacheMisses: 1
+      })
+    );
     expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledWith(
       expect.any(Array),
       1,
@@ -319,6 +336,35 @@ describe('TestSimulationService runtime contract', () => {
         seedPrompt: 'Do you live in a house or an apartment?',
         followUpMode: 'single_narrow',
         voiceProfileId: 'british'
+      })
+    );
+  });
+
+  it('tracks adaptive follow-up cache hits in telemetry', async () => {
+    speechService.generateBufferedExaminerFollowUp.mockResolvedValueOnce({
+      text: 'Could you tell me a little more about that?',
+      audioAssetId: 'asset-follow-up',
+      audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3',
+      cacheKey: 'dynamic-follow-up:british:could-you-tell-me-a-little-more-about-that',
+      provider: 'openai',
+      cacheHit: true
+    });
+
+    const service = createService();
+    await startThroughFirstPart1CandidateTurn(service);
+
+    const followUp = await service.submitRuntimeAnswer(
+      'user-1',
+      'simulation-1',
+      { transcript: 'I live in an apartment near the city centre.', durationSeconds: 9 },
+      { urc: 'answer-cache-hit' } as any
+    );
+
+    expect((followUp as any).telemetry).toEqual(
+      expect.objectContaining({
+        examinerProfileId: 'british',
+        followUpCacheHits: 1,
+        followUpCacheMisses: 0
       })
     );
   });

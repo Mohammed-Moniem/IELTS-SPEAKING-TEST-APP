@@ -74,6 +74,15 @@ export interface TestSimulationRuntimeDto {
   currentSegment: TestSimulationRuntimeSegmentDto;
 }
 
+export interface TestSimulationTelemetryDto {
+  packageBuildDurationMs: number;
+  baseAudioAssetHits: number;
+  baseAudioAssetMisses: number;
+  followUpCacheHits: number;
+  followUpCacheMisses: number;
+  examinerProfileId: string;
+}
+
 export interface TestSimulationSessionResponseDto {
   simulationId: string;
   status?: string;
@@ -81,6 +90,7 @@ export interface TestSimulationSessionResponseDto {
   runtime: TestSimulationRuntimeDto;
   currentPart?: unknown;
   sessionPackage?: SpeakingSessionPackageDto;
+  telemetry?: TestSimulationTelemetryDto;
 }
 
 export class TestPartInput {

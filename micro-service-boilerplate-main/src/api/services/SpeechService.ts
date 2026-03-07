@@ -92,7 +92,12 @@ export class SpeechService {
     const optimizeStreamingLatency = options.optimizeStreamingLatency ?? env.elevenlabs.optimizeStreamingLatency ?? 0;
     const cacheTtlMs = Math.max(0, (env.elevenlabs.cacheTtlSeconds ?? 0) * 1000);
     const now = Date.now();
-    const preferredProvider = options.provider || (env.elevenlabs?.apiKey ? 'elevenlabs' : 'openai');
+    const elevenLabsEnabled = Boolean(env.elevenlabs?.apiKey) && !env.speaking.disableElevenLabsHotPath;
+    const requestedProvider = options.provider;
+    const preferredProvider =
+      requestedProvider === 'elevenlabs' && !elevenLabsEnabled
+        ? 'openai'
+        : requestedProvider || (elevenLabsEnabled ? 'elevenlabs' : 'openai');
 
     if (preferredProvider === 'elevenlabs') {
       const elevenLabsVoiceId = options.voiceId || env.elevenlabs.voiceId;
@@ -348,6 +353,7 @@ export class SpeechService {
     const cachedAsset = await this.speakingAudioAssetService.getDynamicFollowUpAsset(examinerProfile.id, text);
 
     if (cachedAsset?.publicUrl && cachedAsset.status === 'ready') {
+      this.log.info(`Speaking follow-up cache hit (profile=${examinerProfile.id}, key=${cacheKey})`);
       return {
         text,
         audioAssetId: typeof cachedAsset._id === 'string' ? cachedAsset._id : cachedAsset._id?.toString?.() || cacheKey,
@@ -371,6 +377,8 @@ export class SpeechService {
       audioBuffer: synthesized.buffer,
       mimeType: 'audio/mpeg'
     });
+
+    this.log.info(`Speaking follow-up cache miss (profile=${examinerProfile.id}, key=${cacheKey})`);
 
     return {
       text,

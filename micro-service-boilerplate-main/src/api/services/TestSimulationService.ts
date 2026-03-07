@@ -36,10 +36,20 @@ interface RuntimeAnswerPayload {
   durationSeconds?: number;
 }
 
+interface SimulationRuntimeTelemetry {
+  packageBuildDurationMs: number;
+  baseAudioAssetHits: number;
+  baseAudioAssetMisses: number;
+  followUpCacheHits: number;
+  followUpCacheMisses: number;
+  examinerProfileId: string;
+}
+
 @Service()
 export class TestSimulationService {
   private log = new Logger(__filename);
   private readonly examinerPhraseService = new ExaminerPhraseService();
+  private readonly runtimeTelemetryBySimulation = new Map<string, SimulationRuntimeTelemetry>();
 
   constructor(
     private readonly usageService: UsageService,
@@ -65,7 +75,9 @@ export class TestSimulationService {
 
     const parts = await this.buildSimulationParts(userId, headers);
     const runtime = this.buildInitialRuntime();
+    const packageBuildStartedAt = Date.now();
     const sessionPackage = await this.sessionPackageService.buildSessionPackage(parts);
+    const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
     const simulation = (await TestSimulationModel.create({
       user: userId,
       status: 'in_progress',
@@ -85,13 +97,23 @@ export class TestSimulationService {
       startedAt: new Date()
     })) as TestSimulationDocument;
 
+    this.recordSessionPackageTelemetry(
+      simulation._id,
+      sessionPackage,
+      packageBuildDurationMs
+    );
+
     this.log.info(`${logMessage} :: Started simulation ${simulation._id}`);
+    this.log.info(
+      `${logMessage} :: Speaking package telemetry buildMs=${packageBuildDurationMs} baseHits=${this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)?.baseAudioAssetHits ?? 0} baseMisses=${this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)?.baseAudioAssetMisses ?? 0} examiner=${sessionPackage.examinerProfile.id}`
+    );
 
     return {
       simulationId: simulation._id,
       parts,
       runtime,
-      sessionPackage
+      sessionPackage,
+      telemetry: this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)
     };
   }
 
@@ -305,6 +327,7 @@ export class TestSimulationService {
           text: followUp.text
         };
         this.appendDynamicFollowUpSegment(simulation, partNumber, followUp);
+        this.recordFollowUpCacheTelemetry(simulation._id, followUp.cacheHit);
 
         await simulation.save();
         return this.buildRuntimeResponse(simulation);
@@ -447,6 +470,7 @@ export class TestSimulationService {
     }
 
     if (!simulation.sessionPackage) {
+      const packageBuildStartedAt = Date.now();
       simulation.sessionPackage = await this.sessionPackageService.buildSessionPackage(
         simulation.parts.map(part => ({
           part: part.part,
@@ -456,6 +480,15 @@ export class TestSimulationService {
           timeLimit: part.timeLimit || 0,
           tips: part.tips || []
         }))
+      );
+      const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
+      this.recordSessionPackageTelemetry(
+        simulation._id,
+        simulation.sessionPackage,
+        packageBuildDurationMs
+      );
+      this.log.info(
+        `Hydrated missing speaking session package for simulation ${simulationId} (buildMs=${packageBuildDurationMs})`
       );
 
       await simulation.save();
@@ -470,8 +503,80 @@ export class TestSimulationService {
       status: simulation.status,
       runtime: simulation.runtime,
       currentPart: simulation.parts.find(part => part.part === simulation.runtime?.currentPart),
-      sessionPackage: simulation.sessionPackage
+      sessionPackage: simulation.sessionPackage,
+      telemetry: this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)
     };
+  }
+
+  private recordSessionPackageTelemetry(
+    simulationId: string,
+    sessionPackage: TestSimulationDocument['sessionPackage'],
+    packageBuildDurationMs: number
+  ) {
+    if (!sessionPackage) {
+      return;
+    }
+
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    const baseSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    const baseAudioAssetHits = baseSegments.filter(segment => this.isPrebuiltAudioHit(segment)).length;
+    const baseAudioAssetMisses = Math.max(baseSegments.length - baseAudioAssetHits, 0);
+
+    this.runtimeTelemetryBySimulation.set(simulationId, {
+      packageBuildDurationMs,
+      baseAudioAssetHits,
+      baseAudioAssetMisses,
+      followUpCacheHits: existing?.followUpCacheHits ?? 0,
+      followUpCacheMisses: existing?.followUpCacheMisses ?? 0,
+      examinerProfileId: sessionPackage.examinerProfile.id
+    });
+  }
+
+  private recordFollowUpCacheTelemetry(simulationId: string, cacheHit: boolean) {
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    if (!existing) {
+      return;
+    }
+
+    this.runtimeTelemetryBySimulation.set(simulationId, {
+      ...existing,
+      followUpCacheHits: existing.followUpCacheHits + (cacheHit ? 1 : 0),
+      followUpCacheMisses: existing.followUpCacheMisses + (cacheHit ? 0 : 1)
+    });
+  }
+
+  private getSimulationTelemetry(
+    simulationId: string,
+    sessionPackage: TestSimulationDocument['sessionPackage']
+  ) {
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    if (existing) {
+      return existing;
+    }
+
+    if (!sessionPackage) {
+      return undefined;
+    }
+
+    const baseSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    const baseAudioAssetHits = baseSegments.filter(segment => this.isPrebuiltAudioHit(segment)).length;
+    const telemetry: SimulationRuntimeTelemetry = {
+      packageBuildDurationMs: 0,
+      baseAudioAssetHits,
+      baseAudioAssetMisses: Math.max(baseSegments.length - baseAudioAssetHits, 0),
+      followUpCacheHits: 0,
+      followUpCacheMisses: 0,
+      examinerProfileId: sessionPackage.examinerProfile.id
+    };
+
+    this.runtimeTelemetryBySimulation.set(simulationId, telemetry);
+    return telemetry;
+  }
+
+  private isPrebuiltAudioHit(
+    segment: NonNullable<TestSimulationDocument['sessionPackage']>['segments'][number]
+  ) {
+    return Boolean(segment.audioAssetId && segment.cacheKey && segment.audioAssetId !== segment.cacheKey);
   }
 
   private moveToCachedPhrase(

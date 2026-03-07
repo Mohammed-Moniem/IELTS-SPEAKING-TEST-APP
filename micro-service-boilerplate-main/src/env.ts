@@ -151,7 +151,8 @@ export const env = {
   },
   speaking: {
     audioBaseUrl: getOsEnv('SPEAKING_AUDIO_BASE_URL') || 'https://storage.spokio.local/speaking',
-    defaultExaminerProfile: getOsEnv('SPEAKING_DEFAULT_EXAMINER_PROFILE') || 'auto'
+    defaultExaminerProfile: getOsEnv('SPEAKING_DEFAULT_EXAMINER_PROFILE') || 'auto',
+    disableElevenLabsHotPath: toBool(getOsEnv('SPEAKING_DISABLE_ELEVENLABS_HOT_PATH') || 'false')
   },
   storage: {
     provider: getOsEnv('STORAGE_PROVIDER') || 'supabase', // 'supabase', 'mongodb', or 's3'
