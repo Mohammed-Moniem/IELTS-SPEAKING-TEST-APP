@@ -35,7 +35,13 @@ const buildIdentity = (request: NextRequest): string => {
 };
 
 // Routes that are disabled (feature not yet launched) – redirect to dashboard
-const DISABLED_APP_ROUTES = ['/app/achievements', '/app/leaderboard', '/app/rewards'];
+const DISABLED_APP_ROUTES = [
+  '/app/achievements',
+  '/app/leaderboard',
+  '/app/rewards',
+  '/app/library/books',
+  '/app/library/channels'
+];
 
 export function middleware(request: NextRequest) {
   // Block disabled app routes – redirect to dashboard
@@ -76,5 +82,14 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/pricing', '/register', '/app/achievements/:path*', '/app/leaderboard/:path*', '/app/rewards/:path*']
+  matcher: [
+    '/',
+    '/pricing',
+    '/register',
+    '/app/achievements/:path*',
+    '/app/leaderboard/:path*',
+    '/app/rewards/:path*',
+    '/app/library/books/:path*',
+    '/app/library/channels/:path*'
+  ]
 };

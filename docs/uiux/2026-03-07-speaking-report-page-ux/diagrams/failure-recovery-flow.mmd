@@ -1,0 +1,11 @@
+flowchart LR
+  A["Learner opens full report"] --> B{"Report loads?"}
+  B -->|"Yes"| C["Render report hero and details"]
+  B -->|"No"| D["Show report error state"]
+  D --> E{"Can recover?"}
+  E -->|"Retry"| F["Reload report"]
+  F --> B
+  E -->|"Exit"| G["Back to Speaking"]
+  C --> H{"Feedback complete?"}
+  H -->|"Yes"| I["Show full debrief"]
+  H -->|"Partial"| J["Show partial report with explanation and next actions"]

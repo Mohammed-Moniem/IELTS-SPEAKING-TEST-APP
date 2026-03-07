@@ -1,0 +1,8 @@
+flowchart LR
+  A["Learner opens full report"] --> B["Hero shows band, verdict, and next action"]
+  B --> C["Learner scans 'Why this score happened'"]
+  C --> D{"Need more detail?"}
+  D -->|"No"| E["Clicks retry or targeted practice CTA"]
+  D -->|"Yes"| F["Reads transcript and rubric detail"]
+  F --> G["Understands strengths and improvements"]
+  G --> E

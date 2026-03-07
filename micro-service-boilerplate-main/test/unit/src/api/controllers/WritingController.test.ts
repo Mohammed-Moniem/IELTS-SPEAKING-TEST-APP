@@ -54,7 +54,7 @@ describe('WritingController', () => {
     expect(response.body.data.taskId).toBe('task-1');
     expect(mockService.generateTask).toHaveBeenCalledWith(
       '507f1f77bcf86cd799439011',
-      { track: 'general', taskType: 'task1' },
+      { track: 'general', taskType: 'task1', excludeTaskIds: [] },
       expect.objectContaining({ urc: 'writing-generate-test' })
     );
   });

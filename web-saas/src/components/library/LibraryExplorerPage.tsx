@@ -23,9 +23,7 @@ type LibraryQuery = {
 
 const libraryNav: Array<{ href: string; label: string; kind: LibraryKind }> = [
   { href: '/app/library/collocations', label: 'Collocations', kind: 'collocations' },
-  { href: '/app/library/vocabulary', label: 'Vocabulary', kind: 'vocabulary' },
-  { href: '/app/library/books', label: 'Books', kind: 'books' },
-  { href: '/app/library/channels', label: 'Channels', kind: 'channels' }
+  { href: '/app/library/vocabulary', label: 'Vocabulary', kind: 'vocabulary' }
 ];
 
 const moduleOptions = [

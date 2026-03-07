@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { bootstrapSession, mockAppConfig, mockJsonSuccess } from './helpers/mockApi';
 
 test.describe('Learner notification settings', () => {
-  test('loads preferences and persists toggle updates', async ({ page }) => {
+  test('hides social notification toggles and persists visible preference updates', async ({ page }) => {
     await bootstrapSession(page);
     await mockAppConfig(page);
 
@@ -44,14 +44,23 @@ test.describe('Learner notification settings', () => {
 
     await page.goto('/app/settings');
     await expect(page.getByRole('heading', { name: /Profile\s*&\s*Notification Preferences/i })).toBeVisible();
+    await expect(page.getByText('Study Preferences')).toBeVisible();
+    await expect(page.getByText('Browser notifications are not available in this browser yet.')).toBeVisible();
+    await expect(page.getByText('Study Defaults (UI Only)')).toHaveCount(0);
+    await expect(page.getByText('unsupported')).toHaveCount(0);
+    await expect(page.getByText('not registered')).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: /Direct messages/i })).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: /Group messages/i })).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: /Friend requests/i })).toHaveCount(0);
+    await expect(page.getByRole('switch', { name: /Friend acceptances/i })).toHaveCount(0);
 
-    const friendRequestsToggle = page.getByRole('switch', { name: /Friend requests/i });
-    await expect(friendRequestsToggle).toHaveAttribute('aria-checked', 'true');
-    await friendRequestsToggle.click();
-    await expect(friendRequestsToggle).toHaveAttribute('aria-checked', 'false');
+    const systemAnnouncementsToggle = page.getByRole('switch', { name: /System announcements/i });
+    await expect(systemAnnouncementsToggle).toHaveAttribute('aria-checked', 'true');
+    await systemAnnouncementsToggle.click();
+    await expect(systemAnnouncementsToggle).toHaveAttribute('aria-checked', 'false');
 
     await expect(page.getByText('Notification preferences updated')).toBeVisible();
     expect(putCalls.length).toBeGreaterThan(0);
-    expect(putCalls.at(-1)?.friendRequestsEnabled).toBe(false);
+    expect(putCalls.at(-1)?.systemAnnouncementsEnabled).toBe(false);
   });
 });

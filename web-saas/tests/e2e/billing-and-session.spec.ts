@@ -141,6 +141,140 @@ const gotoStable = async (page: Page, routePath: string) => {
 };
 
 test.describe('Billing and auth session runtime hardening', () => {
+  test('aligns billing plan actions across cards with uneven content', async ({ page }) => {
+    await setupLearnerContext(page);
+
+    await page.route('**/api/v1/subscription/plans', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          plans: [
+            {
+              tier: 'premium',
+              name: 'Premium',
+              headline: 'Focused daily practice',
+              description: 'Solid AI support for learners who want steady weekly progress.',
+              audience: 'Daily learners',
+              features: [
+                'AI feedback across every IELTS module',
+                'Structured daily practice without advanced analytics',
+                'Core progress tracking for consistency'
+              ],
+              pricing: {
+                currency: 'USD',
+                monthly: { amount: 19, priceId: 'price_premium_monthly' }
+              },
+              limits: {
+                practiceSessionsPerMonth: -1,
+                simulationSessionsPerMonth: -1,
+                writingSubmissionsPerMonth: -1,
+                readingAttemptsPerMonth: -1,
+                listeningAttemptsPerMonth: -1
+              }
+            },
+            {
+              tier: 'pro',
+              name: 'Pro',
+              headline: 'Advanced acceleration with personalized strategy',
+              description:
+                'Advanced analytics, priority AI scoring, custom study plans, and score prediction for exam sprints.',
+              audience: 'Advanced learners',
+              recommended: true,
+              features: [
+                'Everything in Premium with priority scoring throughput',
+                'Advanced analytics and full mock readiness',
+                'Custom study plans and score prediction',
+                'Band Score Improvement Guarantee included'
+              ],
+              pricing: {
+                currency: 'USD',
+                monthly: { amount: 49, priceId: 'price_pro_monthly' }
+              },
+              limits: {
+                practiceSessionsPerMonth: -1,
+                simulationSessionsPerMonth: -1,
+                writingSubmissionsPerMonth: -1,
+                readingAttemptsPerMonth: -1,
+                listeningAttemptsPerMonth: -1
+              }
+            },
+            {
+              tier: 'team',
+              name: 'Team',
+              headline: 'Small cohorts and coaching teams',
+              description:
+                'Coach dashboard and student management for mentor-led cohorts and institutions.',
+              audience: 'Teams',
+              features: [
+                'Everything in Pro with shared throughput',
+                'Coach dashboard and student management',
+                'Group analytics and operational support'
+              ],
+              pricing: {
+                currency: 'USD',
+                monthly: { amount: 99, priceId: 'price_team_monthly' }
+              },
+              limits: {
+                practiceSessionsPerMonth: -1,
+                simulationSessionsPerMonth: -1,
+                writingSubmissionsPerMonth: -1,
+                readingAttemptsPerMonth: -1,
+                listeningAttemptsPerMonth: -1
+              }
+            }
+          ]
+        })
+      )
+    );
+
+    await page.route('**/api/v1/subscription/current', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          planType: 'free',
+          status: 'active'
+        })
+      )
+    );
+
+    await page.route('**/api/v1/subscription/config', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          enabled: true,
+          mode: 'test',
+          publishableKey: 'pk_test_123',
+          portalEnabled: true,
+          prices: {
+            premium: 'price_premium_monthly',
+            pro: 'price_pro_monthly',
+            team: 'price_team_monthly'
+          },
+          priceMatrix: {
+            premium: { monthly: 'price_premium_monthly' },
+            pro: { monthly: 'price_pro_monthly' },
+            team: { monthly: 'price_team_monthly' }
+          }
+        })
+      )
+    );
+
+    await gotoStable(page, '/app/billing');
+
+    const buttons = [
+      page.getByRole('button', { name: 'Choose Premium' }),
+      page.getByRole('button', { name: 'Choose Pro' }),
+      page.getByRole('button', { name: 'Choose Team' })
+    ];
+
+    const bottoms = await Promise.all(
+      buttons.map(async button => {
+        const box = await button.boundingBox();
+        expect(box).not.toBeNull();
+        return (box?.y || 0) + (box?.height || 0);
+      })
+    );
+
+    expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(2);
+  });
+
   test('handles checkout return states and checkout initiation failures', async ({ page }) => {
     await setupLearnerContext(page);
     await setupBillingBaseRoutes(page);
@@ -159,6 +293,14 @@ test.describe('Billing and auth session runtime hardening', () => {
     await expect(page.getByText('Checkout completed. Subscription state is refreshing.')).toBeVisible();
 
     await gotoStable(page, '/app/billing');
+    await expect(page.getByText('Manage your plan, track your study usage, and keep your practice on schedule.')).toBeVisible();
+    await expect(page.getByText('Plan overview')).toBeVisible();
+    await expect(page.getByText('Billing available')).toBeVisible();
+    await expect(page.getByText('Your plan: free')).toBeVisible();
+    await expect(page.getByText('test-mode')).toHaveCount(0);
+    await expect(page.getByText('Billing + Entitlement')).toHaveCount(0);
+    await expect(page.getByText('Mode: test')).toHaveCount(0);
+    await expect(page.getByText(/Current:\s*free/i)).toHaveCount(0);
     await page.getByRole('button', { name: 'Choose Pro' }).click();
     await expect(page.getByText('Stripe is temporarily unavailable.')).toBeVisible();
   });

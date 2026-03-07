@@ -161,13 +161,12 @@ export default function BillingPage() {
       {/* ── Page header ── */}
       <PageHeader
         title="Subscription & Billing"
-        subtitle="Full local test-mode flow with checkout return handling, customer portal access, and entitlement refresh."
+        subtitle="Manage your plan, track your study usage, and keep your practice on schedule."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone="brand">Billing + Entitlement</StatusBadge>
-            {stripeConfig?.enabled ? <StatusBadge tone="success">Stripe: Connected</StatusBadge> : <StatusBadge tone="neutral">Stripe: Not configured</StatusBadge>}
-            {stripeConfig?.enabled ? <StatusBadge tone="neutral">Mode: {stripeConfig.mode}</StatusBadge> : null}
-            {currentSubscription ? <StatusBadge tone="neutral">Current: {currentSubscription.planType}</StatusBadge> : null}
+            <StatusBadge tone="brand">Plan overview</StatusBadge>
+            {stripeConfig?.enabled ? <StatusBadge tone="success">Billing available</StatusBadge> : <StatusBadge tone="neutral">Billing unavailable</StatusBadge>}
+            {currentSubscription ? <StatusBadge tone="neutral">Your plan: {currentSubscription.planType}</StatusBadge> : null}
           </div>
         }
       />
@@ -186,7 +185,9 @@ export default function BillingPage() {
               Listening {summary.listeningCount}/{summary.listeningLimit}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Stripe mode: {stripeConfig?.mode || 'unknown'} | Portal: {stripeConfig?.portalEnabled ? 'Available' : 'Unavailable'}
+              {stripeConfig?.portalEnabled
+                ? 'You can update payment details and manage renewals from the billing portal.'
+                : 'Billing portal access is not available right now.'}
             </p>
             {stripeConfig?.portalEnabled ? (
               <div className="mt-2">
@@ -241,7 +242,7 @@ export default function BillingPage() {
             (isPaidPlan && (!stripeConfig?.enabled || !cycleHasPriceId || (isCurrentPlan && currentSubscription?.status === 'active')));
 
           return (
-            <SectionCard key={plan.tier} className={`flex flex-col h-full transform transition-all duration-300 hover:-translate-y-1 ${plan.recommended ? 'border-2 border-violet-400/50 shadow-violet-500/10 shadow-xl relative' : 'border-gray-200/80 shadow-sm'}`}>
+            <SectionCard key={plan.tier} className={`flex h-full flex-col transform transition-all duration-300 hover:-translate-y-1 [&>div:last-child]:flex [&>div:last-child]:h-full [&>div:last-child]:flex-1 [&>div:last-child]:flex-col ${plan.recommended ? 'relative border-2 border-violet-400/50 shadow-violet-500/10 shadow-xl' : 'border-gray-200/80 shadow-sm'}`}>
               <div className="flex-1 space-y-4">
                 {plan.recommended ? (
                   <div className="absolute -top-3 inset-x-0 flex justify-center">

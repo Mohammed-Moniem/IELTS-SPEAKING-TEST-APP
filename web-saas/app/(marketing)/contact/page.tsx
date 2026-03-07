@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { HardNavigationLink } from '@/components/navigation/HardNavigationLink';
 import { siteConfig } from '@/lib/seo/site';
 
 /* ── Static data ── */
@@ -318,9 +319,9 @@ function ContactPageInner() {
           <Link className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" href="/ielts">
             IELTS Guides
           </Link>
-          <Link className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all shadow-lg shadow-violet-500/25 hover:-translate-y-0.5" href="/register">
+          <HardNavigationLink className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-all shadow-lg shadow-violet-500/25 hover:-translate-y-0.5" href="/register">
             Create Account
-          </Link>
+          </HardNavigationLink>
         </div>
       </section>
 

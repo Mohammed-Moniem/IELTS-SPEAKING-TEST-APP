@@ -1,0 +1,106 @@
+provider,scenario,component,category,monthly_min,monthly_base,monthly_max,annual_base,confidence,notes
+aws,low,web-frontend-1,frontend,2.15,3.08,4.0,36.91,0.702,Request-driven frontend/edge execution
+aws,low,api-service-1,compute,114.55,163.65,212.74,1963.8,0.702,Provisioned compute + request uplifts
+aws,low,container-service-1,compute,114.55,163.65,212.74,1963.8,0.702,Provisioned compute + request uplifts
+aws,low,relational-db-1,database,45.5,65.0,84.5,780.0,0.702,Managed PostgreSQL baseline by data size
+aws,low,shared-object-storage,storage,0.29,0.42,0.55,5.04,0.702,Object storage capacity
+aws,low,shared-network-egress,network,12.46,17.8,23.14,213.57,0.702,External data transfer
+aws,low,shared-observability,observability,5.99,8.56,11.13,102.7,0.702,Metrics/log ingestion and retention
+aws,medium,web-frontend-1,frontend,43.06,61.52,79.97,738.2,0.702,Request-driven frontend/edge execution
+aws,medium,api-service-1,compute,116.28,166.11,215.95,1993.34,0.702,Provisioned compute + request uplifts
+aws,medium,container-service-1,compute,116.28,166.11,215.95,1993.34,0.702,Provisioned compute + request uplifts
+aws,medium,relational-db-1,database,68.25,97.5,126.75,1170.0,0.702,Managed PostgreSQL baseline by data size
+aws,medium,shared-object-storage,storage,2.94,4.2,5.46,50.4,0.702,Object storage capacity
+aws,medium,shared-network-egress,network,373.75,533.94,694.12,6407.23,0.702,External data transfer
+aws,medium,shared-observability,observability,175.19,250.26,325.34,3003.18,0.702,Metrics/log ingestion and retention
+aws,high,web-frontend-1,frontend,430.62,615.17,799.72,7382.05,0.702,Request-driven frontend/edge execution
+aws,high,api-service-1,compute,132.61,189.44,246.27,2273.28,0.702,Provisioned compute + request uplifts
+aws,high,container-service-1,compute,132.61,189.44,246.27,2273.28,0.702,Provisioned compute + request uplifts
+aws,high,relational-db-1,database,364.0,520.0,676.0,6240.0,0.702,Managed PostgreSQL baseline by data size
+aws,high,shared-object-storage,storage,17.64,25.2,32.76,302.4,0.702,Object storage capacity
+aws,high,shared-network-egress,network,5606.32,8009.03,10411.74,96108.4,0.702,External data transfer
+aws,high,shared-observability,observability,2582.42,3689.17,4795.92,44270.04,0.702,Metrics/log ingestion and retention
+azure,low,web-frontend-1,frontend,2.54,3.63,4.72,43.55,0.702,Request-driven frontend/edge execution
+azure,low,api-service-1,compute,29.52,42.18,54.83,506.13,0.702,Provisioned compute + request uplifts
+azure,low,container-service-1,compute,29.52,42.18,54.83,506.13,0.702,Provisioned compute + request uplifts
+azure,low,relational-db-1,database,87.38,124.83,162.28,1497.96,0.702,Managed PostgreSQL baseline by data size
+azure,low,shared-object-storage,storage,0.27,0.38,0.5,4.58,0.702,Object storage capacity
+azure,low,shared-network-egress,network,12.04,17.2,22.37,206.46,0.702,External data transfer
+azure,low,shared-observability,observability,6.47,9.24,12.02,110.91,0.702,Metrics/log ingestion and retention
+azure,medium,web-frontend-1,frontend,50.8,72.58,94.35,870.91,0.702,Request-driven frontend/edge execution
+azure,medium,api-service-1,compute,31.25,44.64,58.03,535.68,0.702,Provisioned compute + request uplifts
+azure,medium,container-service-1,compute,31.25,44.64,58.03,535.68,0.702,Provisioned compute + request uplifts
+azure,medium,relational-db-1,database,131.07,187.25,243.42,2246.94,0.702,Managed PostgreSQL baseline by data size
+azure,medium,shared-object-storage,storage,2.67,3.82,4.97,45.84,0.702,Object storage capacity
+azure,medium,shared-network-egress,network,361.3,516.14,670.98,6193.65,0.702,External data transfer
+azure,medium,shared-observability,observability,189.2,270.29,351.37,3243.43,0.702,Metrics/log ingestion and retention
+azure,high,web-frontend-1,frontend,508.03,725.76,943.49,8709.12,0.702,Request-driven frontend/edge execution
+azure,high,api-service-1,compute,47.58,67.97,88.36,815.62,0.702,Provisioned compute + request uplifts
+azure,high,container-service-1,compute,47.58,67.97,88.36,815.62,0.702,Provisioned compute + request uplifts
+azure,high,relational-db-1,database,699.05,998.64,1298.23,11983.68,0.702,Managed PostgreSQL baseline by data size
+azure,high,shared-object-storage,storage,16.04,22.92,29.8,275.04,0.702,Object storage capacity
+azure,high,shared-network-egress,network,5419.45,7742.07,10064.69,92904.79,0.702,External data transfer
+azure,high,shared-observability,observability,2789.01,3984.3,5179.6,47811.65,0.702,Metrics/log ingestion and retention
+cloudflare,low,web-frontend-1,frontend,1.48,2.95,4.43,35.46,0.641,Request-driven frontend/edge execution
+cloudflare,low,api-service-1,compute,55.58,111.15,166.73,1333.85,0.641,Provisioned compute + request uplifts
+cloudflare,low,container-service-1,compute,55.58,111.15,166.73,1333.85,0.641,Provisioned compute + request uplifts
+cloudflare,low,relational-db-1,database,12.5,25.0,37.5,300.0,0.641,Managed PostgreSQL baseline by data size
+cloudflare,low,shared-object-storage,storage,0.15,0.3,0.45,3.6,0.641,Object storage capacity
+cloudflare,low,shared-network-egress,network,1.98,3.96,5.93,47.46,0.641,External data transfer
+cloudflare,low,shared-observability,observability,3.42,6.85,10.27,82.16,0.641,Metrics/log ingestion and retention
+cloudflare,medium,web-frontend-1,frontend,29.55,59.1,88.65,709.17,0.641,Request-driven frontend/edge execution
+cloudflare,medium,api-service-1,compute,57.42,114.85,172.27,1378.18,0.641,Provisioned compute + request uplifts
+cloudflare,medium,container-service-1,compute,57.42,114.85,172.27,1378.18,0.641,Provisioned compute + request uplifts
+cloudflare,medium,relational-db-1,database,18.75,37.5,56.25,450.0,0.641,Managed PostgreSQL baseline by data size
+cloudflare,medium,shared-object-storage,storage,1.5,3.0,4.5,36.0,0.641,Object storage capacity
+cloudflare,medium,shared-network-egress,network,59.33,118.65,177.98,1423.83,0.641,External data transfer
+cloudflare,medium,shared-observability,observability,100.11,200.21,300.32,2402.54,0.641,Metrics/log ingestion and retention
+cloudflare,high,web-frontend-1,frontend,295.49,590.98,886.46,7091.71,0.641,Request-driven frontend/edge execution
+cloudflare,high,api-service-1,compute,74.92,149.84,224.76,1798.08,0.641,Provisioned compute + request uplifts
+cloudflare,high,container-service-1,compute,74.92,149.84,224.76,1798.08,0.641,Provisioned compute + request uplifts
+cloudflare,high,relational-db-1,database,100.0,200.0,300.0,2400.0,0.641,Managed PostgreSQL baseline by data size
+cloudflare,high,shared-object-storage,storage,9.0,18.0,27.0,216.0,0.641,Object storage capacity
+cloudflare,high,shared-network-egress,network,889.89,1779.79,2669.68,21357.42,0.641,External data transfer
+cloudflare,high,shared-observability,observability,1475.67,2951.34,4427.0,35416.04,0.641,Metrics/log ingestion and retention
+gcp,low,web-frontend-1,frontend,1.76,3.53,5.29,42.3,0.641,Request-driven frontend/edge execution
+gcp,low,api-service-1,compute,77.51,155.02,232.53,1860.23,0.641,Provisioned compute + request uplifts
+gcp,low,container-service-1,compute,77.51,155.02,232.53,1860.23,0.641,Provisioned compute + request uplifts
+gcp,low,relational-db-1,database,35.0,70.0,105.0,840.0,0.641,Managed PostgreSQL baseline by data size
+gcp,low,shared-object-storage,storage,0.2,0.4,0.6,4.8,0.641,Object storage capacity
+gcp,low,shared-network-egress,network,11.87,23.73,35.6,284.77,0.641,External data transfer
+gcp,low,shared-observability,observability,4.28,8.56,12.84,102.7,0.641,Metrics/log ingestion and retention
+gcp,medium,web-frontend-1,frontend,35.25,70.5,105.75,846.03,0.641,Request-driven frontend/edge execution
+gcp,medium,api-service-1,compute,79.97,159.94,239.92,1919.33,0.641,Provisioned compute + request uplifts
+gcp,medium,container-service-1,compute,79.97,159.94,239.92,1919.33,0.641,Provisioned compute + request uplifts
+gcp,medium,relational-db-1,database,52.5,105.0,157.5,1260.0,0.641,Managed PostgreSQL baseline by data size
+gcp,medium,shared-object-storage,storage,2.0,4.0,6.0,48.0,0.641,Object storage capacity
+gcp,medium,shared-network-egress,network,355.96,711.91,1067.87,8542.97,0.641,External data transfer
+gcp,medium,shared-observability,observability,125.13,250.26,375.4,3003.18,0.641,Metrics/log ingestion and retention
+gcp,high,web-frontend-1,frontend,352.51,705.02,1057.54,8460.29,0.641,Request-driven frontend/edge execution
+gcp,high,api-service-1,compute,103.3,206.6,309.9,2479.2,0.641,Provisioned compute + request uplifts
+gcp,high,container-service-1,compute,103.3,206.6,309.9,2479.2,0.641,Provisioned compute + request uplifts
+gcp,high,relational-db-1,database,280.0,560.0,840.0,6720.0,0.641,Managed PostgreSQL baseline by data size
+gcp,high,shared-object-storage,storage,12.0,24.0,36.0,288.0,0.641,Object storage capacity
+gcp,high,shared-network-egress,network,5339.36,10678.71,16018.07,128144.53,0.641,External data transfer
+gcp,high,shared-observability,observability,1844.59,3689.17,5533.76,44270.04,0.641,Metrics/log ingestion and retention
+vercel,low,web-frontend-1,frontend,2.54,5.08,7.62,60.96,0.641,Request-driven frontend/edge execution
+vercel,low,api-service-1,compute,111.15,222.31,333.46,2667.71,0.641,Provisioned compute + request uplifts
+vercel,low,container-service-1,compute,111.15,222.31,333.46,2667.71,0.641,Provisioned compute + request uplifts
+vercel,low,relational-db-1,database,45.0,90.0,135.0,1080.0,0.641,Managed PostgreSQL baseline by data size
+vercel,low,shared-object-storage,storage,0.3,0.6,0.9,7.2,0.641,Object storage capacity
+vercel,low,shared-network-egress,network,14.83,29.66,44.49,355.96,0.641,External data transfer
+vercel,low,shared-observability,observability,8.56,17.12,25.67,205.4,0.641,Metrics/log ingestion and retention
+vercel,medium,web-frontend-1,frontend,50.8,101.61,152.41,1219.28,0.641,Request-driven frontend/edge execution
+vercel,medium,api-service-1,compute,114.85,229.7,344.54,2756.35,0.641,Provisioned compute + request uplifts
+vercel,medium,container-service-1,compute,114.85,229.7,344.54,2756.35,0.641,Provisioned compute + request uplifts
+vercel,medium,relational-db-1,database,67.5,135.0,202.5,1620.0,0.641,Managed PostgreSQL baseline by data size
+vercel,medium,shared-object-storage,storage,3.0,6.0,9.0,72.0,0.641,Object storage capacity
+vercel,medium,shared-network-egress,network,444.95,889.89,1334.84,10678.71,0.641,External data transfer
+vercel,medium,shared-observability,observability,250.26,500.53,750.79,6006.35,0.641,Metrics/log ingestion and retention
+vercel,high,web-frontend-1,frontend,508.03,1016.06,1524.1,12192.77,0.641,Request-driven frontend/edge execution
+vercel,high,api-service-1,compute,149.84,299.68,449.52,3596.16,0.641,Provisioned compute + request uplifts
+vercel,high,container-service-1,compute,149.84,299.68,449.52,3596.16,0.641,Provisioned compute + request uplifts
+vercel,high,relational-db-1,database,360.0,720.0,1080.0,8640.0,0.641,Managed PostgreSQL baseline by data size
+vercel,high,shared-object-storage,storage,18.0,36.0,54.0,432.0,0.641,Object storage capacity
+vercel,high,shared-network-egress,network,6674.19,13348.39,20022.58,160180.66,0.641,External data transfer
+vercel,high,shared-observability,observability,3689.17,7378.34,11067.51,88540.09,0.641,Metrics/log ingestion and retention

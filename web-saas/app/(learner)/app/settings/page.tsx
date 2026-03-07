@@ -144,6 +144,20 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const browserPushStatusMessage = !supportsPush
+    ? 'Browser notifications are not available in this browser yet.'
+    : permissionState === 'granted'
+      ? 'Browser notifications are on for this device.'
+      : permissionState === 'denied'
+        ? 'Browser notifications are blocked in this browser.'
+        : 'Browser notifications are off for this device.';
+
+  const browserPushRegistrationMessage = !supportsPush
+    ? 'Use email and in-app alerts for now while browser notifications are unavailable.'
+    : hasRegisteredWebPush
+      ? 'This browser is linked to your reminders and study alerts.'
+      : 'Turn browser notifications on to receive reminders and study alerts here.';
+
   return (
     <div className="space-y-6">
       {/* ── Page header ── */}
@@ -169,8 +183,8 @@ export default function SettingsPage() {
 
               <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">Browser Push</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Status: {supportsPush ? permissionState : 'unsupported'}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Registration: {hasRegisteredWebPush ? 'active' : 'not registered'}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{browserPushStatusMessage}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{browserPushRegistrationMessage}</p>
                 <div className="flex gap-2">
                   <button className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50" disabled={!supportsPush || saving} onClick={() => void enableBrowserPush()}>Enable Browser Push</button>
                   <button className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50" disabled={!hasRegisteredWebPush || saving} onClick={() => void disableBrowserPush()}>Disable Browser Push</button>
@@ -179,8 +193,11 @@ export default function SettingsPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Study Defaults (UI Only)">
+          <SectionCard title="Study Preferences">
             <div className="space-y-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Set your preferred exam track and target band so practice recommendations stay relevant.
+              </p>
               <label className="block space-y-1">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Preferred track</span>
                 <select className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40" value={preferredTrack} onChange={e => setPreferredTrack(e.target.value as 'academic' | 'general')}>
@@ -200,10 +217,6 @@ export default function SettingsPage() {
       {!loading ? (
         <SectionCard title="Notification Toggles">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Toggle label="Direct messages" value={settings.directMessagesEnabled} disabled={saving} onChange={() => void onToggle('directMessagesEnabled')} />
-            <Toggle label="Group messages" value={settings.groupMessagesEnabled} disabled={saving} onChange={() => void onToggle('groupMessagesEnabled')} />
-            <Toggle label="Friend requests" value={settings.friendRequestsEnabled} disabled={saving} onChange={() => void onToggle('friendRequestsEnabled')} />
-            <Toggle label="Friend acceptances" value={settings.friendAcceptancesEnabled} disabled={saving} onChange={() => void onToggle('friendAcceptancesEnabled')} />
             <Toggle label="System announcements" value={settings.systemAnnouncementsEnabled} disabled={saving} onChange={() => void onToggle('systemAnnouncementsEnabled')} />
             <Toggle label="Special offers" value={settings.offersEnabled} disabled={saving} onChange={() => void onToggle('offersEnabled')} />
             <Toggle label="Partner offers" value={settings.partnerOffersEnabled} disabled={saving} onChange={() => void onToggle('partnerOffersEnabled')} />

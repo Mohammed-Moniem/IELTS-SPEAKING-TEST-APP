@@ -12,6 +12,67 @@ import {
   ValidateNested
 } from 'class-validator';
 
+export type TestSimulationRuntimeState =
+  | 'preflight'
+  | 'intro-examiner'
+  | 'intro-candidate-turn'
+  | 'part1-examiner'
+  | 'part1-candidate-turn'
+  | 'part1-processing'
+  | 'part1-transition'
+  | 'part2-intro'
+  | 'part2-prep'
+  | 'part2-examiner-launch'
+  | 'part2-candidate-turn'
+  | 'part2-cutoff'
+  | 'part2-transition'
+  | 'part3-intro'
+  | 'part3-examiner'
+  | 'part3-candidate-turn'
+  | 'part3-processing'
+  | 'evaluation'
+  | 'completed'
+  | 'paused-retryable'
+  | 'failed-terminal';
+
+export type TestSimulationRuntimeSegmentKind = 'cached_phrase' | 'dynamic_prompt';
+
+export interface TestSimulationRuntimeSegmentDto {
+  kind: TestSimulationRuntimeSegmentKind;
+  phraseId?: string;
+  text?: string;
+}
+
+export interface TestSimulationConversationMessageDto {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface TestSimulationTurnRecordDto {
+  part: number;
+  prompt: string;
+  transcript?: string;
+  durationSeconds?: number;
+}
+
+export interface TestSimulationRuntimeDto {
+  state: TestSimulationRuntimeState;
+  currentPart: number;
+  currentTurnIndex: number;
+  retryCount: number;
+  retryBudgetRemaining?: number;
+  introStep?: 'welcome' | 'id_check' | 'part1_begin';
+  seedQuestionIndex?: number;
+  followUpCount?: number;
+  partFollowUpCount?: number;
+  previousState?: TestSimulationRuntimeState;
+  lastError?: string;
+  failedStep?: string;
+  conversationHistory?: TestSimulationConversationMessageDto[];
+  turnHistory?: TestSimulationTurnRecordDto[];
+  currentSegment: TestSimulationRuntimeSegmentDto;
+}
+
 export class TestPartInput {
   @IsNumber()
   @Min(1)
@@ -57,4 +118,15 @@ export class TestSimulationQuery {
   @IsNumber()
   @Min(0)
   offset?: number;
+}
+
+export class RuntimeAnswerRequest {
+  @IsString()
+  transcript!: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(3600)
+  durationSeconds?: number;
 }

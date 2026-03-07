@@ -1,0 +1,12 @@
+flowchart LR
+  A["Returning learner opens dashboard"] --> B{"Resume available?"}
+  B -->|"Yes"| C["Resume active session"]
+  B -->|"No"| D["Pick weakest-skill practice"]
+  C --> E["Complete module activity"]
+  D --> E
+  E --> F{"Input succeeds?"}
+  F -->|"No"| G["Offer manual fallback or retry"]
+  G --> E
+  F -->|"Yes"| H["Show score and weakness summary"]
+  H --> I["Offer one next step"]
+  I --> J["Continue practice or open related library"]

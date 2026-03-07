@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { HardNavigationLink } from '@/components/navigation/HardNavigationLink';
 import { MarketingPageHero } from '@/components/marketing/MarketingPageHero';
 import { getServerMarketingVariant } from '@/lib/marketing/variant-server';
 import { getGuideTreeWithFallback } from '@/lib/seo/guideData';
@@ -170,12 +171,12 @@ export default async function IeltsGuidesPage() {
       <section className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Module Coverage</h2>
-          <Link
+          <HardNavigationLink
             href="/register"
             className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/25"
           >
             Start Free
-          </Link>
+          </HardNavigationLink>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {modules.map(moduleEntry => (

@@ -8,7 +8,7 @@ test.describe('Growth routes', () => {
     await expect(page.getByRole('heading', { name: /Advertise with Spokio/i })).toBeVisible();
   });
 
-  test('learner library routes render', async ({ page }) => {
+  test('learner library routes keep books and channels disabled', async ({ page }) => {
     await bootstrapSession(page);
     await mockAppConfig(page);
     await mockUsageSummary(page);
@@ -37,41 +37,21 @@ test.describe('Growth routes', () => {
       )
     );
 
-    await page.route('**/api/v1/library/resources/books?**', route =>
-      route.fulfill(
-        mockJsonSuccess({
-          items: [],
-          total: 0,
-          limit: 24,
-          offset: 0,
-          hasMore: false
-        })
-      )
-    );
-
-    await page.route('**/api/v1/library/resources/channels?**', route =>
-      route.fulfill(
-        mockJsonSuccess({
-          items: [],
-          total: 0,
-          limit: 24,
-          offset: 0,
-          hasMore: false
-        })
-      )
-    );
-
     await page.goto('/app/library/collocations');
     await expect(page.getByRole('heading', { name: /Collocations Library/i })).toBeVisible();
+    await expect(page.locator('aside').getByRole('link', { name: 'Books', exact: true })).toHaveCount(0);
+    await expect(page.locator('aside').getByRole('link', { name: 'Channels', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Books', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Channels', exact: true })).toHaveCount(0);
 
     await page.goto('/app/library/vocabulary');
     await expect(page.getByRole('heading', { name: /Vocabulary Library/i })).toBeVisible();
 
     await page.goto('/app/library/books');
-    await expect(page.getByRole('heading', { name: /Books Library/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/dashboard$/);
 
     await page.goto('/app/library/channels');
-    await expect(page.getByRole('heading', { name: /Channels Library/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/dashboard$/);
   });
 
   test('admin blog content route renders', async ({ page }) => {

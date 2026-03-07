@@ -17,6 +17,7 @@ const publicIndexableRoutes = [
 ] as const;
 
 const shouldBeNoIndexRoutes = ['/login', '/register'] as const;
+const representativeBlogSlug = '/blog/academic-discussion-skills-for-ielts-speaking-part-3';
 
 const gotoStable = async (page: Page, route: string) => {
   const maxAttempts = 3;
@@ -74,34 +75,55 @@ test.describe('SEO marketing baseline', () => {
     }
   });
 
-  test('public marketing pages include structured data scripts', async ({ page }) => {
+  test('public marketing pages include structured data scripts', async ({ request }) => {
     const routesWithStructuredData = [
       '/',
       '/pricing',
       '/features',
+      representativeBlogSlug,
       '/about',
       '/contact',
       '/editorial-policy',
       '/methodology',
-      '/ielts',
-      '/ielts/ielts-study-plan-30-days'
+      '/ielts/exam-strategy/study-plans/30-days'
     ];
 
     for (const route of routesWithStructuredData) {
-      await gotoStable(page, route);
-      const jsonLdScripts = await page.locator('script[type="application/ld+json"]').allInnerTexts();
-      expect(jsonLdScripts.length).toBeGreaterThan(0);
-      expect(jsonLdScripts.join(' ')).toMatch(/schema\.org|@context|@type/i);
+      const response = await request.get(route);
+      expect(response.ok()).toBeTruthy();
+      const html = await response.text();
+
+      expect(html).toContain('application/ld+json');
+      expect(html).toMatch(/schema\.org|@context|@type/i);
     }
+  });
+
+  test('blog routes return crawlable article content in server HTML', async ({ request }) => {
+    const indexResponse = await request.get('/blog');
+    expect(indexResponse.ok()).toBeTruthy();
+    const indexHtml = await indexResponse.text();
+
+    expect(indexHtml).toContain('IELTS strategy and study insights');
+    expect(indexHtml).toContain('Read article');
+    expect(indexHtml).toContain('/blog/');
+
+    const articleResponse = await request.get(representativeBlogSlug);
+    expect(articleResponse.ok()).toBeTruthy();
+    const articleHtml = await articleResponse.text();
+
+    expect(articleHtml).toContain('Academic Discussion Skills for IELTS Speaking Part 3');
+    expect(articleHtml).toContain('Use this strategy in Spokio');
+    expect(articleHtml).toContain('"@type":"Article"');
   });
 
   test('guide detail pages expose breadcrumbs and editorial attribution', async ({ page }) => {
     await gotoStable(page, '/ielts/ielts-speaking-practice-online');
+    const main = page.getByRole('main');
 
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Editorial Trust and Methodology/i }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Scoring methodology' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Editorial policy' })).toBeVisible();
+    await expect(main.getByRole('link', { name: 'Scoring methodology' })).toBeVisible();
+    await expect(main.getByRole('link', { name: 'Editorial Policy' }).first()).toBeVisible();
   });
 
   test('robots and sitemap expose crawl configuration for public pages only', async ({ request }) => {

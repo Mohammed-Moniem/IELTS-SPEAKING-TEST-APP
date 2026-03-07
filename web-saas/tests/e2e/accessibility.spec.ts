@@ -19,8 +19,8 @@ test.describe('Accessibility checks', () => {
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('nav')).toBeVisible();
 
-    const emailInput = page.getByLabel('Email');
-    const passwordInput = page.getByLabel('Password');
+    const emailInput = page.getByLabel('Email', { exact: true });
+    const passwordInput = page.getByLabel('Password', { exact: true });
     const forgotPasswordLink = page.getByRole('link', { name: /forgot password/i });
     const submitButton = page.getByRole('button', { name: 'Login' });
 

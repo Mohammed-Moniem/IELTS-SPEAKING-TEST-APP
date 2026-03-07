@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { HardNavigationLink } from '@/components/navigation/HardNavigationLink';
+
 export const metadata: Metadata = {
   title: 'Band Score Improvement Guarantee',
   description:
@@ -85,12 +87,12 @@ export default function GuaranteePage() {
           Follow your personalised study plan on a Pro subscription for 90 days. If your overall band score doesn&apos;t
           improve by at least 0.5 bands, we&apos;ll extend your subscription free for another 90 days.
         </p>
-        <Link
+        <HardNavigationLink
           href="/register"
           className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-violet-700 shadow-lg shadow-black/10 transition-colors hover:bg-white/90"
         >
           Get Started With Pro
-        </Link>
+        </HardNavigationLink>
       </div>
 
       {/* How It Works */}
@@ -142,12 +144,12 @@ export default function GuaranteePage() {
           Start your free baseline test today. Upgrade to Pro to activate the Band Score Improvement Guarantee.
         </p>
         <div className="flex flex-wrap justify-center gap-3 pt-1">
-          <Link
+          <HardNavigationLink
             className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 hover:bg-gray-100 transition-colors shadow-lg shadow-black/10"
             href="/register"
           >
             Create Account
-          </Link>
+          </HardNavigationLink>
           <Link
             className="rounded-xl border border-white/30 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
             href="/pricing"

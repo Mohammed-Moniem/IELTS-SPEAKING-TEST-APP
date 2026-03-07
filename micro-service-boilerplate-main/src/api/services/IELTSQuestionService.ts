@@ -1,4 +1,5 @@
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
+import { getPgPool } from '@lib/db/pgClient';
 import { constructLogMessage } from '@lib/env/helpers';
 import { Logger } from '@lib/logger';
 import {
@@ -44,6 +45,17 @@ const DIFFICULTY_PRIORITY: Record<IELTSQuestionDifficulty, IELTSQuestionDifficul
   hard: ['hard', 'medium', 'easy']
 };
 
+const shuffle = <T>(items: T[]): T[] => {
+  const copy = [...items];
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+
+  return copy;
+};
+
 @Service()
 export class IELTSQuestionService {
   private log = new Logger(__filename);
@@ -55,10 +67,23 @@ export class IELTSQuestionService {
   ): Promise<FullTestSelection | null> {
     const logMessage = constructLogMessage(__filename, 'buildFullTestFromBank', headers);
     const targetDifficulty = this.mapDifficulty(difficulty);
+    const excludedQuestionIds = new Set<string>(await this.getUserRecentQuestions(userId, 30));
 
-    const part1 = await this.selectQuestions('part1', targetDifficulty, 4, { ensureUniqueTopics: true, userId });
-    const part2Docs = await this.selectQuestions('part2', targetDifficulty, 1, { userId });
-    const part3 = await this.selectQuestions('part3', targetDifficulty, 3, { ensureUniqueTopics: true, userId });
+    const part1 = await this.selectQuestions('part1', targetDifficulty, 4, {
+      ensureUniqueTopics: true,
+      excludeIds: excludedQuestionIds
+    });
+    part1.forEach(doc => excludedQuestionIds.add(doc._id.toString()));
+
+    const part2Docs = await this.selectQuestions('part2', targetDifficulty, 1, {
+      excludeIds: excludedQuestionIds
+    });
+    part2Docs.forEach(doc => excludedQuestionIds.add(doc._id.toString()));
+
+    const part3 = await this.selectQuestions('part3', targetDifficulty, 3, {
+      ensureUniqueTopics: true,
+      excludeIds: excludedQuestionIds
+    });
 
     const part2 = part2Docs[0] ?? null;
 
@@ -146,27 +171,20 @@ export class IELTSQuestionService {
       }
 
       if (excluded.size) {
-        matchQuery._id = { $nin: Array.from(excluded).map(id => new Types.ObjectId(id)) };
+        matchQuery._id = { $nin: Array.from(excluded) };
       }
 
-      // Use $sample for true randomization from large dataset
-      // Fetch more than needed to allow filtering for unique topics
       const sampleSize = Math.max(count * 6, 20);
-      const batch = await IELTSQuestionModel.aggregate([
-        { $match: matchQuery },
-        // First sort by usage to prefer less-used questions
-        { $sort: { timesUsed: 1, lastUsedAt: 1 } },
-        // Limit to least-used questions
-        { $limit: Math.min(sampleSize * 5, 1000) },
-        // Then randomly sample from those least-used questions
-        { $sample: { size: sampleSize } }
-      ]).exec();
+      const batch = (await IELTSQuestionModel.find(matchQuery)
+        .sort({ timesUsed: 1, lastUsedAt: 1 })
+        .limit(Math.min(sampleSize * 5, 1000))
+        .lean()) as IELTSQuestionDocument[];
 
       if (!batch.length) {
         continue;
       }
 
-      for (const doc of batch) {
+      for (const doc of shuffle(batch)) {
         if (selected.length >= count) {
           break;
         }
@@ -193,17 +211,15 @@ export class IELTSQuestionService {
       const fallbackMatchQuery: Record<string, unknown> = {
         category,
         active: true,
-        _id: { $nin: Array.from(excluded).map(id => new Types.ObjectId(id)) }
+        _id: { $nin: Array.from(excluded) }
       };
 
-      const fallbackBatch = await IELTSQuestionModel.aggregate([
-        { $match: fallbackMatchQuery },
-        { $sort: { timesUsed: 1, lastUsedAt: 1 } },
-        { $limit: 500 },
-        { $sample: { size: count - selected.length } }
-      ]).exec();
+      const fallbackBatch = (await IELTSQuestionModel.find(fallbackMatchQuery)
+        .sort({ timesUsed: 1, lastUsedAt: 1 })
+        .limit(500)
+        .lean()) as IELTSQuestionDocument[];
 
-      for (const doc of fallbackBatch) {
+      for (const doc of shuffle(fallbackBatch)) {
         if (selected.length >= count) {
           break;
         }
@@ -260,13 +276,33 @@ export class IELTSQuestionService {
     }
 
     const now = new Date();
-    await IELTSQuestionModel.updateMany(
-      { _id: { $in: questionIds } },
-      {
-        $inc: { timesUsed: 1 },
-        $set: { lastUsedAt: now }
-      }
-    ).exec();
+    const pool = getPgPool();
+
+    await pool.query(
+      `
+        UPDATE "ielts_questions"
+        SET
+          data = jsonb_set(
+            jsonb_set(
+              data,
+              '{timesUsed}',
+              to_jsonb(
+                CASE
+                  WHEN COALESCE(data->>'timesUsed', '') ~ '^[0-9]+$' THEN ((data->>'timesUsed')::int + 1)
+                  ELSE 1
+                END
+              ),
+              true
+            ),
+            '{lastUsedAt}',
+            to_jsonb($1::text),
+            true
+          ),
+          updated_at = $1::timestamptz
+        WHERE id = ANY($2::text[])
+      `,
+      [now.toISOString(), questionIds]
+    );
   }
 
   private mapQuestionToPayload(doc: IELTSQuestionDocument): QuestionTopicPayload {

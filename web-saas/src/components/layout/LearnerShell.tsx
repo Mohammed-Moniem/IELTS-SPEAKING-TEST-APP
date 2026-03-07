@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { ThemeToggle } from './ThemeToggle';
 
 const practiceLinks = [
@@ -21,9 +23,7 @@ const assessmentLinks = [
 
 const libraryLinks = [
   { href: '/app/library/collocations', label: 'Collocations', icon: 'dictionary' },
-  { href: '/app/library/vocabulary', label: 'Vocabulary', icon: 'menu_book' },
-  { href: '/app/library/books', label: 'Books', icon: 'book_2' },
-  { href: '/app/library/channels', label: 'Channels', icon: 'tv' }
+  { href: '/app/library/vocabulary', label: 'Vocabulary', icon: 'menu_book' }
 ];
 
 const accountLinks = [
@@ -40,6 +40,7 @@ const rewardsLinks = [
 export function LearnerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout, appConfig } = useAuth();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const visiblePracticeLinks = practiceLinks.filter(item => {
@@ -68,104 +69,103 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
   const initials =
     `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase() || 'U';
 
+  const sections = useMemo(
+    () => [
+      { title: null, items: [{ href: '/app/dashboard', label: 'Dashboard', icon: 'dashboard' }] },
+      { title: 'Practice Areas', items: visiblePracticeLinks },
+      { title: 'Assessment', items: visibleAssessmentLinks },
+      { title: 'Library', items: libraryLinks },
+      { title: 'Account', items: visibleAccountLinks }
+    ],
+    [visiblePracticeLinks, visibleAssessmentLinks, visibleAccountLinks]
+  );
+
+  const currentPageLabel = useMemo(() => {
+    const allItems = sections.flatMap(section => section.items);
+    return allItems.find(item => isActive(item.href))?.label || 'Learner App';
+  }, [sections, pathname]);
+
   const navLinkClasses = (href: string) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive(href)
       ? 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400'
       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
     }`;
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileNavOpen(false);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMobileNavOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = (event: MediaQueryList | MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsMobileNavOpen(false);
+      }
+    };
+
+    closeOnDesktop(mediaQuery);
+    mediaQuery.addEventListener('change', closeOnDesktop);
+    return () => mediaQuery.removeEventListener('change', closeOnDesktop);
+  }, []);
+
+  const handleLogout = () => {
+    setIsMobileNavOpen(false);
+    void logout();
+  };
+
+  const renderNavLinks = () =>
+    sections.map(section => (
+      <div key={section.title || 'dashboard'} className={section.title ? 'mb-6' : 'mb-0'}>
+        {section.title ? (
+          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            {section.title}
+          </p>
+        ) : null}
+        <nav className="flex flex-col gap-1">
+          {section.items.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={navLinkClasses(item.href)}
+              onClick={() => setIsMobileNavOpen(false)}
+            >
+              <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+    ));
+
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Sidebar */}
-      <aside className="fixed top-0 left-0 h-screen w-[264px] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col p-5 overflow-y-auto z-20">
+      {/* Desktop sidebar */}
+      <aside className="fixed top-0 left-0 z-20 hidden h-screen w-[264px] flex-col overflow-y-auto border-r border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 lg:flex">
         {/* Logo */}
-        <Link href="/app/dashboard" className="group flex items-center gap-3 mb-8 transition-transform hover:scale-105 active:scale-95 duration-300">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 via-violet-500 to-indigo-600 bg-[length:200%_auto] animate-gradient flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow">
-            <span className="text-white font-black text-sm group-hover:rotate-12 transition-transform duration-500">S</span>
-          </div>
-          <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 tracking-tight group-hover:from-violet-600 group-hover:to-indigo-600 dark:group-hover:from-violet-400 dark:group-hover:to-indigo-400 transition-all duration-300">Spokio</span>
+        <Link href="/app/dashboard" className="group mb-8 inline-flex transition-transform hover:scale-[1.02] active:scale-[0.99] duration-300">
+          <BrandLogo className="w-[138px]" priority />
         </Link>
 
-        {/* Dashboard */}
-        <Link href="/app/dashboard" className={navLinkClasses('/app/dashboard')}>
-          <span className="material-symbols-outlined text-[20px]">dashboard</span>
-          Dashboard
-        </Link>
-
-        {/* Practice Areas */}
-        <div className="mt-6 mb-6">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Practice Areas
-          </p>
-          <nav className="flex flex-col gap-1">
-            {visiblePracticeLinks.map(item => (
-              <Link key={item.href} href={item.href} className={navLinkClasses(item.href)}>
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        {/* Assessment */}
-        <div className="mb-6">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Assessment
-          </p>
-          <nav className="flex flex-col gap-1">
-            {visibleAssessmentLinks.map(item => (
-              <Link key={item.href} href={item.href} className={navLinkClasses(item.href)}>
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        <div className="mb-6">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Library
-          </p>
-          <nav className="flex flex-col gap-1">
-            {libraryLinks.map(item => (
-              <Link key={item.href} href={item.href} className={navLinkClasses(item.href)}>
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        {/* Rewards – hidden until feature is ready
-        <div className="mb-6">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Rewards
-          </p>
-          <nav className="flex flex-col gap-1">
-            {rewardsLinks.map(item => (
-              <Link key={item.href} href={item.href} className={navLinkClasses(item.href)}>
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        */}
-
-        {/* Account */}
-        <div className="mb-6">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Account
-          </p>
-          <nav className="flex flex-col gap-1">
-            {visibleAccountLinks.map(item => (
-              <Link key={item.href} href={item.href} className={navLinkClasses(item.href)}>
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+        {renderNavLinks()}
 
         {/* User profile footer */}
         <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
@@ -180,7 +180,7 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || ''}</p>
             </div>
             <button
-              onClick={() => void logout()}
+              onClick={handleLogout}
               className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
               aria-label="Logout"
             >
@@ -190,18 +190,107 @@ export function LearnerShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
+      {/* Mobile header */}
+      <div className="fixed inset-x-0 top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/95 lg:hidden">
+        <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+          <button
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={isMobileNavOpen}
+            aria-controls="learner-mobile-navigation"
+            onClick={() => setIsMobileNavOpen(true)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <span className="material-symbols-outlined text-[20px]">menu</span>
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{currentPageLabel}</p>
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+              {user?.firstName || 'Student'} {user?.lastName || ''}
+            </p>
+          </div>
+
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* Mobile drawer */}
+      <div
+        className={`fixed inset-0 z-40 transition-opacity duration-200 lg:hidden ${isMobileNavOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+        aria-hidden={!isMobileNavOpen}
+      >
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          onClick={() => setIsMobileNavOpen(false)}
+          className="absolute inset-0 bg-gray-950/50 backdrop-blur-[1px]"
+        />
+
+        <div
+          id="learner-mobile-navigation"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Learner navigation"
+          className={`relative flex h-full w-[min(320px,calc(100%-2rem))] flex-col border-r border-gray-200 bg-white p-5 shadow-2xl transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 ${isMobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        >
+          <div className="mb-8 flex items-center justify-between gap-3">
+            <Link
+              href="/app/dashboard"
+              className="group inline-flex"
+              onClick={() => setIsMobileNavOpen(false)}
+            >
+              <BrandLogo className="w-[138px]" />
+            </Link>
+
+            <button
+              type="button"
+              aria-label="Close navigation"
+              onClick={() => setIsMobileNavOpen(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+
+          {renderNavLinks()}
+
+          <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-xs font-bold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                  {user?.firstName || 'Student'} {user?.lastName || ''}
+                </p>
+                <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user?.email || ''}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Logout"
+              >
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main content */}
-      <main className="ml-[264px] flex-1 min-h-screen">
-        {/* Top navbar */}
-        <header className="sticky top-0 z-10 h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-end px-6">
+      <main className="min-h-screen flex-1 lg:ml-[264px]">
+        {/* Desktop top navbar */}
+        <header className="sticky top-0 z-10 hidden h-14 items-center justify-end border-b border-gray-200 bg-white px-6 dark:border-gray-800 dark:bg-gray-900 lg:flex">
           <ThemeToggle />
         </header>
-        <div className="max-w-[1440px] mx-auto p-6 lg:p-10">
-          {children}
+
+        <div className="pt-16 lg:pt-0">
+          <div className="mx-auto max-w-[1440px] p-4 sm:p-6 lg:p-10">
+            {children}
+          </div>
         </div>
       </main>
     </div>
   );
 }
-
-

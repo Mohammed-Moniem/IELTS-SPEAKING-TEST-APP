@@ -1,0 +1,13 @@
+flowchart LR
+  A["Learner starts full exam"] --> B["System saves runtime state"]
+  B --> C{"Interrupted?"}
+  C -->|"No"| D["Continue sections normally"]
+  C -->|"Yes"| E["Learner returns later"]
+  E --> F["Show resume state with saved progress"]
+  F --> G{"Resume or discard?"}
+  G -->|"Resume"| H["Return to correct section"]
+  G -->|"Discard"| I["Confirm loss of progress"]
+  H --> J{"Resume succeeds?"}
+  J -->|"No"| K["Explain failure and offer retry or support path"]
+  J -->|"Yes"| D
+  I --> L["Return to dashboard with restart option"]

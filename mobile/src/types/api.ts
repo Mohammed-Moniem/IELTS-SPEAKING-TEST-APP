@@ -174,15 +174,86 @@ export interface SimulationPart {
   feedback?: PracticeFeedback;
 }
 
+export type TestSimulationRuntimeState =
+  | "preflight"
+  | "intro-examiner"
+  | "intro-candidate-turn"
+  | "part1-examiner"
+  | "part1-candidate-turn"
+  | "part1-processing"
+  | "part1-transition"
+  | "part2-intro"
+  | "part2-prep"
+  | "part2-examiner-launch"
+  | "part2-candidate-turn"
+  | "part2-cutoff"
+  | "part2-transition"
+  | "part3-intro"
+  | "part3-examiner"
+  | "part3-candidate-turn"
+  | "part3-processing"
+  | "evaluation"
+  | "completed"
+  | "paused-retryable"
+  | "failed-terminal";
+
+export type TestSimulationRuntimeSegmentKind =
+  | "cached_phrase"
+  | "dynamic_prompt";
+
+export interface TestSimulationRuntimeSegment {
+  kind: TestSimulationRuntimeSegmentKind;
+  phraseId?: string;
+  text?: string;
+}
+
+export interface TestSimulationConversationMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface TestSimulationTurnRecord {
+  part: number;
+  prompt: string;
+  transcript?: string;
+  durationSeconds?: number;
+}
+
+export interface TestSimulationRuntime {
+  state: TestSimulationRuntimeState;
+  currentPart: number;
+  currentTurnIndex: number;
+  retryCount: number;
+  retryBudgetRemaining?: number;
+  introStep?: "welcome" | "id_check" | "part1_begin";
+  seedQuestionIndex?: number;
+  followUpCount?: number;
+  previousState?: TestSimulationRuntimeState;
+  lastError?: string;
+  failedStep?: string;
+  conversationHistory?: TestSimulationConversationMessage[];
+  turnHistory?: TestSimulationTurnRecord[];
+  currentSegment: TestSimulationRuntimeSegment;
+}
+
 export interface SimulationStart {
   simulationId: string;
   parts: SimulationPart[];
+  runtime: TestSimulationRuntime;
+}
+
+export interface SimulationRuntimeResponse {
+  simulationId: string;
+  status: "in_progress" | "completed";
+  runtime: TestSimulationRuntime;
+  currentPart?: SimulationPart;
 }
 
 export interface TestSimulation {
   _id: string;
   status: "in_progress" | "completed";
   parts: SimulationPart[];
+  runtime?: TestSimulationRuntime;
   overallFeedback?: PracticeFeedback;
   overallBand?: number;
   startedAt: string;

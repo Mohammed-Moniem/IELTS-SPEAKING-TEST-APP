@@ -1,0 +1,135 @@
+{
+  "repo": {
+    "source": "/Users/mohammedosman/Downloads/IELTS-SPEAKING-TEST-APP",
+    "commit": "dfe867523b29e3506b2cd5ed0b093c9febd2ecc8",
+    "analyzed_at": "2026-03-06T01:54:45.146988+00:00"
+  },
+  "components": [
+    {
+      "id": "web-frontend-1",
+      "type": "web-frontend",
+      "runtime": "node",
+      "language": "typescript",
+      "inferred_size_class": "large",
+      "evidence_paths": [
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/package.json"
+      ]
+    },
+    {
+      "id": "api-service-1",
+      "type": "api-service",
+      "runtime": "node",
+      "language": "typescript",
+      "inferred_size_class": "large",
+      "evidence_paths": [
+        ".claude/worktrees/cool-buck/ielts-speaking-test-main/package.json",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/package.json",
+        ".claude/worktrees/cool-buck/mobile/package.json"
+      ]
+    },
+    {
+      "id": "container-service-1",
+      "type": "container-service",
+      "runtime": "container",
+      "language": "typescript",
+      "inferred_size_class": "large",
+      "evidence_paths": [
+        ".claude/worktrees/blissful-mcnulty/micro-service-boilerplate-main/Dockerfile",
+        ".claude/worktrees/competent-torvalds/micro-service-boilerplate-main/Dockerfile",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/Dockerfile",
+        ".claude/worktrees/cool-buck/web-saas/Dockerfile",
+        ".claude/worktrees/exciting-spence/micro-service-boilerplate-main/Dockerfile",
+        ".claude/worktrees/exciting-spence/web-saas/Dockerfile",
+        ".claude/worktrees/goofy-chebyshev/micro-service-boilerplate-main/Dockerfile",
+        ".claude/worktrees/goofy-chebyshev/web-saas/Dockerfile"
+      ]
+    },
+    {
+      "id": "relational-db-1",
+      "type": "relational-db",
+      "runtime": "managed-database",
+      "language": "sql",
+      "inferred_size_class": "medium",
+      "evidence_paths": [
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/.env.example",
+        ".claude/worktrees/cool-buck/mobile/.env.example",
+        ".claude/worktrees/cool-buck/web-saas/.env.example",
+        ".env",
+        "mongodb"
+      ]
+    }
+  ],
+  "data_stores": [
+    {
+      "kind": "mongodb",
+      "capacity_signals": "Document store with variable schema",
+      "durability_needs": "medium",
+      "evidence": [
+        "mongodb",
+        "mongoose"
+      ]
+    }
+  ],
+  "network": [
+    {
+      "estimated_egress_drivers": [
+        "Frontend static and dynamic asset delivery",
+        "API response traffic"
+      ],
+      "cdn_signals": true
+    }
+  ],
+  "third_party": [
+    {
+      "vendor": "openai",
+      "feature": "LLM inference",
+      "evidence": [
+        "dependency:openai"
+      ],
+      "pricing_model_hint": "token-based"
+    },
+    {
+      "vendor": "stripe",
+      "feature": "Payments/billing",
+      "evidence": [
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/scripts/ops/bootstrap_stripe_test_mode.sh",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/src/api/services/StripeService.ts",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/src/api/services/StripePaymentService.ts",
+        ".claude/worktrees/exciting-spence/micro-service-boilerplate-main/scripts/ops/bootstrap_stripe_test_mode.sh",
+        ".claude/worktrees/exciting-spence/micro-service-boilerplate-main/src/api/services/StripeService.ts",
+        ".claude/worktrees/exciting-spence/micro-service-boilerplate-main/src/api/services/StripePaymentService.ts"
+      ],
+      "pricing_model_hint": "transaction + usage mix"
+    },
+    {
+      "vendor": "supabase",
+      "feature": "Managed database/auth/storage",
+      "evidence": [
+        ".secrets/supabase_api_keys.json",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/.supabase-admin.json",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/supabase/migrations/20260223_000004_notification_campaign_tables.sql",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/supabase/migrations/20260221_000001_create_supabase_document_tables.sql",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/supabase/migrations/20260222_000003_partner_program_tables.sql",
+        ".claude/worktrees/cool-buck/micro-service-boilerplate-main/supabase/migrations/20260222_000002_add_ielts_saas_tables.sql"
+      ],
+      "pricing_model_hint": "tier + usage"
+    },
+    {
+      "vendor": "firebase",
+      "feature": "Managed backend",
+      "evidence": [
+        ".claude/worktrees/cool-buck/docs/firebase-analytics-setup.md",
+        ".claude/worktrees/cool-buck/mobile/src/services/firebaseAnalyticsService.ts",
+        ".claude/worktrees/cool-buck/web-saas/public/firebase-messaging-sw.js",
+        ".claude/worktrees/cool-buck/web-saas/src/lib/push/firebaseWebPush.ts",
+        ".claude/worktrees/cool-buck/web-saas/src/lib/analytics/firebaseAnalyticsService.ts",
+        ".claude/worktrees/exciting-spence/docs/firebase-analytics-setup.md"
+      ],
+      "pricing_model_hint": "tier + usage"
+    }
+  ],
+  "confidence_inputs": {
+    "architecture_signal_strength": 0.84,
+    "unknowns": []
+  }
+}

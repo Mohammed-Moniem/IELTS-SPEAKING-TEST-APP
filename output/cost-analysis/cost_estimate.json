@@ -1,0 +1,2170 @@
+{
+  "assumptions": {
+    "load_profile": {
+      "source": "default-low-confidence",
+      "growth_rate_monthly_pct": 0.0,
+      "scenarios": {
+        "low": {
+          "requests_per_second": 1.0,
+          "monthly_active_users": 250,
+          "avg_response_kb": 80.0,
+          "storage_gb": 20.0,
+          "db_gb": 10.0,
+          "cache_gb": 2.0,
+          "queue_million_ops": 1.0,
+          "background_job_hours": 100.0,
+          "ai_requests_per_month": 2500.0,
+          "sms_messages_per_month": 500.0,
+          "emails_per_month": 5000.0
+        },
+        "medium": {
+          "requests_per_second": 20.0,
+          "monthly_active_users": 10000,
+          "avg_response_kb": 120.0,
+          "storage_gb": 200.0,
+          "db_gb": 60.0,
+          "cache_gb": 10.0,
+          "queue_million_ops": 15.0,
+          "background_job_hours": 300.0,
+          "ai_requests_per_month": 50000.0,
+          "sms_messages_per_month": 8000.0,
+          "emails_per_month": 120000.0
+        },
+        "high": {
+          "requests_per_second": 200.0,
+          "monthly_active_users": 200000,
+          "avg_response_kb": 180.0,
+          "storage_gb": 1200.0,
+          "db_gb": 320.0,
+          "cache_gb": 64.0,
+          "queue_million_ops": 160.0,
+          "background_job_hours": 600.0,
+          "ai_requests_per_month": 700000.0,
+          "sms_messages_per_month": 75000.0,
+          "emails_per_month": 1800000.0
+        }
+      }
+    },
+    "locale": "global-blended",
+    "currency": "USD",
+    "pricing_timestamp": "2026-03-06T01:54:45.148474+00:00",
+    "stale_pricing_flag": false,
+    "annual_model": "flat_monthly_baseline",
+    "weights": {
+      "cost": 0.5,
+      "scalability": 0.3,
+      "ops": 0.2
+    },
+    "include_ai_api_costs": true
+  },
+  "providers": [
+    {
+      "provider": "aws",
+      "scenarios": {
+        "low": {
+          "totals": {
+            "monthly_min": 354.42,
+            "monthly_base": 506.31,
+            "monthly_max": 658.21,
+            "annual_base": 6075.76
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 2.15,
+              "monthly_base": 3.08,
+              "monthly_max": 4.0,
+              "annual_base": 36.91,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 114.55,
+              "monthly_base": 163.65,
+              "monthly_max": 212.74,
+              "annual_base": 1963.8,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 114.55,
+              "monthly_base": 163.65,
+              "monthly_max": 212.74,
+              "annual_base": 1963.8,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 45.5,
+              "monthly_base": 65.0,
+              "monthly_max": 84.5,
+              "annual_base": 780.0,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 0.29,
+              "monthly_base": 0.42,
+              "monthly_max": 0.55,
+              "annual_base": 5.04,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 12.46,
+              "monthly_base": 17.8,
+              "monthly_max": 23.14,
+              "annual_base": 213.57,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 5.99,
+              "monthly_base": 8.56,
+              "monthly_max": 11.13,
+              "annual_base": 102.7,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 25.75,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.01,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 25.4,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.01,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 1.0,
+            "monthly_active_users": 250.0,
+            "storage_gb": 20.0,
+            "db_gb": 10.0,
+            "egress_gb": 197.754
+          }
+        },
+        "medium": {
+          "totals": {
+            "monthly_min": 967.5,
+            "monthly_base": 1382.14,
+            "monthly_max": 1796.78,
+            "annual_base": 16585.7
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 43.06,
+              "monthly_base": 61.52,
+              "monthly_max": 79.97,
+              "annual_base": 738.2,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 116.28,
+              "monthly_base": 166.11,
+              "monthly_max": 215.95,
+              "annual_base": 1993.34,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 116.28,
+              "monthly_base": 166.11,
+              "monthly_max": 215.95,
+              "annual_base": 1993.34,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 68.25,
+              "monthly_base": 97.5,
+              "monthly_max": 126.75,
+              "annual_base": 1170.0,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 2.94,
+              "monthly_base": 4.2,
+              "monthly_max": 5.46,
+              "annual_base": 50.4,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 373.75,
+              "monthly_base": 533.94,
+              "monthly_max": 694.12,
+              "annual_base": 6407.23,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 175.19,
+              "monthly_base": 250.26,
+              "monthly_max": 325.34,
+              "annual_base": 3003.18,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 40.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.2,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 29.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.3,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 20.0,
+            "monthly_active_users": 10000.0,
+            "storage_gb": 200.0,
+            "db_gb": 60.0,
+            "egress_gb": 5932.617
+          }
+        },
+        "high": {
+          "totals": {
+            "monthly_min": 9495.12,
+            "monthly_base": 13564.45,
+            "monthly_max": 17633.79,
+            "annual_base": 162773.45
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 430.62,
+              "monthly_base": 615.17,
+              "monthly_max": 799.72,
+              "annual_base": 7382.05,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 132.61,
+              "monthly_base": 189.44,
+              "monthly_max": 246.27,
+              "annual_base": 2273.28,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 132.61,
+              "monthly_base": 189.44,
+              "monthly_max": 246.27,
+              "annual_base": 2273.28,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 364.0,
+              "monthly_base": 520.0,
+              "monthly_max": 676.0,
+              "annual_base": 6240.0,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 17.64,
+              "monthly_base": 25.2,
+              "monthly_max": 32.76,
+              "annual_base": 302.4,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 5606.32,
+              "monthly_base": 8009.03,
+              "monthly_max": 10411.74,
+              "annual_base": 96108.4,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 2582.42,
+              "monthly_base": 3689.17,
+              "monthly_max": 4795.92,
+              "annual_base": 44270.04,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 235.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 12.0,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 49.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 31.0,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 200.0,
+            "monthly_active_users": 200000.0,
+            "storage_gb": 1200.0,
+            "db_gb": 320.0,
+            "egress_gb": 88989.258
+          }
+        }
+      },
+      "totals": {
+        "average_monthly_base": 5150.97,
+        "average_annual_base": 61811.64
+      },
+      "uncertainty": {
+        "style": "ranges",
+        "confidence": 0.702
+      }
+    },
+    {
+      "provider": "azure",
+      "scenarios": {
+        "low": {
+          "totals": {
+            "monthly_min": 226.66,
+            "monthly_base": 323.81,
+            "monthly_max": 420.95,
+            "annual_base": 3885.67
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 2.54,
+              "monthly_base": 3.63,
+              "monthly_max": 4.72,
+              "annual_base": 43.55,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 29.52,
+              "monthly_base": 42.18,
+              "monthly_max": 54.83,
+              "annual_base": 506.13,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 29.52,
+              "monthly_base": 42.18,
+              "monthly_max": 54.83,
+              "annual_base": 506.13,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 87.38,
+              "monthly_base": 124.83,
+              "monthly_max": 162.28,
+              "annual_base": 1497.96,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 0.27,
+              "monthly_base": 0.38,
+              "monthly_max": 0.5,
+              "annual_base": 4.58,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 12.04,
+              "monthly_base": 17.2,
+              "monthly_max": 22.37,
+              "annual_base": 206.46,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 6.47,
+              "monthly_base": 9.24,
+              "monthly_max": 12.02,
+              "annual_base": 110.91,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 25.75,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.01,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 25.4,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.01,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 1.0,
+            "monthly_active_users": 250.0,
+            "storage_gb": 20.0,
+            "db_gb": 10.0,
+            "egress_gb": 197.754
+          }
+        },
+        "medium": {
+          "totals": {
+            "monthly_min": 869.29,
+            "monthly_base": 1241.84,
+            "monthly_max": 1614.4,
+            "annual_base": 14902.13
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 50.8,
+              "monthly_base": 72.58,
+              "monthly_max": 94.35,
+              "annual_base": 870.91,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 31.25,
+              "monthly_base": 44.64,
+              "monthly_max": 58.03,
+              "annual_base": 535.68,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 31.25,
+              "monthly_base": 44.64,
+              "monthly_max": 58.03,
+              "annual_base": 535.68,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 131.07,
+              "monthly_base": 187.25,
+              "monthly_max": 243.42,
+              "annual_base": 2246.94,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 2.67,
+              "monthly_base": 3.82,
+              "monthly_max": 4.97,
+              "annual_base": 45.84,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 361.3,
+              "monthly_base": 516.14,
+              "monthly_max": 670.98,
+              "annual_base": 6193.65,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 189.2,
+              "monthly_base": 270.29,
+              "monthly_max": 351.37,
+              "annual_base": 3243.43,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 40.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.2,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 29.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.3,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 20.0,
+            "monthly_active_users": 10000.0,
+            "storage_gb": 200.0,
+            "db_gb": 60.0,
+            "egress_gb": 5932.617
+          }
+        },
+        "high": {
+          "totals": {
+            "monthly_min": 9755.64,
+            "monthly_base": 13936.63,
+            "monthly_max": 18117.61,
+            "annual_base": 167239.5
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 508.03,
+              "monthly_base": 725.76,
+              "monthly_max": 943.49,
+              "annual_base": 8709.12,
+              "confidence": 0.702,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 47.58,
+              "monthly_base": 67.97,
+              "monthly_max": 88.36,
+              "annual_base": 815.62,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 47.58,
+              "monthly_base": 67.97,
+              "monthly_max": 88.36,
+              "annual_base": 815.62,
+              "confidence": 0.702,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 699.05,
+              "monthly_base": 998.64,
+              "monthly_max": 1298.23,
+              "annual_base": 11983.68,
+              "confidence": 0.702,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 16.04,
+              "monthly_base": 22.92,
+              "monthly_max": 29.8,
+              "annual_base": 275.04,
+              "confidence": 0.702,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 5419.45,
+              "monthly_base": 7742.07,
+              "monthly_max": 10064.69,
+              "annual_base": 92904.79,
+              "confidence": 0.702,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 2789.01,
+              "monthly_base": 3984.3,
+              "monthly_max": 5179.6,
+              "annual_base": 47811.65,
+              "confidence": 0.702,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 235.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 12.0,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 49.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 31.0,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 200.0,
+            "monthly_active_users": 200000.0,
+            "storage_gb": 1200.0,
+            "db_gb": 320.0,
+            "egress_gb": 88989.258
+          }
+        }
+      },
+      "totals": {
+        "average_monthly_base": 5167.43,
+        "average_annual_base": 62009.1
+      },
+      "uncertainty": {
+        "style": "ranges",
+        "confidence": 0.702
+      }
+    },
+    {
+      "provider": "cloudflare",
+      "scenarios": {
+        "low": {
+          "totals": {
+            "monthly_min": 172.76,
+            "monthly_base": 345.53,
+            "monthly_max": 518.29,
+            "annual_base": 4146.33
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 1.48,
+              "monthly_base": 2.95,
+              "monthly_max": 4.43,
+              "annual_base": 35.46,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 55.58,
+              "monthly_base": 111.15,
+              "monthly_max": 166.73,
+              "annual_base": 1333.85,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 55.58,
+              "monthly_base": 111.15,
+              "monthly_max": 166.73,
+              "annual_base": 1333.85,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 12.5,
+              "monthly_base": 25.0,
+              "monthly_max": 37.5,
+              "annual_base": 300.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 0.15,
+              "monthly_base": 0.3,
+              "monthly_max": 0.45,
+              "annual_base": 3.6,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 1.98,
+              "monthly_base": 3.96,
+              "monthly_max": 5.93,
+              "annual_base": 47.46,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 3.42,
+              "monthly_base": 6.85,
+              "monthly_max": 10.27,
+              "annual_base": 82.16,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 25.75,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.01,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 25.4,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.01,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 1.0,
+            "monthly_active_users": 250.0,
+            "storage_gb": 20.0,
+            "db_gb": 10.0,
+            "egress_gb": 197.754
+          }
+        },
+        "medium": {
+          "totals": {
+            "monthly_min": 375.33,
+            "monthly_base": 750.66,
+            "monthly_max": 1125.99,
+            "annual_base": 9007.89
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 29.55,
+              "monthly_base": 59.1,
+              "monthly_max": 88.65,
+              "annual_base": 709.17,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 57.42,
+              "monthly_base": 114.85,
+              "monthly_max": 172.27,
+              "annual_base": 1378.18,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 57.42,
+              "monthly_base": 114.85,
+              "monthly_max": 172.27,
+              "annual_base": 1378.18,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 18.75,
+              "monthly_base": 37.5,
+              "monthly_max": 56.25,
+              "annual_base": 450.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 1.5,
+              "monthly_base": 3.0,
+              "monthly_max": 4.5,
+              "annual_base": 36.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 59.33,
+              "monthly_base": 118.65,
+              "monthly_max": 177.98,
+              "annual_base": 1423.83,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 100.11,
+              "monthly_base": 200.21,
+              "monthly_max": 300.32,
+              "annual_base": 2402.54,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 40.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.2,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 29.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.3,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 20.0,
+            "monthly_active_users": 10000.0,
+            "storage_gb": 200.0,
+            "db_gb": 60.0,
+            "egress_gb": 5932.617
+          }
+        },
+        "high": {
+          "totals": {
+            "monthly_min": 3083.39,
+            "monthly_base": 6166.78,
+            "monthly_max": 9250.17,
+            "annual_base": 74001.33
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 295.49,
+              "monthly_base": 590.98,
+              "monthly_max": 886.46,
+              "annual_base": 7091.71,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 74.92,
+              "monthly_base": 149.84,
+              "monthly_max": 224.76,
+              "annual_base": 1798.08,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 74.92,
+              "monthly_base": 149.84,
+              "monthly_max": 224.76,
+              "annual_base": 1798.08,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 100.0,
+              "monthly_base": 200.0,
+              "monthly_max": 300.0,
+              "annual_base": 2400.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 9.0,
+              "monthly_base": 18.0,
+              "monthly_max": 27.0,
+              "annual_base": 216.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 889.89,
+              "monthly_base": 1779.79,
+              "monthly_max": 2669.68,
+              "annual_base": 21357.42,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 1475.67,
+              "monthly_base": 2951.34,
+              "monthly_max": 4427.0,
+              "annual_base": 35416.04,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 235.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 12.0,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 49.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 31.0,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 200.0,
+            "monthly_active_users": 200000.0,
+            "storage_gb": 1200.0,
+            "db_gb": 320.0,
+            "egress_gb": 88989.258
+          }
+        }
+      },
+      "totals": {
+        "average_monthly_base": 2420.99,
+        "average_annual_base": 29051.85
+      },
+      "uncertainty": {
+        "style": "ranges",
+        "confidence": 0.641
+      }
+    },
+    {
+      "provider": "gcp",
+      "scenarios": {
+        "low": {
+          "totals": {
+            "monthly_min": 250.21,
+            "monthly_base": 500.41,
+            "monthly_max": 750.62,
+            "annual_base": 6004.98
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 1.76,
+              "monthly_base": 3.53,
+              "monthly_max": 5.29,
+              "annual_base": 42.3,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 77.51,
+              "monthly_base": 155.02,
+              "monthly_max": 232.53,
+              "annual_base": 1860.23,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 77.51,
+              "monthly_base": 155.02,
+              "monthly_max": 232.53,
+              "annual_base": 1860.23,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 35.0,
+              "monthly_base": 70.0,
+              "monthly_max": 105.0,
+              "annual_base": 840.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 0.2,
+              "monthly_base": 0.4,
+              "monthly_max": 0.6,
+              "annual_base": 4.8,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 11.87,
+              "monthly_base": 23.73,
+              "monthly_max": 35.6,
+              "annual_base": 284.77,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 4.28,
+              "monthly_base": 8.56,
+              "monthly_max": 12.84,
+              "annual_base": 102.7,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 25.75,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.01,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 25.4,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.01,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 1.0,
+            "monthly_active_users": 250.0,
+            "storage_gb": 20.0,
+            "db_gb": 10.0,
+            "egress_gb": 197.754
+          }
+        },
+        "medium": {
+          "totals": {
+            "monthly_min": 782.03,
+            "monthly_base": 1564.07,
+            "monthly_max": 2346.1,
+            "annual_base": 18768.83
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 35.25,
+              "monthly_base": 70.5,
+              "monthly_max": 105.75,
+              "annual_base": 846.03,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 79.97,
+              "monthly_base": 159.94,
+              "monthly_max": 239.92,
+              "annual_base": 1919.33,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 79.97,
+              "monthly_base": 159.94,
+              "monthly_max": 239.92,
+              "annual_base": 1919.33,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 52.5,
+              "monthly_base": 105.0,
+              "monthly_max": 157.5,
+              "annual_base": 1260.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 2.0,
+              "monthly_base": 4.0,
+              "monthly_max": 6.0,
+              "annual_base": 48.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 355.96,
+              "monthly_base": 711.91,
+              "monthly_max": 1067.87,
+              "annual_base": 8542.97,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 125.13,
+              "monthly_base": 250.26,
+              "monthly_max": 375.4,
+              "annual_base": 3003.18,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 40.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.2,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 29.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.3,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 20.0,
+            "monthly_active_users": 10000.0,
+            "storage_gb": 200.0,
+            "db_gb": 60.0,
+            "egress_gb": 5932.617
+          }
+        },
+        "high": {
+          "totals": {
+            "monthly_min": 8198.55,
+            "monthly_base": 16397.11,
+            "monthly_max": 24595.66,
+            "annual_base": 196765.26
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 352.51,
+              "monthly_base": 705.02,
+              "monthly_max": 1057.54,
+              "annual_base": 8460.29,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 103.3,
+              "monthly_base": 206.6,
+              "monthly_max": 309.9,
+              "annual_base": 2479.2,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 103.3,
+              "monthly_base": 206.6,
+              "monthly_max": 309.9,
+              "annual_base": 2479.2,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 280.0,
+              "monthly_base": 560.0,
+              "monthly_max": 840.0,
+              "annual_base": 6720.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 12.0,
+              "monthly_base": 24.0,
+              "monthly_max": 36.0,
+              "annual_base": 288.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 5339.36,
+              "monthly_base": 10678.71,
+              "monthly_max": 16018.07,
+              "annual_base": 128144.53,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 1844.59,
+              "monthly_base": 3689.17,
+              "monthly_max": 5533.76,
+              "annual_base": 44270.04,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 235.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 12.0,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 49.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 31.0,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 200.0,
+            "monthly_active_users": 200000.0,
+            "storage_gb": 1200.0,
+            "db_gb": 320.0,
+            "egress_gb": 88989.258
+          }
+        }
+      },
+      "totals": {
+        "average_monthly_base": 6153.86,
+        "average_annual_base": 73846.36
+      },
+      "uncertainty": {
+        "style": "ranges",
+        "confidence": 0.641
+      }
+    },
+    {
+      "provider": "vercel",
+      "scenarios": {
+        "low": {
+          "totals": {
+            "monthly_min": 335.62,
+            "monthly_base": 671.24,
+            "monthly_max": 1006.86,
+            "annual_base": 8054.88
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 2.54,
+              "monthly_base": 5.08,
+              "monthly_max": 7.62,
+              "annual_base": 60.96,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 111.15,
+              "monthly_base": 222.31,
+              "monthly_max": 333.46,
+              "annual_base": 2667.71,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 111.15,
+              "monthly_base": 222.31,
+              "monthly_max": 333.46,
+              "annual_base": 2667.71,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 45.0,
+              "monthly_base": 90.0,
+              "monthly_max": 135.0,
+              "annual_base": 1080.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 0.3,
+              "monthly_base": 0.6,
+              "monthly_max": 0.9,
+              "annual_base": 7.2,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 14.83,
+              "monthly_base": 29.66,
+              "monthly_max": 44.49,
+              "annual_base": 355.96,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 8.56,
+              "monthly_base": 17.12,
+              "monthly_max": 25.67,
+              "annual_base": 205.4,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 25.75,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.01,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 25.4,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.01,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 1.0,
+            "monthly_active_users": 250.0,
+            "storage_gb": 20.0,
+            "db_gb": 10.0,
+            "egress_gb": 197.754
+          }
+        },
+        "medium": {
+          "totals": {
+            "monthly_min": 1097.46,
+            "monthly_base": 2194.92,
+            "monthly_max": 3292.38,
+            "annual_base": 26339.04
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 50.8,
+              "monthly_base": 101.61,
+              "monthly_max": 152.41,
+              "annual_base": 1219.28,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 114.85,
+              "monthly_base": 229.7,
+              "monthly_max": 344.54,
+              "annual_base": 2756.35,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 114.85,
+              "monthly_base": 229.7,
+              "monthly_max": 344.54,
+              "annual_base": 2756.35,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 67.5,
+              "monthly_base": 135.0,
+              "monthly_max": 202.5,
+              "annual_base": 1620.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 3.0,
+              "monthly_base": 6.0,
+              "monthly_max": 9.0,
+              "annual_base": 72.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 444.95,
+              "monthly_base": 889.89,
+              "monthly_max": 1334.84,
+              "annual_base": 10678.71,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 250.26,
+              "monthly_base": 500.53,
+              "monthly_max": 750.79,
+              "annual_base": 6006.35,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 40.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 8.2,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 29.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 25.3,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 20.0,
+            "monthly_active_users": 10000.0,
+            "storage_gb": 200.0,
+            "db_gb": 60.0,
+            "egress_gb": 5932.617
+          }
+        },
+        "high": {
+          "totals": {
+            "monthly_min": 11712.58,
+            "monthly_base": 23425.15,
+            "monthly_max": 35137.73,
+            "annual_base": 281101.84
+          },
+          "component_breakdown": [
+            {
+              "component_id": "web-frontend-1",
+              "category": "frontend",
+              "monthly_min": 508.03,
+              "monthly_base": 1016.06,
+              "monthly_max": 1524.1,
+              "annual_base": 12192.77,
+              "confidence": 0.641,
+              "notes": "Request-driven frontend/edge execution"
+            },
+            {
+              "component_id": "api-service-1",
+              "category": "compute",
+              "monthly_min": 149.84,
+              "monthly_base": 299.68,
+              "monthly_max": 449.52,
+              "annual_base": 3596.16,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "container-service-1",
+              "category": "compute",
+              "monthly_min": 149.84,
+              "monthly_base": 299.68,
+              "monthly_max": 449.52,
+              "annual_base": 3596.16,
+              "confidence": 0.641,
+              "notes": "Provisioned compute + request uplifts"
+            },
+            {
+              "component_id": "relational-db-1",
+              "category": "database",
+              "monthly_min": 360.0,
+              "monthly_base": 720.0,
+              "monthly_max": 1080.0,
+              "annual_base": 8640.0,
+              "confidence": 0.641,
+              "notes": "Managed PostgreSQL baseline by data size"
+            },
+            {
+              "component_id": "shared-object-storage",
+              "category": "storage",
+              "monthly_min": 18.0,
+              "monthly_base": 36.0,
+              "monthly_max": 54.0,
+              "annual_base": 432.0,
+              "confidence": 0.641,
+              "notes": "Object storage capacity"
+            },
+            {
+              "component_id": "shared-network-egress",
+              "category": "network",
+              "monthly_min": 6674.19,
+              "monthly_base": 13348.39,
+              "monthly_max": 20022.58,
+              "annual_base": 160180.66,
+              "confidence": 0.641,
+              "notes": "External data transfer"
+            },
+            {
+              "component_id": "shared-observability",
+              "category": "observability",
+              "monthly_min": 3689.17,
+              "monthly_base": 7378.34,
+              "monthly_max": 11067.51,
+              "annual_base": 88540.09,
+              "confidence": 0.641,
+              "notes": "Metrics/log ingestion and retention"
+            }
+          ],
+          "third_party_breakdown": [
+            {
+              "vendor": "openai",
+              "monthly_base": 235.0,
+              "assumption_notes": "Assumes blended token usage for model calls."
+            },
+            {
+              "vendor": "stripe",
+              "monthly_base": 12.0,
+              "assumption_notes": "Represents operational overhead, not payment processing percentage fees."
+            },
+            {
+              "vendor": "supabase",
+              "monthly_base": 49.0,
+              "assumption_notes": "Assumes paid project tier plus storage growth."
+            },
+            {
+              "vendor": "firebase",
+              "monthly_base": 31.0,
+              "assumption_notes": "Assumes Blaze pay-as-you-go usage."
+            }
+          ],
+          "assumptions": {
+            "requests_per_second": 200.0,
+            "monthly_active_users": 200000.0,
+            "storage_gb": 1200.0,
+            "db_gb": 320.0,
+            "egress_gb": 88989.258
+          }
+        }
+      },
+      "totals": {
+        "average_monthly_base": 8763.77,
+        "average_annual_base": 105165.25
+      },
+      "uncertainty": {
+        "style": "ranges",
+        "confidence": 0.641
+      }
+    }
+  ],
+  "pricing": {
+    "providers": {
+      "aws": {
+        "sources": [
+          {
+            "url": "https://aws.amazon.com/ec2/pricing/on-demand/",
+            "checked_at": "2026-03-06T01:54:45.148497+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://aws.amazon.com/s3/pricing/",
+            "checked_at": "2026-03-06T01:54:45.528706+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://aws.amazon.com/rds/postgresql/pricing/",
+            "checked_at": "2026-03-06T01:54:45.856228+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://aws.amazon.com/lambda/pricing/",
+            "checked_at": "2026-03-06T01:54:46.739520+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://aws.amazon.com/cloudwatch/pricing/",
+            "checked_at": "2026-03-06T01:54:47.054556+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json",
+            "checked_at": "2026-03-06T01:54:47.371131+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-east-1/index.json",
+            "checked_at": "2026-03-06T01:54:47.998253+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/us-east-1/index.json",
+            "checked_at": "2026-03-06T01:54:48.911843+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          }
+        ],
+        "live_updates": [
+          {
+            "metric": "serverless_request_million",
+            "value": 0.19999999999999998,
+            "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json"
+          },
+          {
+            "metric": "serverless_gb_second",
+            "value": 1.33334e-05,
+            "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json"
+          },
+          {
+            "metric": "object_storage_gb_month",
+            "value": 0.021,
+            "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-east-1/index.json"
+          }
+        ],
+        "notes": [
+          "AWS RDS live extraction failed: Unterminated string starting at: line 278173 column 15 (char 10499995)"
+        ],
+        "retrieved_at": "2026-03-06T01:55:01.986396+00:00"
+      },
+      "azure": {
+        "sources": [
+          {
+            "url": "https://azure.microsoft.com/pricing/details/virtual-machines/linux/",
+            "checked_at": "2026-03-06T01:55:10.881790+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://azure.microsoft.com/pricing/details/storage/blobs/",
+            "checked_at": "2026-03-06T01:55:29.898899+00:00",
+            "status": "error",
+            "error": "The read operation timed out"
+          },
+          {
+            "url": "https://azure.microsoft.com/pricing/details/postgresql/server/",
+            "checked_at": "2026-03-06T01:55:53.312119+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://azure.microsoft.com/pricing/details/functions/",
+            "checked_at": "2026-03-06T01:56:12.072472+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://azure.microsoft.com/pricing/details/bandwidth/",
+            "checked_at": "2026-03-06T01:56:32.649769+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://azure.microsoft.com/pricing/details/monitor/",
+            "checked_at": "2026-03-06T01:56:51.587510+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://prices.azure.com/api/retail/prices?$top=1",
+            "checked_at": "2026-03-06T01:57:11.812932+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          }
+        ],
+        "live_updates": [
+          {
+            "metric": "compute_vcpu_hour",
+            "value": 0.0096,
+            "source": "https://prices.azure.com/api/retail/prices"
+          },
+          {
+            "metric": "compute_gb_hour",
+            "value": 0.0024,
+            "source": "https://prices.azure.com/api/retail/prices"
+          },
+          {
+            "metric": "object_storage_gb_month",
+            "value": 0.0191,
+            "source": "https://prices.azure.com/api/retail/prices"
+          },
+          {
+            "metric": "managed_postgres_month",
+            "value": 124.83000000000001,
+            "source": "https://prices.azure.com/api/retail/prices"
+          }
+        ],
+        "notes": [],
+        "retrieved_at": "2026-03-06T01:57:13.515263+00:00"
+      },
+      "cloudflare": {
+        "sources": [
+          {
+            "url": "https://www.cloudflare.com/plans/developer-platform/",
+            "checked_at": "2026-03-06T01:57:16.236862+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://developers.cloudflare.com/workers/platform/pricing/",
+            "checked_at": "2026-03-06T01:57:17.130371+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://www.cloudflare.com/products/r2/pricing/",
+            "checked_at": "2026-03-06T01:57:17.382276+00:00",
+            "status": "error",
+            "error": "HTTP Error 404: Not Found"
+          }
+        ],
+        "live_updates": [],
+        "notes": [],
+        "retrieved_at": "2026-03-06T01:57:17.876748+00:00"
+      },
+      "gcp": {
+        "sources": [
+          {
+            "url": "https://cloud.google.com/compute/vm-instance-pricing",
+            "checked_at": "2026-03-06T01:55:01.986424+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://cloud.google.com/storage/pricing",
+            "checked_at": "2026-03-06T01:55:03.066194+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://cloud.google.com/sql/pricing",
+            "checked_at": "2026-03-06T01:55:04.133682+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://cloud.google.com/functions/pricing-1stgen",
+            "checked_at": "2026-03-06T01:55:05.200890+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://cloud.google.com/vpc/network-pricing",
+            "checked_at": "2026-03-06T01:55:06.028672+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://cloud.google.com/monitoring/pricing",
+            "checked_at": "2026-03-06T01:55:09.305055+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          }
+        ],
+        "live_updates": [],
+        "notes": [],
+        "retrieved_at": "2026-03-06T01:55:10.881652+00:00"
+      },
+      "vercel": {
+        "sources": [
+          {
+            "url": "https://vercel.com/pricing",
+            "checked_at": "2026-03-06T01:57:13.515282+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          },
+          {
+            "url": "https://vercel.com/docs/pricing/compute",
+            "checked_at": "2026-03-06T01:57:13.757239+00:00",
+            "status": "error",
+            "error": "HTTP Error 404: Not Found"
+          },
+          {
+            "url": "https://vercel.com/docs/pricing/networking",
+            "checked_at": "2026-03-06T01:57:15.746792+00:00",
+            "status": "ok",
+            "http_status": 200,
+            "used_insecure_ssl": true
+          }
+        ],
+        "live_updates": [],
+        "notes": [],
+        "retrieved_at": "2026-03-06T01:57:16.236839+00:00"
+      }
+    }
+  },
+  "ranking": {
+    "top3": [
+      {
+        "provider": "cloudflare",
+        "overall_score": 0.953,
+        "estimated_monthly_base": 2420.99,
+        "weighted_scores": {
+          "cost": 1.0,
+          "scalability": 0.91,
+          "ops": 0.9
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 1.0; scalability score 0.91; ops score 0.9"
+      },
+      {
+        "provider": "aws",
+        "overall_score": 0.7098,
+        "estimated_monthly_base": 5150.97,
+        "weighted_scores": {
+          "cost": 0.5696,
+          "scalability": 0.95,
+          "ops": 0.7
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.57; scalability score 0.95; ops score 0.7"
+      },
+      {
+        "provider": "azure",
+        "overall_score": 0.6985,
+        "estimated_monthly_base": 5167.43,
+        "weighted_scores": {
+          "cost": 0.567,
+          "scalability": 0.93,
+          "ops": 0.68
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.567; scalability score 0.93; ops score 0.68"
+      }
+    ],
+    "all_ranked": [
+      {
+        "provider": "cloudflare",
+        "overall_score": 0.953,
+        "estimated_monthly_base": 2420.99,
+        "weighted_scores": {
+          "cost": 1.0,
+          "scalability": 0.91,
+          "ops": 0.9
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 1.0; scalability score 0.91; ops score 0.9"
+      },
+      {
+        "provider": "aws",
+        "overall_score": 0.7098,
+        "estimated_monthly_base": 5150.97,
+        "weighted_scores": {
+          "cost": 0.5696,
+          "scalability": 0.95,
+          "ops": 0.7
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.57; scalability score 0.95; ops score 0.7"
+      },
+      {
+        "provider": "azure",
+        "overall_score": 0.6985,
+        "estimated_monthly_base": 5167.43,
+        "weighted_scores": {
+          "cost": 0.567,
+          "scalability": 0.93,
+          "ops": 0.68
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.567; scalability score 0.93; ops score 0.68"
+      },
+      {
+        "provider": "gcp",
+        "overall_score": 0.6317,
+        "estimated_monthly_base": 6153.86,
+        "weighted_scores": {
+          "cost": 0.4115,
+          "scalability": 0.94,
+          "ops": 0.72
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.411; scalability score 0.94; ops score 0.72"
+      },
+      {
+        "provider": "vercel",
+        "overall_score": 0.43,
+        "estimated_monthly_base": 8763.77,
+        "weighted_scores": {
+          "cost": 0.0,
+          "scalability": 0.8,
+          "ops": 0.95
+        },
+        "weights": {
+          "cost": 0.5,
+          "scalability": 0.3,
+          "ops": 0.2
+        },
+        "rationale": "Cost score 0.0; scalability score 0.8; ops score 0.95"
+      }
+    ]
+  },
+  "confidence": {
+    "overall_score_0_to_1": 0.702,
+    "reasons": [
+      "Architecture signal strength: 0.84",
+      "Load profile confidence: 0.45",
+      "Pricing confidence: 0.78",
+      "Third-party confidence: 0.58"
+    ]
+  },
+  "warnings": []
+}

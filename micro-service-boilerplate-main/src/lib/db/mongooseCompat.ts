@@ -1352,8 +1352,16 @@ const createDocumentClass = (name: string, schema: Schema): any => {
       options: PlainObject = {},
       multi: boolean
     ): Promise<{ matchedCount: number; modifiedCount: number; upsertedCount: number; upsertedId?: string }> {
-      const rows = await this.__loadRows();
-      const matched = rows.filter((row: PlainObject) => matchesFilter(row, filter || {}));
+      let matched = await this.__queryRows({
+        filter: filter || {},
+        single: multi ? false : true
+      });
+
+      if (!matched) {
+        const rows = await this.__loadRows();
+        matched = rows.filter((row: PlainObject) => matchesFilter(row, filter || {}));
+      }
+
       const limitedMatched = multi ? matched : matched.slice(0, 1);
 
       let modifiedCount = 0;

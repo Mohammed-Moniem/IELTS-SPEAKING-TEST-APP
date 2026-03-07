@@ -632,7 +632,7 @@ export default function TestsPage() {
       <PageHeader
         kicker="Simulation"
         title="Full Exam Simulation"
-        subtitle="Guided section orchestration with resume support and no manual IDs."
+        subtitle="Move through each section with clear timing, saved progress, and an easy resume path."
         actions={
           <div className="flex flex-wrap items-center gap-4">
             <StatusBadge tone="neutral">Total duration 2h 45m</StatusBadge>

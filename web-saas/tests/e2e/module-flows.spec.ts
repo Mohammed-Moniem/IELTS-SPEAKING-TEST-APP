@@ -271,6 +271,55 @@ test.describe('Module learner flows', () => {
     await expect(page.getByRole('heading', { name: 'Writing Submission Detail' })).toBeVisible();
   });
 
+  test('resumes pending writing attempt with running timer and latest saved edits', async ({ page }) => {
+    await setupLearnerContext(page);
+    await mockWritingRoutes(page);
+
+    await page.goto('/app/writing');
+
+    await page.getByRole('button', { name: /Generate Task/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Global Urbanization' })).toBeVisible();
+
+    const firstDraft =
+      'Urban migration can improve employment access, but it may also increase housing pressure and commute stress for low-income residents.';
+    await page.getByPlaceholder('Write your response here...').fill(firstDraft);
+
+    await page.evaluate((href: string) => {
+      const link = document.createElement('a');
+      link.href = href;
+      link.textContent = 'leave-writing';
+      document.body.appendChild(link);
+      link.click();
+    }, '/app/writing?resume_check=1');
+
+    await expect(page.getByText('Leave writing attempt?')).toBeVisible();
+    await page.getByRole('button', { name: 'Save and Leave' }).click();
+    await expect(page).toHaveURL(/\/app\/writing\?resume_check=1$/);
+
+    await page.locator('tr', { hasText: 'Pending resume' }).first().getByRole('button', { name: 'Resume' }).click();
+
+    await expect(page.getByRole('button', { name: 'Pause Timer' }).first()).toBeVisible();
+    await expect(page.getByPlaceholder('Write your response here...')).toHaveValue(firstDraft);
+
+    const secondDraft = `${firstDraft} Updated version with clearer policy recommendation and a specific transport example.`;
+    await page.getByPlaceholder('Write your response here...').fill(secondDraft);
+
+    await page.evaluate((href: string) => {
+      const link = document.createElement('a');
+      link.href = href;
+      link.textContent = 'leave-writing-again';
+      document.body.appendChild(link);
+      link.click();
+    }, '/app/writing?resume_check=2');
+
+    await expect(page.getByText('Leave writing attempt?')).toBeVisible();
+    await page.getByRole('button', { name: 'Save and Leave' }).click();
+    await expect(page).toHaveURL(/\/app\/writing\?resume_check=2$/);
+
+    await page.locator('tr', { hasText: 'Pending resume' }).first().getByRole('button', { name: 'Resume' }).click();
+    await expect(page.getByPlaceholder('Write your response here...')).toHaveValue(secondDraft);
+  });
+
   test('completes reading flow with review-before-submit and deep-link detail', async ({ page }) => {
     await setupLearnerContext(page);
     await mockReadingRoutes(page);

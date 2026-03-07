@@ -6,6 +6,7 @@ import {
   mockJsonSuccess,
   mockUsageSummary,
 } from "./helpers/mockApi";
+import type { LearnerDashboardView, LearnerProgressView } from "@/lib/types";
 
 /**
  * Production smoke tests — lightweight assertions that every critical page
@@ -16,7 +17,7 @@ import {
 
 const nowIso = "2026-02-22T12:00:00.000Z";
 
-const learnerDashboardView = {
+const learnerDashboardView: LearnerDashboardView = {
   generatedAt: nowIso,
   plan: "premium",
   kpis: {
@@ -108,7 +109,12 @@ const learnerDashboardView = {
   ],
 };
 
-const learnerProgressView = {
+const learnerDashboardViewNoResume: LearnerDashboardView = {
+  ...learnerDashboardView,
+  resume: null,
+};
+
+const learnerProgressView: LearnerProgressView = {
   range: "90d",
   module: "all",
   totals: {
@@ -142,6 +148,16 @@ const learnerProgressView = {
       href: "/app/speaking/history/practice-1",
     },
   ],
+};
+
+const learnerProgressViewWritingWeakest: LearnerProgressView = {
+  ...learnerProgressView,
+  skillBreakdown: {
+    speaking: 6.6,
+    writing: 5.4,
+    reading: 6.2,
+    listening: 6.1,
+  },
 };
 
 const setupPointsMocks = async (page: Page) => {
@@ -193,6 +209,39 @@ const setupLearnerContext = async (page: Page) => {
   await setupPointsMocks(page);
 };
 
+const setupLearnerContextWithOverrides = async (
+  page: Page,
+  options: {
+    dashboardView?: typeof learnerDashboardView;
+    progressView?: typeof learnerProgressView;
+    progressStatus?: number;
+  } = {},
+) => {
+  await bootstrapSession(page);
+  await mockAppConfig(page);
+  await mockUsageSummary(page);
+  await page.route("**/api/v1/app/dashboard-view", (route) =>
+    route.fulfill(mockJsonSuccess(options.dashboardView ?? learnerDashboardView)),
+  );
+  await page.route("**/api/v1/app/progress-view**", (route) => {
+    if (options.progressStatus && options.progressStatus >= 400) {
+      return route.fulfill({
+        status: options.progressStatus,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: options.progressStatus,
+          success: false,
+          message: "Progress view unavailable",
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    }
+
+    return route.fulfill(mockJsonSuccess(options.progressView ?? learnerProgressView));
+  });
+  await setupPointsMocks(page);
+};
+
 const mockEmptyArray = (page: Page, pattern: string) =>
   page.route(pattern, (route) => route.fulfill(mockJsonSuccess([])));
 
@@ -205,6 +254,27 @@ test.describe("Marketing smoke", () => {
     await expect(
       page.getByRole("link", { name: /start free test/i }),
     ).toBeVisible();
+  });
+
+  test("marketing login nav resolves to the sign-in form", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("link", { name: "Login" }).click();
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
+    await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+    await expect(page.getByText("Loading sign-in...")).toHaveCount(0);
+  });
+
+  test("marketing register nav resolves to the registration form", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("link", { name: /start free/i }).first().click();
+
+    await expect(page).toHaveURL(/\/register$/);
+    await expect(page.getByRole("heading", { name: "Create Your Account" })).toBeVisible();
+    await expect(page.getByLabel(/first name/i)).toBeVisible();
   });
 
   test("pricing page renders plan cards", async ({ page }) => {
@@ -220,8 +290,8 @@ test.describe("Marketing smoke", () => {
 
   test("login page renders form", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   });
 
   test("register page renders form", async ({ page }) => {
@@ -256,11 +326,41 @@ test.describe("Marketing smoke", () => {
 // ── Learner app pages ───────────────────────────────────────────────────────
 
 test.describe("Learner app smoke", () => {
-  test("dashboard renders after auth", async ({ page }) => {
-    await setupLearnerContext(page);
+  test("dashboard prioritizes resuming an active session", async ({ page }) => {
+    await setupLearnerContextWithOverrides(page);
 
     await page.goto("/app/dashboard");
-    await expect(page.getByText(/dashboard/i).first()).toBeVisible();
+    await expect(page.getByText("Resume your current session")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Resume now" })).toBeVisible();
+    await expect(page.getByText("Weakest skill focus")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start New Test" })).toHaveCount(0);
+  });
+
+  test("dashboard falls back to the weakest skill when no session is active", async ({ page }) => {
+    await setupLearnerContextWithOverrides(page, {
+      dashboardView: learnerDashboardViewNoResume,
+      progressView: learnerProgressViewWritingWeakest,
+    });
+
+    await page.goto("/app/dashboard");
+    await expect(page.getByText("Focus on your weakest skill")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Practice Writing" })).toBeVisible();
+    await expect(page.getByText("Suggested speaking prompts")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Start New Test" })).toHaveCount(0);
+  });
+
+  test("dashboard keeps a clear fallback action when progress data is unavailable", async ({ page }) => {
+    await setupLearnerContextWithOverrides(page, {
+      dashboardView: learnerDashboardViewNoResume,
+      progressStatus: 500,
+    });
+
+    await page.goto("/app/dashboard");
+    await expect(page.getByText("Pick up your next practice session")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /^Start Speaking/ }).first(),
+    ).toBeVisible();
+    await expect(page.getByText("Dashboard Unavailable")).toHaveCount(0);
   });
 
   test("achievements page renders", async ({ page }) => {
@@ -321,5 +421,22 @@ test.describe("Learner app smoke", () => {
 
     await page.goto("/app/study-plan");
     await expect(page.getByText(/study plan/i).first()).toBeVisible();
+  });
+
+  test("full exam page renders learner guidance", async ({ page }) => {
+    await setupLearnerContext(page);
+
+    await page.goto("/app/tests");
+    await expect(page.getByRole("heading", { name: "Full Exam Simulation" })).toBeVisible();
+    await expect(
+      page.getByText(
+        "Move through each section with clear timing, saved progress, and an easy resume path.",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Guided section orchestration with resume support and no manual IDs.",
+      ),
+    ).toHaveCount(0);
   });
 });

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect } from 'react';
 
 export default function GlobalError({
@@ -14,6 +13,15 @@ export default function GlobalError({
     // eslint-disable-next-line no-console
     console.error('[GlobalError]', error);
   }, [error]);
+
+  const handleRetry = () => {
+    reset();
+    window.location.reload();
+  };
+
+  const handleGoToDashboard = () => {
+    window.location.assign('/app/dashboard');
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-6">
@@ -32,18 +40,19 @@ export default function GlobalError({
         </div>
         <div className="flex items-center justify-center gap-3">
           <button
-            onClick={reset}
+            onClick={handleRetry}
             className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:bg-violet-700 transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">refresh</span>
             Try Again
           </button>
-          <Link
-            href="/app/dashboard"
+          <button
+            type="button"
+            onClick={handleGoToDashboard}
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Go to Dashboard
-          </Link>
+          </button>
         </div>
       </div>
     </div>

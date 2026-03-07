@@ -17,6 +17,8 @@ type MediaMockOptions = {
 const installMockMediaStack = async (page: Page, options: MediaMockOptions = {}) => {
   await page.addInitScript(
     opts => {
+      (window as typeof window & { __mockGetUserMediaCalls?: number }).__mockGetUserMediaCalls = 0;
+
       const devices =
         opts.devices && opts.devices.length > 0
           ? opts.devices
@@ -33,6 +35,9 @@ const installMockMediaStack = async (page: Page, options: MediaMockOptions = {})
         value: {
           enumerateDevices: async () => devices,
           getUserMedia: async () => {
+            (window as typeof window & { __mockGetUserMediaCalls?: number }).__mockGetUserMediaCalls =
+              ((window as typeof window & { __mockGetUserMediaCalls?: number }).__mockGetUserMediaCalls || 0) + 1;
+
             if (opts.getUserMediaErrorName) {
               throw createNamedError(opts.getUserMediaErrorName, opts.getUserMediaErrorMessage || 'Media error');
             }
@@ -88,6 +93,100 @@ const installMockMediaStack = async (page: Page, options: MediaMockOptions = {})
     },
     { ...options }
   );
+};
+
+const installMockAudioContextPlayback = async (
+  page: Page,
+  options: {
+    fireEnded?: boolean;
+  } = {}
+) => {
+  await page.addInitScript(
+    ({ fireEnded }) => {
+    type MockWindow = typeof window & {
+      __mockAudioContextStarts?: number;
+      webkitAudioContext?: typeof AudioContext;
+    };
+
+    class FakeBufferSource {
+      public buffer: unknown = null;
+      public onended: (() => void) | null = null;
+
+      public connect() {
+        return undefined;
+      }
+
+      public disconnect() {
+        return undefined;
+      }
+
+      public start() {
+        (window as MockWindow).__mockAudioContextStarts = ((window as MockWindow).__mockAudioContextStarts || 0) + 1;
+        if (fireEnded !== false) {
+          window.setTimeout(() => {
+            this.onended?.();
+          }, 10);
+        }
+      }
+
+      public stop() {
+        return undefined;
+      }
+    }
+
+    class FakeAudioContext {
+      public state: AudioContextState = 'running';
+      public destination = {} as AudioDestinationNode;
+
+      public resume() {
+        this.state = 'running';
+        return Promise.resolve();
+      }
+
+      public decodeAudioData(arrayBuffer: ArrayBuffer) {
+        return Promise.resolve({
+          duration: arrayBuffer.byteLength / 1000
+        } as AudioBuffer);
+      }
+
+      public createBufferSource() {
+        return new FakeBufferSource() as unknown as AudioBufferSourceNode;
+      }
+    }
+
+    (window as MockWindow).__mockAudioContextStarts = 0;
+    Object.defineProperty(window, 'AudioContext', {
+      configurable: true,
+      value: FakeAudioContext
+    });
+    Object.defineProperty(window, 'webkitAudioContext', {
+      configurable: true,
+      value: FakeAudioContext
+    });
+    },
+    { fireEnded: options.fireEnded ?? true }
+  );
+};
+
+const installMockAudioPlayback = async (page: Page) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value() {
+        window.setTimeout(() => {
+          this.dispatchEvent(new Event('ended'));
+        }, 10);
+        return Promise.resolve();
+      }
+    });
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
+      configurable: true,
+      value() {
+        return undefined;
+      }
+    });
+  });
 };
 
 const mockSpeakingRoutes = async (page: Page) => {
@@ -164,6 +263,97 @@ const mockSpeakingRoutes = async (page: Page) => {
 
   await page.route('**/api/v1/test-simulations?**', route => route.fulfill(mockJsonSuccess([])));
 
+  await page.route('**/api/v1/test-simulations', async route => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback();
+    }
+
+    return route.fulfill(
+      mockJsonSuccess(
+        {
+          simulationId: 'simulation-123',
+          parts: [
+            {
+              part: 1,
+              question: 'Tell me about your hometown.',
+              tips: ['Answer directly', 'Add one specific example']
+            },
+            {
+              part: 2,
+              question: 'Describe a memorable trip you took.',
+              tips: ['Use a clear sequence', 'Include what you learned']
+            },
+            {
+              part: 3,
+              question: 'How does travel change people?',
+              tips: ['Compare viewpoints', 'Explain wider impact']
+            }
+          ],
+          runtime: {
+            state: 'intro-examiner',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          }
+        },
+        201,
+        'Simulation started'
+      )
+    );
+  });
+
+  await page.route('**/api/v1/test-simulations/*/runtime/advance', route =>
+    route.fulfill(
+      mockJsonSuccess({
+        simulationId: 'simulation-123',
+        status: 'in_progress',
+        runtime: {
+          state: 'intro-candidate-turn',
+          currentPart: 0,
+          currentTurnIndex: 0,
+          retryCount: 0,
+          retryBudgetRemaining: 1,
+          introStep: 'welcome',
+          seedQuestionIndex: 0,
+          followUpCount: 0,
+          currentSegment: {
+            kind: 'cached_phrase',
+            phraseId: 'welcome_intro',
+            text: 'Good morning. My name is Anna. I will be your examiner today.'
+          }
+        }
+      })
+    )
+  );
+
+  await page.route('**/api/v1/speech/synthesize', route =>
+    route.fulfill(
+      mockJsonSuccess({
+        audioBase64: 'bW9jay1hdWRpbw==',
+        mimeType: 'audio/mpeg'
+      })
+    )
+  );
+
+  await page.route('**/api/v1/speech/evaluate', async route =>
+    route.fulfill(
+      mockJsonSuccess({
+        overallBand: 6.5,
+        spokenSummary: 'Clear answer with room for stronger vocabulary choices.',
+        suggestions: ['Add more precise vocabulary']
+      })
+    )
+  );
+
   await page.route('**/api/v1/practice/sessions', async route => {
     if (route.request().method() !== 'POST') {
       return route.fallback();
@@ -229,12 +419,605 @@ test.describe('Speaking flow', () => {
 
     await page.getByRole('button', { name: 'Submit Manual Transcript' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Practice Result' })).toBeVisible();
-    await expect(page.getByText(/Band 6.5/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeVisible();
+    await expect(page.getByText('Good structure and a clear narrative.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open full report' })).toBeVisible();
 
     await page.getByRole('link', { name: 'Open' }).first().click();
     await expect(page.getByRole('heading', { name: /Speaking session report|Memorable Trip/i })).toBeVisible();
-    await expect(page.getByText(/Band insights/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Why this score happened' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your transcript' })).toBeVisible();
+  });
+
+  test('keeps manual submit disabled until transcript text is present', async ({ page }) => {
+    await page.goto('/app/speaking');
+
+    await page.getByRole('button', { name: 'Start Practice' }).first().click();
+
+    const transcriptField = page.getByPlaceholder('Type your answer if microphone permission is denied or device fails');
+    const submitButton = page.getByRole('button', { name: 'Submit Manual Transcript' });
+
+    await expect(transcriptField).toHaveValue('');
+    await expect(submitButton).toBeDisabled();
+
+    await transcriptField.fill('I visited Istanbul with my family and learned a lot from the trip.');
+    await expect(submitButton).toBeEnabled();
+  });
+
+  test('refreshes audio upload auth and copies the transcription into the manual transcript field', async ({ page }) => {
+    await installMockMediaStack(page);
+
+    let audioUploadCalls = 0;
+
+    await page.route('**/api/v1/practice/sessions/*/audio', async route => {
+      audioUploadCalls += 1;
+      const authHeader = route.request().headers().authorization;
+
+      if (audioUploadCalls === 1) {
+        expect(authHeader).toBe('Bearer playwright-access-token');
+        return route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 401,
+            success: false,
+            message: 'Access token expired',
+            error: {
+              code: 'AUTH.TokenExpired',
+              message: 'Access token expired'
+            }
+          })
+        });
+      }
+
+      expect(authHeader).toBe('Bearer refreshed-access-token');
+      return route.fulfill(
+        mockJsonSuccess({
+          session: {
+            _id: practiceSessionId,
+            sessionId: practiceSessionId,
+            topicId: 'memorable-trip',
+            topicTitle: 'Memorable Trip',
+            status: 'completed',
+            feedback: {
+              overallBand: 6.5,
+              summary: 'Good structure and a clear narrative.',
+              improvements: ['Use a wider range of linking phrases']
+            }
+          },
+          transcription: {
+            text: 'I visited Istanbul with my family and described the trip clearly.'
+          }
+        })
+      );
+    });
+
+    await page.route('**/api/v1/auth/refresh', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess({
+          accessToken: 'refreshed-access-token',
+          refreshToken: 'refreshed-refresh-token',
+          user: {
+            _id: '507f1f77bcf86cd799439011',
+            email: 'learner@example.com',
+            firstName: 'Playwright',
+            lastName: 'Learner',
+            subscriptionPlan: 'premium',
+            adminRoles: []
+          }
+        })
+      );
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('button', { name: 'Start Practice' }).first().click();
+    await page.getByRole('button', { name: 'Start Recording' }).click();
+    await page.getByRole('button', { name: 'Stop + Upload' }).click();
+
+    const transcriptField = page.getByPlaceholder('Type your answer if microphone permission is denied or device fails');
+    await expect(transcriptField).toHaveValue('I visited Istanbul with my family and described the trip clearly.');
+    await expect(page.getByRole('button', { name: 'Submit Manual Transcript' })).toBeEnabled();
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeVisible();
+    expect(audioUploadCalls).toBe(2);
+  });
+
+  test('surfaces a prominent upload state and inline review after recording', async ({ page }) => {
+    await installMockMediaStack(page);
+
+    let releaseUpload: () => void = () => {};
+    const uploadReleased = new Promise<void>(resolve => {
+      releaseUpload = resolve;
+    });
+
+    await page.route('**/api/v1/practice/sessions/*/audio', async route => {
+      await uploadReleased;
+      return route.fulfill(
+        mockJsonSuccess({
+          session: {
+            _id: practiceSessionId,
+            sessionId: practiceSessionId,
+            topicId: 'memorable-trip',
+            topicTitle: 'Memorable Trip',
+            question: 'Describe a memorable trip you took.',
+            status: 'completed',
+            feedback: {
+              overallBand: 6.5,
+              summary: 'Good structure and a clear narrative.',
+              strengths: ['Clear narrative arc'],
+              improvements: ['Use a wider range of linking phrases'],
+              bandBreakdown: {
+                pronunciation: 6.5,
+                fluency: 6.5,
+                lexicalResource: 6.0,
+                grammaticalRange: 6.5
+              }
+            }
+          },
+          transcription: {
+            text: 'I visited Istanbul with my family and described the trip clearly.'
+          }
+        })
+      );
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('button', { name: 'Start Practice' }).first().click();
+    await page.getByRole('button', { name: 'Start Recording' }).click();
+    await page.getByRole('button', { name: 'Stop + Upload' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Processing your response' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Processing your response' })).toBeInViewport();
+    await expect(page.getByText('Uploading audio, generating a transcript, and scoring your response.')).toBeVisible();
+
+    releaseUpload();
+
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeInViewport();
+    await expect(page.getByRole('heading', { name: 'Transcript' })).toBeVisible();
+    await expect(page.getByText('Auto-transcribed')).toBeVisible();
+    await expect(page.getByText('Good structure and a clear narrative.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open full report' })).toBeVisible();
+  });
+
+  test('renders the speaking full report as a coaching debrief', async ({ page }) => {
+    await page.goto(`/app/speaking/history/${practiceSessionId}`);
+
+    await expect(page.getByRole('heading', { name: /Speaking session report|Memorable Trip/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Why this score happened' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your transcript' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Example stronger answer' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Practice again', exact: true }).first()).toBeVisible();
+  });
+
+  test('keeps speaking workspaces and results in view when actions start', async ({ page }) => {
+    await installMockMediaStack(page);
+
+    await page.goto('/app/speaking');
+
+    await page.getByRole('button', { name: 'Start Practice' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Active Session' })).toBeInViewport();
+
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toBeInViewport();
+
+    await page.getByRole('tab', { name: 'Quick Evaluate' }).click();
+    await page
+      .getByPlaceholder('Paste your transcript for direct evaluation')
+      .fill('I recently learned how to manage my time better by planning each day in advance.');
+    await page.getByRole('button', { name: 'Evaluate Transcript' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Evaluation', exact: true })).toBeInViewport();
+  });
+
+  test('shows a visible preparing state while full simulation is starting', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let releaseSimulationStart: () => void = () => {};
+    const simulationStartReleased = new Promise<void>(resolve => {
+      releaseSimulationStart = resolve;
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      await simulationStartReleased;
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-123',
+            parts: [
+              {
+                part: 1,
+                question: 'Tell me about your hometown.',
+                tips: ['Answer directly', 'Add one specific example']
+              },
+              {
+                part: 2,
+                question: 'Describe a memorable trip you took.',
+                tips: ['Use a clear sequence', 'Include what you learned']
+              },
+              {
+                part: 3,
+                question: 'How does travel change people?',
+                tips: ['Compare viewpoints', 'Explain wider impact']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('button', { name: 'Preparing simulation...' }).first()).toBeDisabled();
+    await expect(page.getByRole('heading', { name: 'Preparing your full simulation' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Preparing your full simulation' })).toBeInViewport();
+    await expect(
+      page.getByText('We are building all three speaking parts and saving your timer state.')
+    ).toBeVisible();
+
+    releaseSimulationStart();
+
+    await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toBeVisible();
+  });
+
+  test('hydrates missing simulation runtime after start so the examiner flow can continue', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-runtime-recovery-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'Would you like to attend weather in the future?\nWhat do you do when the weather changes?',
+                timeLimit: 60,
+                tips: ['Keep answers brief', 'Give specific examples']
+              },
+              {
+                part: 2,
+                topicId: 'app',
+                topicTitle: 'App',
+                question: 'Describe a challenging app.\n\nYou should say:\n• what it does\n• why it is challenging',
+                timeLimit: 180,
+                tips: ['You have 1 minute to prepare', 'Speak for 1-2 minutes']
+              },
+              {
+                part: 3,
+                topicId: 'technology',
+                topicTitle: 'Technology',
+                question: 'How do apps change everyday life?\nShould all services depend on apps?',
+                timeLimit: 120,
+                tips: ['Explain your reasons']
+              }
+            ]
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-runtime-recovery-123/runtime', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-runtime-recovery-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-examiner',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
+    await expect(page.getByText('Good morning. My name is Anna. I will be your examiner today.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
+  });
+
+  test('runs full simulation as examiner audio plus learner turns', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    await page.route('**/api/v1/speech/synthesize', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      )
+    );
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-runtime-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'hobbies',
+                topicTitle: 'Hobbies',
+                question:
+                  'What hobbies do you have?\nHow often do you spend time on your hobbies?\nDo you prefer to do hobbies alone or with friends?',
+                timeLimit: 60,
+                tips: ['Keep answers brief', 'Add one real example']
+              },
+              {
+                part: 2,
+                topicId: 'memorable-trip',
+                topicTitle: 'Memorable trip',
+                question: 'Describe a memorable journey you have taken.\n\nYou should say:\n• where you went\n• who you went with',
+                timeLimit: 180,
+                tips: ['You have 1 minute to prepare', 'Speak for 1-2 minutes']
+              },
+              {
+                part: 3,
+                topicId: 'travel',
+                topicTitle: 'Travel',
+                question: 'How does travel change people?\nWhy do some people avoid travelling?',
+                timeLimit: 120,
+                tips: ['Explain your reasons', 'Compare different viewpoints']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-runtime-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-runtime-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockGetUserMediaCalls?: number }).__mockGetUserMediaCalls || 0)).toBe(1);
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
+    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeDisabled();
+    await expect(page.getByPlaceholder('Write or paste your response for this speaking part')).toHaveCount(0);
+
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
+  });
+
+  test('unlocks the learner turn even if the browser never fires audio ended', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page, { fireEnded: false });
+
+    await page.route('**/api/v1/speech/synthesize', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      )
+    );
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-runtime-audio-fallback-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'name',
+                topicTitle: 'Check-in',
+                question: 'Can you tell me your full name please?',
+                timeLimit: 30,
+                tips: ['Answer clearly']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. Can you tell me your full name please?'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-runtime-audio-fallback-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-runtime-audio-fallback-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. Can you tell me your full name please?'
+            }
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
+  });
+
+  test('shows a retryable pause when a simulation step fails', async ({ page }) => {
+    await installMockMediaStack(page);
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-runtime-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'hobbies',
+                topicTitle: 'Hobbies',
+                question: 'What hobbies do you have?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'paused-retryable',
+              currentPart: 1,
+              currentTurnIndex: 0,
+              retryCount: 1,
+              retryBudgetRemaining: 0,
+              previousState: 'part1-examiner',
+              lastError: 'Speech synthesis failed for the current examiner prompt.',
+              failedStep: 'speech_synthesis',
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'What hobbies do you have?'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Simulation paused' })).toBeVisible();
+    await expect(page.getByText('Speech synthesis failed for the current examiner prompt.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry step' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Restart simulation' })).toBeVisible();
   });
 
   test('shows explicit error when microphone permission is denied', async ({ page }) => {
@@ -280,7 +1063,7 @@ test.describe('Speaking flow', () => {
     await page.getByRole('button', { name: 'Start Recording' }).click();
 
     await expect(page.getByText('Recorder crashed while starting')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Submit Manual Transcript' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Submit Manual Transcript' })).toBeDisabled();
   });
 
   test('surfaces upload timeout and allows manual transcript recovery', async ({ page }) => {
@@ -308,7 +1091,7 @@ test.describe('Speaking flow', () => {
       .getByPlaceholder('Type your answer if microphone permission is denied or device fails')
       .fill('I travelled with my family and learned a lot from the experience.');
     await page.getByRole('button', { name: 'Submit Manual Transcript' }).click();
-    await expect(page.getByRole('heading', { name: 'Practice Result' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeVisible();
   });
 
   test('handles transcription failure with fallback transcript path', async ({ page }) => {
@@ -337,6 +1120,6 @@ test.describe('Speaking flow', () => {
       .fill('My answer is provided manually after transcription fallback.');
     await page.getByRole('button', { name: 'Submit Manual Transcript' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Practice Result' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your response' })).toBeVisible();
   });
 });

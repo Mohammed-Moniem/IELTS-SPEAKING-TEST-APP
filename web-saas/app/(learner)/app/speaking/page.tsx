@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
+import AuthenticSimulationStage from '@/components/speaking/AuthenticSimulationStage';
 import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { ApiError, apiRequest, handleUsageLimitRedirect } from '@/lib/api/client';
+import { LiveSimulationSession, getSimulationRuntime, mergeRuntimeIntoSimulation, startSimulationRuntime } from '@/lib/speaking/simulationRuntime';
 import { PageHeader, SectionCard, StatusBadge, SegmentedTabs, EmptyState } from '@/components/ui/v2';
 import {
   PracticeAudioUploadResult,
@@ -14,7 +15,6 @@ import {
   PracticeTopic,
   PracticeTopicPage,
   SimulationSession,
-  SimulationStartPayload,
   SpeakingEvaluation
 } from '@/lib/types';
 
@@ -24,8 +24,6 @@ type SynthesizeResponse = {
 };
 
 type RecorderState = 'idle' | 'recording' | 'uploading' | 'error';
-
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
 const speakingResumeStorageKey = 'spokio.web.speaking.resume';
 
 type SpeakingResumeSnapshot = {
@@ -34,13 +32,12 @@ type SpeakingResumeSnapshot = {
   practiceManualResponse: string;
   practiceTranscription: string;
   practiceElapsed: number;
-  simulation: SimulationStartPayload | null;
-  simulationResponses: Record<number, string>;
-  simulationPartIndex: number;
-  simulationTimeSpent: Record<number, number>;
+  simulation: LiveSimulationSession | null;
   simulationElapsed: number;
   savedAt: string;
 };
+
+type BrowserAudioContextConstructor = typeof AudioContext;
 
 const quickQuestionBank = [
   'Describe a skill you learned recently and why it was important.',
@@ -49,7 +46,7 @@ const quickQuestionBank = [
 ];
 
 const buildLibraryHref = (
-  kind: 'collocations' | 'vocabulary' | 'books' | 'channels',
+  kind: 'collocations' | 'vocabulary',
   module: 'speaking' | 'writing' | 'reading' | 'listening',
   seed?: string
 ) => {
@@ -87,14 +84,47 @@ const getMicErrorMessage = (error: any) => {
   return error?.message || 'Unable to access microphone.';
 };
 
+const getSimulationMicSetupErrorMessage = (error: any) => {
+  const name = String(error?.name || '');
+
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Microphone permission is required before the full simulation can begin. Allow microphone access and start a new simulation.';
+  }
+  if (name === 'NotFoundError') {
+    return 'No microphone device was found. Connect a microphone before starting the full simulation.';
+  }
+  if (name === 'NotReadableError') {
+    return 'Your microphone is already in use by another app. Close the other app, then start a new simulation.';
+  }
+  if (name === 'OverconstrainedError') {
+    return 'The selected microphone is unavailable. Choose another microphone, then start a new simulation.';
+  }
+
+  return error?.message || 'Microphone access failed before the full simulation could begin.';
+};
+
+const getBrowserAudioContextConstructor = (): BrowserAudioContextConstructor | null => {
+  if (typeof window === 'undefined') return null;
+
+  const browserWindow = window as Window &
+    typeof globalThis & {
+      webkitAudioContext?: BrowserAudioContextConstructor;
+    };
+
+  return browserWindow.AudioContext || browserWindow.webkitAudioContext || null;
+};
+
 export default function SpeakingPage() {
-  const { accessToken } = useAuth();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const simulationAudioContextRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const practiceWorkspaceRef = useRef<HTMLElement | null>(null);
+  const practiceInlineSurfaceRef = useRef<HTMLElement | null>(null);
+  const simulationWorkspaceRef = useRef<HTMLElement | null>(null);
+  const quickEvaluationRef = useRef<HTMLElement | null>(null);
   const practiceTimerRef = useRef<number | null>(null);
   const simulationTimerRef = useRef<number | null>(null);
-  const partStartedAtRef = useRef<number | null>(null);
 
   const [activeTab, setActiveTab] = useState<'practice' | 'simulation' | 'quick'>('practice');
   const [errorMessage, setErrorMessage] = useState('');
@@ -117,13 +147,11 @@ export default function SpeakingPage() {
   const [practiceHistory, setPracticeHistory] = useState<PracticeSession[]>([]);
   const [practiceElapsed, setPracticeElapsed] = useState(0);
 
-  const [simulation, setSimulation] = useState<SimulationStartPayload | null>(null);
+  const [simulation, setSimulation] = useState<LiveSimulationSession | null>(null);
   const [simulationResult, setSimulationResult] = useState<SimulationSession | null>(null);
   const [simulationHistory, setSimulationHistory] = useState<SimulationSession[]>([]);
-  const [simulationPartIndex, setSimulationPartIndex] = useState(0);
-  const [simulationResponses, setSimulationResponses] = useState<Record<number, string>>({});
-  const [simulationTimeSpent, setSimulationTimeSpent] = useState<Record<number, number>>({});
   const [simulationElapsed, setSimulationElapsed] = useState(0);
+  const [simulationStarting, setSimulationStarting] = useState(false);
 
   const [quickQuestion, setQuickQuestion] = useState(quickQuestionBank[0]);
   const [quickTranscript, setQuickTranscript] = useState('');
@@ -135,8 +163,6 @@ export default function SpeakingPage() {
     []
   );
 
-  const currentSimulationPart = simulation?.parts?.[simulationPartIndex];
-
   const refreshDevices = async () => {
     if (!supportsMedia) return;
 
@@ -147,6 +173,34 @@ export default function SpeakingPage() {
       setDeviceId(mics[0].deviceId);
     }
   };
+
+  const ensureSimulationAudioContext = useCallback(async () => {
+    const AudioContextCtor = getBrowserAudioContextConstructor();
+    if (!AudioContextCtor) return null;
+
+    if (!simulationAudioContextRef.current) {
+      simulationAudioContextRef.current = new AudioContextCtor();
+    }
+
+    if (simulationAudioContextRef.current.state === 'suspended') {
+      await simulationAudioContextRef.current.resume();
+    }
+
+    return simulationAudioContextRef.current;
+  }, []);
+
+  const primeSimulationMicrophone = useCallback(async () => {
+    if (!supportsMedia) {
+      throw new Error('This browser does not support microphone recording for the live simulation.');
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true
+    });
+
+    stream.getTracks().forEach(track => track.stop());
+    await refreshDevices();
+  }, [deviceId, supportsMedia]);
 
   const stopRecorder = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -196,6 +250,19 @@ export default function SpeakingPage() {
     }
   };
 
+  const scrollToSurface = useCallback((element: HTMLElement | null) => {
+    if (!element) return;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const top = Math.max(0, element.getBoundingClientRect().top + window.scrollY - 112);
+
+    window.scrollTo({
+      top,
+      behavior: prefersReducedMotion ? 'auto' : 'smooth'
+    });
+    element.focus({ preventScroll: true });
+  }, []);
+
   const hasActiveSpeakingAttempt = Boolean(
     (practiceSession && !practiceResult) || (simulation && !simulationResult)
   );
@@ -208,9 +275,6 @@ export default function SpeakingPage() {
       practiceTranscription,
       practiceElapsed,
       simulation,
-      simulationResponses,
-      simulationPartIndex,
-      simulationTimeSpent,
       simulationElapsed,
       savedAt: new Date().toISOString()
     };
@@ -223,10 +287,7 @@ export default function SpeakingPage() {
     practiceSession,
     practiceTranscription,
     simulation,
-    simulationElapsed,
-    simulationPartIndex,
-    simulationResponses,
-    simulationTimeSpent
+    simulationElapsed
   ]);
 
   const saveSpeakingSnapshotForLeave = useCallback(async () => {
@@ -335,27 +396,15 @@ export default function SpeakingPage() {
     formData.append('audio', audioBlob, 'practice.webm');
 
     try {
-      const response = await fetch(`${apiBase}/practice/sessions/${practiceSession.sessionId}/audio`, {
+      const payload = await apiRequest<PracticeAudioUploadResult>(`/practice/sessions/${practiceSession.sessionId}/audio`, {
         method: 'POST',
-        body: formData,
-        headers: {
-          'Unique-Reference-Code': `web-speaking-practice-audio-${Date.now()}`,
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-        }
+        body: formData
       });
+      const transcribedText = payload.transcription?.text?.trim() || '';
 
-      const payload = (await response.json()) as {
-        success: boolean;
-        message?: string;
-        data?: PracticeAudioUploadResult;
-      };
-
-      if (!payload.success || !payload.data) {
-        throw new Error(payload.message || 'Practice audio upload failed');
-      }
-
-      setPracticeResult(payload.data.session);
-      setPracticeTranscription(payload.data.transcription.text);
+      setPracticeResult(payload.session);
+      setPracticeTranscription(transcribedText);
+      setPracticeManualResponse(current => (current.trim() ? current : transcribedText));
       stopPracticeTimer();
       window.localStorage.removeItem(speakingResumeStorageKey);
       setRecorderState('idle');
@@ -422,71 +471,36 @@ export default function SpeakingPage() {
   };
 
   const startSimulation = async () => {
+    if (simulationStarting) return;
+
+    setActiveTab('simulation');
     setErrorMessage('');
     setResumeNotice('');
+    stopSimulationTimer();
+    setSimulation(null);
     setSimulationResult(null);
-    setSimulationResponses({});
-    setSimulationTimeSpent({});
-    setSimulationPartIndex(0);
+    setSimulationElapsed(0);
+    setSimulationStarting(true);
 
     try {
-      const started = await apiRequest<SimulationStartPayload>('/test-simulations', {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
+      await ensureSimulationAudioContext();
+      await primeSimulationMicrophone();
 
-      setSimulation(started);
-      partStartedAtRef.current = Date.now();
+      const started = await startSimulationRuntime();
+      const hydrated =
+        started.runtime
+          ? started
+          : mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
+
+      setSimulation(hydrated);
       startSimulationTimer();
     } catch (error: any) {
       if (handleUsageLimitRedirect(error)) return;
-      setErrorMessage(error?.message || 'Failed to start speaking simulation.');
-    }
-  };
-
-  const captureCurrentPartTime = () => {
-    if (!simulation || !currentSimulationPart) return;
-    if (!partStartedAtRef.current) return;
-
-    const seconds = Math.max(0, Math.round((Date.now() - partStartedAtRef.current) / 1000));
-    setSimulationTimeSpent(prev => ({
-      ...prev,
-      [currentSimulationPart.part]: (prev[currentSimulationPart.part] || 0) + seconds
-    }));
-    partStartedAtRef.current = Date.now();
-  };
-
-  const goToSimulationPart = (index: number) => {
-    if (!simulation) return;
-    captureCurrentPartTime();
-    setSimulationPartIndex(Math.max(0, Math.min(index, simulation.parts.length - 1)));
-  };
-
-  const completeSimulation = async () => {
-    if (!simulation) return;
-    setErrorMessage('');
-
-    captureCurrentPartTime();
-
-    const payload = simulation.parts.map(part => ({
-      part: part.part,
-      question: part.question,
-      response: simulationResponses[part.part] || '',
-      timeSpent: simulationTimeSpent[part.part] || 0
-    }));
-
-    try {
-      const result = await apiRequest<SimulationSession>(`/test-simulations/${simulation.simulationId}/complete`, {
-        method: 'POST',
-        body: JSON.stringify({ parts: payload })
-      });
-      stopSimulationTimer();
-      setSimulationResult(result);
-      window.localStorage.removeItem(speakingResumeStorageKey);
-      await refreshSimulationHistory();
-    } catch (error: any) {
-      if (handleUsageLimitRedirect(error)) return;
-      setErrorMessage(error?.message || 'Failed to complete simulation.');
+      const message =
+        error instanceof ApiError ? error.message : getSimulationMicSetupErrorMessage(error);
+      setErrorMessage(message || 'Failed to start speaking simulation.');
+    } finally {
+      setSimulationStarting(false);
     }
   };
 
@@ -500,6 +514,49 @@ export default function SpeakingPage() {
       setErrorMessage(error?.message || 'Unable to load simulation details.');
     }
   };
+
+  const handleSimulationSessionChange = useCallback((next: LiveSimulationSession | null) => {
+    setSimulation(next);
+  }, []);
+
+  useEffect(() => {
+    if (!simulation || simulation.runtime) return;
+
+    let cancelled = false;
+
+    const hydrateMissingRuntime = async () => {
+      try {
+        const response = await getSimulationRuntime(simulation.simulationId);
+        if (cancelled) return;
+        setSimulation(current => {
+          if (!current || current.simulationId !== simulation.simulationId || current.runtime) {
+            return current;
+          }
+          return mergeRuntimeIntoSimulation(current, response);
+        });
+      } catch (error: any) {
+        if (cancelled) return;
+        setErrorMessage(current => current || error?.message || 'Failed to restore the speaking simulation runtime.');
+      }
+    };
+
+    void hydrateMissingRuntime();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [simulation]);
+
+  const handleSimulationComplete = useCallback(
+    async (result: SimulationSession) => {
+      stopSimulationTimer();
+      setSimulation(null);
+      setSimulationResult(result);
+      window.localStorage.removeItem(speakingResumeStorageKey);
+      await refreshSimulationHistory();
+    },
+    []
+  );
 
   const runQuickEvaluation = async () => {
     setErrorMessage('');
@@ -574,9 +631,6 @@ export default function SpeakingPage() {
       setPracticeResult(null);
 
       setSimulation(parsed.simulation || null);
-      setSimulationResponses(parsed.simulationResponses || {});
-      setSimulationPartIndex(parsed.simulationPartIndex || 0);
-      setSimulationTimeSpent(parsed.simulationTimeSpent || {});
       setSimulationElapsed(parsed.simulationElapsed || 0);
       setSimulationResult(null);
 
@@ -584,7 +638,6 @@ export default function SpeakingPage() {
         startPracticeTimer(Math.max(0, parsed.practiceElapsed || 0));
       }
       if (parsed.simulation) {
-        partStartedAtRef.current = Date.now();
         startSimulationTimer(Math.max(0, parsed.simulationElapsed || 0));
       }
 
@@ -600,6 +653,36 @@ export default function SpeakingPage() {
   }, [hasActiveSpeakingAttempt, saveSpeakingSnapshot]);
 
   useEffect(() => {
+    if (activeTab !== 'practice' || !practiceSession) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSurface(practiceWorkspaceRef.current);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, practiceSession, scrollToSurface]);
+
+  useEffect(() => {
+    if (activeTab !== 'simulation' || (!simulation && !simulationStarting && !simulationResult)) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSurface(simulationWorkspaceRef.current);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, simulation, simulationResult, simulationStarting, scrollToSurface]);
+
+  useEffect(() => {
+    if (activeTab !== 'quick' || !quickEvaluation) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSurface(quickEvaluationRef.current);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, quickEvaluation, scrollToSurface]);
+
+  useEffect(() => {
     if (hasActiveSpeakingAttempt) return;
     window.localStorage.removeItem(speakingResumeStorageKey);
   }, [hasActiveSpeakingAttempt]);
@@ -609,6 +692,7 @@ export default function SpeakingPage() {
       stopPracticeTimer();
       stopSimulationTimer();
       stopRecorder();
+      void simulationAudioContextRef.current?.close?.();
     };
   }, []);
 
@@ -618,8 +702,72 @@ export default function SpeakingPage() {
     return topics.filter(t => t.title.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q));
   }, [topics, topicSearch]);
 
+  const canSubmitManualTranscript =
+    recorderState !== 'uploading' && practiceManualResponse.trim().length >= 6;
+
+  const practiceFeedback = practiceResult?.feedback;
+  const practiceReviewTranscript = useMemo(
+    () => practiceTranscription.trim() || practiceManualResponse.trim(),
+    [practiceManualResponse, practiceTranscription]
+  );
+  const showPracticeInlineProcessing = Boolean(practiceSession && recorderState === 'uploading');
+  const showPracticeInlineError = Boolean(practiceSession && recorderState === 'error' && errorMessage);
+  const showPracticeInlineReview = Boolean(practiceSession && practiceResult);
+  const showGlobalErrorMessage = Boolean(errorMessage) && !showPracticeInlineError;
+
+  const practiceStatusBadge = useMemo(() => {
+    if (recorderState === 'recording') {
+      return { tone: 'warning' as const, label: 'Recording' };
+    }
+    if (recorderState === 'uploading') {
+      return { tone: 'info' as const, label: 'Processing' };
+    }
+    if (recorderState === 'error') {
+      return { tone: 'danger' as const, label: 'Needs attention' };
+    }
+    if (practiceResult) {
+      return { tone: 'success' as const, label: 'Feedback ready' };
+    }
+    return { tone: 'neutral' as const, label: 'Ready' };
+  }, [practiceResult, recorderState]);
+
+  const practiceDetailHref = useMemo(() => {
+    const sessionId = practiceResult?.sessionId || practiceResult?._id || practiceSession?.sessionId;
+    return sessionId ? `/app/speaking/history/${sessionId}` : '';
+  }, [practiceResult?._id, practiceResult?.sessionId, practiceSession?.sessionId]);
+
+  const practiceBandRows = useMemo(() => {
+    const breakdown = practiceFeedback?.bandBreakdown;
+    if (!breakdown) return [];
+
+    return [
+      { label: 'Fluency', value: breakdown.fluency },
+      { label: 'Vocabulary', value: breakdown.lexicalResource },
+      { label: 'Grammar', value: breakdown.grammaticalRange },
+      { label: 'Pronunciation', value: breakdown.pronunciation }
+    ].filter(row => typeof row.value === 'number');
+  }, [practiceFeedback?.bandBreakdown]);
+
+  useEffect(() => {
+    if (activeTab !== 'practice' || !practiceSession) return;
+    if (!showPracticeInlineProcessing && !showPracticeInlineError && !showPracticeInlineReview) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSurface(practiceInlineSurfaceRef.current || practiceWorkspaceRef.current);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    activeTab,
+    practiceSession,
+    scrollToSurface,
+    showPracticeInlineError,
+    showPracticeInlineProcessing,
+    showPracticeInlineReview
+  ]);
+
   const practiceWeaknessSeed = useMemo(() => {
-    const feedback = practiceResult?.feedback;
+    const feedback = practiceFeedback;
     if (!feedback) return '';
     if (feedback.improvements?.[0]) return feedback.improvements[0];
 
@@ -634,13 +782,18 @@ export default function SpeakingPage() {
     ];
 
     return scores.sort((a, b) => a.score - b.score)[0]?.label || '';
-  }, [practiceResult?.feedback]);
+  }, [practiceFeedback]);
 
   const simulationWeaknessSeed = useMemo(() => {
     const feedback = simulationResult?.overallFeedback;
     if (!feedback) return '';
     return feedback.improvements?.[0] || feedback.summary || '';
   }, [simulationResult?.overallFeedback]);
+
+  const simulationCtaLabel = simulationStarting ? 'Preparing simulation...' : 'Start Full Simulation';
+  const simulationCtaClasses = simulationStarting
+    ? 'bg-violet-300 text-white cursor-wait shadow-none hover:translate-y-0 hover:bg-violet-300 hover:shadow-none'
+    : 'bg-violet-600 text-white shadow-md shadow-violet-500/25 hover:-translate-y-0.5 hover:bg-violet-700 hover:shadow-lg';
 
   return (
     <div className="space-y-8 max-w-[1440px] mx-auto w-full">
@@ -652,10 +805,11 @@ export default function SpeakingPage() {
         actions={
           <button
             onClick={() => void startSimulation()}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-500/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700 hover:shadow-lg"
+            disabled={simulationStarting}
+            className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:cursor-wait ${simulationCtaClasses}`}
           >
             <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-            Start Full Simulation
+            {simulationCtaLabel}
           </button>
         }
       />
@@ -681,6 +835,315 @@ export default function SpeakingPage() {
 
       {activeTab === 'practice' ? (
         <div className="space-y-6 mt-4">
+          {/* ── Active session workspace ── */}
+          {practiceSession ? (
+            <section
+              ref={practiceWorkspaceRef}
+              tabIndex={-1}
+              className="rounded-2xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50/50 dark:bg-violet-500/5 p-6 space-y-4 scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Session</h2>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-violet-100 dark:bg-violet-500/20 px-3 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
+                    {practiceElapsed}s
+                  </span>
+                  <StatusBadge tone={practiceStatusBadge.tone}>{practiceStatusBadge.label}</StatusBadge>
+                </div>
+              </div>
+
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{practiceSession.question}</p>
+
+              {practiceSession.tips?.length ? (
+                <ul className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
+                  {practiceSession.tips.slice(0, 4).map(item => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="material-symbols-outlined text-[14px] text-violet-500 mt-0.5">lightbulb</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              {showPracticeInlineProcessing ? (
+                <section
+                  ref={practiceInlineSurfaceRef}
+                  tabIndex={-1}
+                  aria-live="polite"
+                  className="rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-gray-900/80 p-5 space-y-4 scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                      <span className="material-symbols-outlined animate-spin text-[22px]">progress_activity</span>
+                    </div>
+                    <div className="flex-1 space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">Processing your response</h3>
+                          <StatusBadge tone="info">Live update</StatusBadge>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          Uploading audio, generating a transcript, and scoring your response.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        {[
+                          {
+                            icon: 'cloud_upload',
+                            title: 'Upload in progress',
+                            body: 'Your recording is being sent securely for transcription.'
+                          },
+                          {
+                            icon: 'notes',
+                            title: 'Transcript draft',
+                            body: 'We are turning your audio into editable text.'
+                          },
+                          {
+                            icon: 'analytics',
+                            title: 'Band estimate',
+                            body: 'Your fluency, vocabulary, grammar, and pronunciation are being reviewed.'
+                          }
+                        ].map(step => (
+                          <div
+                            key={step.title}
+                            className="rounded-xl border border-blue-100 dark:border-blue-500/15 bg-blue-50/70 dark:bg-blue-500/5 p-4"
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="material-symbols-outlined text-[18px] text-blue-600 dark:text-blue-400">
+                                {step.icon}
+                              </span>
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{step.title}</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">{step.body}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {showPracticeInlineError ? (
+                <section
+                  ref={practiceInlineSurfaceRef}
+                  tabIndex={-1}
+                  aria-live="assertive"
+                  className="rounded-2xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-gray-900/80 p-5 space-y-4 scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                      <span className="material-symbols-outlined text-[22px]">error</span>
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white">We couldn&apos;t process this recording</h3>
+                          <StatusBadge tone="danger">Action needed</StatusBadge>
+                        </div>
+                        <p className="text-sm text-red-700 dark:text-red-300">{errorMessage}</p>
+                      </div>
+                      <div className="rounded-xl border border-red-100 dark:border-red-500/15 bg-red-50/80 dark:bg-red-500/5 p-4">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Next step</p>
+                        <ul className="mt-2 space-y-1.5 text-sm text-gray-600 dark:text-gray-300">
+                          <li>Review or edit the transcript below, then submit it for scoring.</li>
+                          <li>Check the selected microphone and retry the recording if you prefer audio upload.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {showPracticeInlineReview ? (
+                <section
+                  ref={practiceInlineSurfaceRef}
+                  tabIndex={-1}
+                  className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-white dark:bg-gray-900/80 p-5 space-y-5 scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-400">
+                        Practice result
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Review your response</h3>
+                        <StatusBadge tone="success">Feedback ready</StatusBadge>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Your transcript and score are ready here. Open the full report if you want the dedicated detail page.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-100 dark:border-emerald-500/15 bg-emerald-50/80 dark:bg-emerald-500/5 px-5 py-4 min-w-[180px]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">
+                        Overall band
+                      </p>
+                      <p className="mt-2 text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+                        {practiceFeedback?.overallBand ?? '--'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/40 p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                          Transcript
+                        </h4>
+                        <StatusBadge tone={practiceTranscription ? 'info' : 'neutral'}>
+                          {practiceTranscription ? 'Auto-transcribed' : 'Manual transcript'}
+                        </StatusBadge>
+                      </div>
+                      <p className="text-sm leading-7 text-gray-700 dark:text-gray-300">
+                        {practiceReviewTranscript || 'No transcript available yet.'}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/40 p-4 space-y-3">
+                      <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                        Summary
+                      </h4>
+                      <p className="text-sm leading-7 text-gray-700 dark:text-gray-300">
+                        {practiceFeedback?.summary || 'Your response has been scored. Open the full report for more detail.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {practiceBandRows.length ? (
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                      {practiceBandRows.map(row => (
+                        <div
+                          key={row.label}
+                          className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/40 px-4 py-3"
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                            {row.label}
+                          </p>
+                          <p className="mt-2 text-2xl font-black tracking-tight text-violet-600 dark:text-violet-400">
+                            {typeof row.value === 'number' ? row.value.toFixed(1) : '--'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-emerald-100 dark:border-emerald-500/15 bg-emerald-50/80 dark:bg-emerald-500/5 p-4">
+                      <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">
+                        Strengths
+                      </h4>
+                      <ul className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                        {(practiceFeedback?.strengths || []).slice(0, 4).map(item => (
+                          <li key={item} className="flex items-start gap-2">
+                            <span className="material-symbols-outlined mt-0.5 text-[14px] text-emerald-500">check_circle</span>
+                            {item}
+                          </li>
+                        ))}
+                        {practiceFeedback?.strengths?.length ? null : (
+                          <li className="text-gray-600 dark:text-gray-400">No strengths were captured for this response.</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-2xl border border-amber-100 dark:border-amber-500/15 bg-amber-50/80 dark:bg-amber-500/5 p-4">
+                      <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-400">
+                        Next improvements
+                      </h4>
+                      <ul className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                        {(practiceFeedback?.improvements || []).slice(0, 4).map(item => (
+                          <li key={item} className="flex items-start gap-2">
+                            <span className="material-symbols-outlined mt-0.5 text-[14px] text-amber-500">arrow_upward</span>
+                            {item}
+                          </li>
+                        ))}
+                        {practiceFeedback?.improvements?.length ? null : (
+                          <li className="text-gray-600 dark:text-gray-400">No improvement actions were generated for this response.</li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {practiceDetailHref ? (
+                      <Link
+                        href={practiceDetailHref}
+                        className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
+                      >
+                        Open full report
+                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                      </Link>
+                    ) : null}
+                    <Link
+                      href={buildLibraryHref('collocations', 'speaking', practiceWeaknessSeed)}
+                      className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
+                    >
+                      Related collocations
+                    </Link>
+                    <Link
+                      href={buildLibraryHref('vocabulary', 'speaking', practiceWeaknessSeed)}
+                      className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
+                    >
+                      Word alternatives
+                    </Link>
+                  </div>
+                </section>
+              ) : null}
+
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Microphone</span>
+                <select
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                  value={deviceId}
+                  onChange={event => setDeviceId(event.target.value)}
+                >
+                  <option value="">Default microphone</option>
+                  {devices.map(device => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Microphone ${device.deviceId.slice(0, 6)}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => void startRecording()}
+                  disabled={recorderState === 'recording'}
+                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">mic</span>
+                  Start Recording
+                </button>
+                <button
+                  onClick={stopRecording}
+                  disabled={recorderState !== 'recording'}
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">stop</span>
+                  Stop + Upload
+                </button>
+              </div>
+
+              <label className="block space-y-1">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fallback Manual Transcript</span>
+                <textarea
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 min-h-[100px]"
+                  value={practiceManualResponse}
+                  onChange={event => setPracticeManualResponse(event.target.value)}
+                  placeholder="Type your answer if microphone permission is denied or device fails"
+                />
+              </label>
+              <button
+                onClick={() => void completePracticeSessionWithText()}
+                disabled={!canSubmitManualTranscript}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                Submit Manual Transcript
+              </button>
+            </section>
+          ) : null}
+
           {/* Filter pills + search */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2 bg-gray-50/50 p-1 rounded-xl border border-gray-100 dark:border-gray-800 dark:bg-gray-800/30">
@@ -770,133 +1233,6 @@ export default function SpeakingPage() {
             </div>
           ) : null}
 
-          {/* ── Active session panel ── */}
-          {practiceSession ? (
-            <section className="rounded-2xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50/50 dark:bg-violet-500/5 p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Session</h2>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-violet-100 dark:bg-violet-500/20 px-3 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
-                    {practiceElapsed}s
-                  </span>
-                  <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-400">
-                    {recorderState}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{practiceSession.question}</p>
-
-              {practiceSession.tips?.length ? (
-                <ul className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
-                  {practiceSession.tips.slice(0, 4).map(item => (
-                    <li key={item} className="flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[14px] text-violet-500 mt-0.5">lightbulb</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Microphone</span>
-                <select
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/40"
-                  value={deviceId}
-                  onChange={event => setDeviceId(event.target.value)}
-                >
-                  <option value="">Default microphone</option>
-                  {devices.map(device => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label || `Microphone ${device.deviceId.slice(0, 6)}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => void startRecording()}
-                  disabled={recorderState === 'recording'}
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[18px]">mic</span>
-                  Start Recording
-                </button>
-                <button
-                  onClick={stopRecording}
-                  disabled={recorderState !== 'recording'}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined text-[18px]">stop</span>
-                  Stop + Upload
-                </button>
-              </div>
-
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fallback Manual Transcript</span>
-                <textarea
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 min-h-[100px]"
-                  value={practiceManualResponse}
-                  onChange={event => setPracticeManualResponse(event.target.value)}
-                  placeholder="Type your answer if microphone permission is denied or device fails"
-                />
-              </label>
-              <button
-                onClick={() => void completePracticeSessionWithText()}
-                disabled={recorderState === 'uploading'}
-                className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-              >
-                Submit Manual Transcript
-              </button>
-            </section>
-          ) : null}
-
-          {practiceTranscription ? (
-            <article className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-2">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">Transcription</h3>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{practiceTranscription}</p>
-            </article>
-          ) : null}
-
-          {practiceResult?.feedback ? (
-            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-5 space-y-3">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">Practice Result</h3>
-              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">Band {practiceResult.feedback.overallBand || '--'}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{practiceResult.feedback.summary}</p>
-              {(practiceResult.feedback.improvements || []).length > 0 ? (
-                <ul className="space-y-1.5">
-                  {(practiceResult.feedback.improvements || []).slice(0, 4).map(item => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="material-symbols-outlined text-[14px] text-amber-500 mt-0.5">arrow_upward</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <Link
-                  href={buildLibraryHref('collocations', 'speaking', practiceWeaknessSeed)}
-                  className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
-                >
-                  Related collocations
-                </Link>
-                <Link
-                  href={buildLibraryHref('vocabulary', 'speaking', practiceWeaknessSeed)}
-                  className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
-                >
-                  Word alternatives
-                </Link>
-                <Link
-                  href={buildLibraryHref('channels', 'speaking', practiceWeaknessSeed)}
-                  className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
-                >
-                  Recommended channels
-                </Link>
-              </div>
-            </article>
-          ) : null}
-
           <SectionCard title="Session History">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[580px]">
@@ -938,103 +1274,20 @@ export default function SpeakingPage() {
 
       {activeTab === 'simulation' ? (
         <div className="space-y-6">
-          <section className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Full Speaking Simulation</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Complete all three IELTS speaking parts in one session with AI evaluation.</p>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => void startSimulation()}
-                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:bg-violet-700 transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-                Start Full Simulation
-              </button>
-              {simulationElapsed > 0 ? (
-                <span className="rounded-full bg-violet-100 dark:bg-violet-500/20 px-3 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
-                  {simulationElapsed}s elapsed
-                </span>
-              ) : null}
-            </div>
-          </section>
-
-          {simulation ? (
-            <section className="rounded-2xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50/50 dark:bg-violet-500/5 p-6 space-y-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">Simulation in Progress</h3>
-                <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-400">
-                  Part {currentSimulationPart?.part || 1} / {simulation.parts.length}
-                </span>
-              </div>
-
-              <div className="flex gap-2">
-                {simulation.parts.map((part, index) => (
-                  <button
-                    key={part.part}
-                    onClick={() => goToSimulationPart(index)}
-                    className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${index === simulationPartIndex
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
-                      }`}
-                  >
-                    Part {part.part}
-                  </button>
-                ))}
-              </div>
-
-              {currentSimulationPart ? (
-                <>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{currentSimulationPart.question}</p>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Your Response</span>
-                    <textarea
-                      className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40 min-h-[120px]"
-                      value={simulationResponses[currentSimulationPart.part] || ''}
-                      onChange={event =>
-                        setSimulationResponses(prev => ({
-                          ...prev,
-                          [currentSimulationPart.part]: event.target.value
-                        }))
-                      }
-                      placeholder="Write or paste your response for this speaking part"
-                    />
-                  </label>
-                  {currentSimulationPart.tips?.length ? (
-                    <ul className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
-                      {currentSimulationPart.tips.map(item => (
-                        <li key={item} className="flex items-start gap-2">
-                          <span className="material-symbols-outlined text-[14px] text-violet-500 mt-0.5">lightbulb</span>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              ) : null}
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => goToSimulationPart(simulationPartIndex - 1)}
-                  disabled={simulationPartIndex === 0}
-                  className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  ← Previous Part
-                </button>
-                <button
-                  onClick={() => goToSimulationPart(simulationPartIndex + 1)}
-                  disabled={simulationPartIndex >= simulation.parts.length - 1}
-                  className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                >
-                  Next Part →
-                </button>
-                <button
-                  onClick={() => void completeSimulation()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors"
-                >
-                  Complete Simulation
-                </button>
-              </div>
-            </section>
-          ) : null}
+          <AuthenticSimulationStage
+            audioContextRef={simulationAudioContextRef}
+            devices={devices}
+            deviceId={deviceId}
+            elapsed={simulationElapsed}
+            onComplete={handleSimulationComplete}
+            onDeviceChange={setDeviceId}
+            onRestart={startSimulation}
+            onSessionChange={handleSimulationSessionChange}
+            onStart={startSimulation}
+            session={simulation}
+            starting={simulationStarting}
+            workspaceRef={simulationWorkspaceRef}
+          />
 
           {simulationResult ? (
             <article className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 space-y-4">
@@ -1064,10 +1317,10 @@ export default function SpeakingPage() {
                   Examples and alternatives
                 </Link>
                 <Link
-                  href={buildLibraryHref('books', 'speaking', simulationWeaknessSeed)}
+                  href="/app/study-plan"
                   className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
                 >
-                  Resources
+                  Update study plan
                 </Link>
               </div>
             </article>
@@ -1158,7 +1411,11 @@ export default function SpeakingPage() {
           </section>
 
           {quickEvaluation ? (
-            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 space-y-3">
+            <article
+              ref={quickEvaluationRef}
+              tabIndex={-1}
+              className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 space-y-3 scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+            >
               <h3 className="text-base font-bold text-gray-900 dark:text-white">Evaluation</h3>
               <p className="text-3xl font-extrabold text-gray-900 dark:text-white">Band {quickEvaluation.overallBand}</p>
               <p className="text-sm text-gray-600 dark:text-gray-300">{quickEvaluation.spokenSummary}</p>
@@ -1177,7 +1434,7 @@ export default function SpeakingPage() {
         </div>
       ) : null}
 
-      {errorMessage ? (
+      {showGlobalErrorMessage ? (
         <div className="rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-400">
           {errorMessage}
         </div>

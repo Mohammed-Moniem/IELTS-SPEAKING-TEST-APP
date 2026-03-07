@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { BlogIndexPage } from '@/components/blog/BlogIndexPage';
+import { listPublishedBlogPosts } from '@/lib/seo/blogData';
 
 export const metadata: Metadata = {
   title: 'IELTS Blog – 500+ Study Guides for Speaking, Writing, Reading & Listening',
@@ -23,6 +24,8 @@ export const metadata: Metadata = {
   }
 };
 
-export default function BlogPage() {
-  return <BlogIndexPage />;
+export default async function BlogPage() {
+  const posts = await listPublishedBlogPosts();
+
+  return <BlogIndexPage posts={posts} />;
 }

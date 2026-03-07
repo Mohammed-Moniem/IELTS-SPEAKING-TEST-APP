@@ -1,0 +1,12 @@
+flowchart LR
+  A["Learner stops recording"] --> B["Upload starts"]
+  B --> C{"Upload or transcription fails?"}
+  C -->|"No"| D["Continue to processing and inline review"]
+  C -->|"Yes"| E["Failure panel replaces passive status chip"]
+  E --> F{"Recovery choice"}
+  F -->|"Retry upload"| G["Retry with visible progress"]
+  F -->|"Use manual transcript"| H["Focus transcript textarea with guidance"]
+  F -->|"Cancel attempt"| I["Discard session and return to topics"]
+  G --> B
+  H --> J["Submit manual answer"]
+  J --> K["Inline review summary appears"]

@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 
+import { HardNavigationLink } from '@/components/navigation/HardNavigationLink';
 import { apiRequest, ApiError } from '@/lib/api/client';
 import { type FieldErrors, validateForgotPassword, isValid } from '@/lib/validation';
 
@@ -75,12 +75,12 @@ export default function ForgotPasswordPage() {
               </p>
             ) : null}
           </div>
-          <Link
+          <HardNavigationLink
             href="/login"
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Back to Login
-          </Link>
+          </HardNavigationLink>
         </div>
       </div>
     );
@@ -123,9 +123,9 @@ export default function ForgotPasswordPage() {
         ) : null}
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
           Remember your password?{' '}
-          <Link href="/login" className="text-violet-600 dark:text-violet-400 hover:underline font-semibold">
+          <HardNavigationLink href="/login" className="text-violet-600 dark:text-violet-400 hover:underline font-semibold">
             Sign in
-          </Link>
+          </HardNavigationLink>
         </p>
       </div>
     </div>

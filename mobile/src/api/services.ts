@@ -7,6 +7,7 @@ import {
   PracticeSessionStart,
   Preferences,
   SimulationStart,
+  SimulationRuntimeResponse,
   StandardResponse,
   StripeConfig,
   SubscriptionInfo,
@@ -130,6 +131,25 @@ export const practiceApi = {
 
 export const simulationApi = {
   start: () => unwrap<SimulationStart>(apiClient.post("/test-simulations/")),
+  getRuntime: (simulationId: string) =>
+    unwrap<SimulationRuntimeResponse>(
+      apiClient.get(`/test-simulations/${simulationId}/runtime`)
+    ),
+  advanceRuntime: (simulationId: string) =>
+    unwrap<SimulationRuntimeResponse>(
+      apiClient.post(`/test-simulations/${simulationId}/runtime/advance`, {})
+    ),
+  answerRuntime: (
+    simulationId: string,
+    payload: { transcript: string; durationSeconds?: number }
+  ) =>
+    unwrap<SimulationRuntimeResponse>(
+      apiClient.post(`/test-simulations/${simulationId}/runtime/answer`, payload)
+    ),
+  retryRuntime: (simulationId: string) =>
+    unwrap<SimulationRuntimeResponse>(
+      apiClient.post(`/test-simulations/${simulationId}/runtime/retry`, {})
+    ),
   complete: (
     simulationId: string,
     parts: {

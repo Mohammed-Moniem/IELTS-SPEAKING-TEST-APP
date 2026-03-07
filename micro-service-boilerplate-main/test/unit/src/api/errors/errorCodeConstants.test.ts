@@ -34,6 +34,7 @@ describe('errorCodeConstants', () => {
       InvalidGeospatialQuery: 'InvalidGeospatialQuery',
       InvalidQuery: 'InvalidQuery',
       InvalidQueryParam: 'InvalidQueryParam',
+      InvalidToken: 'InvalidToken',
       InvalidURC: 'InvalidURC',
       InvalidUserId: 'InvalidUserId',
       MissingUserId: 'MissingUserId',
@@ -47,6 +48,7 @@ describe('errorCodeConstants', () => {
       PremiumRequired: 'PremiumRequired',
       RefreshTokenRevoked: 'RefreshTokenRevoked',
       StripeError: 'StripeError',
+      TokenExpired: 'TokenExpired',
       UsageLimitReached: 'UsageLimitReached',
       UserAlreadyExists: 'UserAlreadyExists'
     };

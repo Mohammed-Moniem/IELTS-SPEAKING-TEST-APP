@@ -1,0 +1,14 @@
+flowchart LR
+  A["Visitor lands on Home or Guide"] --> B["Evaluates value and trust"]
+  B --> C{"Convinced to continue?"}
+  C -->|"No"| D["Exit or keep browsing"]
+  C -->|"Yes"| E["View Pricing or Register"]
+  E --> F["Create account"]
+  F --> G{"Registration successful?"}
+  G -->|"No"| H["Show inline errors and recovery help"]
+  H --> F
+  G -->|"Yes"| I["Open learner dashboard"]
+  I --> J["See one dominant first action"]
+  J --> K["Start baseline session"]
+  K --> L["Complete session and view feedback"]
+  L --> M["Receive next recommended action"]

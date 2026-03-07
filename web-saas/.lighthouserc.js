@@ -21,6 +21,8 @@ module.exports = {
         'http://127.0.0.1:3040/',
         'http://127.0.0.1:3040/pricing',
         'http://127.0.0.1:3040/features',
+        'http://127.0.0.1:3040/blog',
+        'http://127.0.0.1:3040/blog/academic-discussion-skills-for-ielts-speaking-part-3',
         'http://127.0.0.1:3040/ielts',
         'http://127.0.0.1:3040/ielts/ielts-speaking-practice-online'
       ],
@@ -43,4 +45,3 @@ module.exports = {
     }
   }
 };
-

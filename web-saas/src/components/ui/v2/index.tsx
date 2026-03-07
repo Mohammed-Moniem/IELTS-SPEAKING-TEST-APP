@@ -165,7 +165,7 @@ export function SegmentedTabs<T extends string>({
               'relative flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold outline-none transition-all duration-300',
               isActive
                 ? 'bg-white text-gray-900 shadow-sm shadow-black/5 ring-1 ring-gray-900/5 dark:bg-gray-700 dark:text-white dark:ring-white/10'
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50'
+                : 'text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'
             )}
             onClick={() => onChange(option.value)}
             role="tab"

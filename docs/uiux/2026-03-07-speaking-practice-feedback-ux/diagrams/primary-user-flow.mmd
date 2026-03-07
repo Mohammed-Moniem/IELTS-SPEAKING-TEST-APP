@@ -1,0 +1,14 @@
+flowchart LR
+  A["Learner opens Speaking practice"] --> B["Chooses a topic"]
+  B --> C["Sees one focused session workspace"]
+  C --> D["Records answer"]
+  D --> E["Stops and uploads audio"]
+  E --> F["Prominent processing state appears"]
+  F --> G{"Processing succeeds?"}
+  G -->|"Yes"| H["Inline review summary appears in same workspace"]
+  H --> I["Learner reads score, transcript, and improvements"]
+  I --> J{"Next action"}
+  J -->|"Open deeper analysis"| K["Open full report"]
+  J -->|"Keep practicing"| L["Choose another topic or targeted follow-up"]
+  G -->|"No"| M["Show explicit recovery actions"]
+  M --> N["Retry upload or switch to manual response"]

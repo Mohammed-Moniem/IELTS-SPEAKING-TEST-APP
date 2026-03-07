@@ -281,6 +281,8 @@ export class SpeechService {
     testPart: 1 | 2 | 3,
     context?: {
       topic?: string;
+      seedPrompt?: string;
+      followUpMode?: 'single_narrow';
       timeRemaining?: number;
       userLevel?: string;
     }
@@ -823,9 +825,28 @@ MANDATORY RULES:
 
   private getExaminerSystemPrompt(
     testPart: 1 | 2 | 3,
-    context?: { topic?: string; timeRemaining?: number; userLevel?: string }
+    context?: {
+      topic?: string;
+      seedPrompt?: string;
+      followUpMode?: 'single_narrow';
+      timeRemaining?: number;
+      userLevel?: string;
+    }
   ): string {
     const basePr = `You are an IELTS Speaking Test examiner. Be professional, clear, and encouraging.`;
+    const narrowFollowUpInstruction =
+      context?.followUpMode === 'single_narrow'
+        ? `
+Follow-up mode:
+- Ask exactly one short follow-up question.
+- Stay on the same subject as the immediately previous examiner question.
+- Do not switch to a different topic.
+- Do not ask a numbered list or multiple questions.
+- Do not summarise the candidate's answer before asking.
+- Keep the question under 18 words.
+- End with a single question mark.
+${context.seedPrompt ? `Previous examiner question: ${context.seedPrompt}` : ''}`
+        : '';
 
     switch (testPart) {
       case 1:
@@ -835,7 +856,8 @@ Part 1: Introduction and Interview (4-5 minutes)
 - Ask 2-3 questions per topic
 - Keep questions simple and personal
 - Be warm and friendly to help candidate relax
-${context?.topic ? `Current topic: ${context.topic}` : ''}`;
+${context?.topic ? `Current topic: ${context.topic}` : ''}
+${narrowFollowUpInstruction}`;
 
       case 2:
         return `${basePr}
@@ -854,7 +876,8 @@ Part 3: Two-way Discussion (4-5 minutes)
 - Discuss broader issues and concepts
 - Encourage deeper thinking and complex responses
 - Questions should be more challenging than Part 1
-${context?.topic ? `Related to: ${context.topic}` : ''}`;
+${context?.topic ? `Related to: ${context.topic}` : ''}
+${narrowFollowUpInstruction}`;
 
       default:
         return basePr;

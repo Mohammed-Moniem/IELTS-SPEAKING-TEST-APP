@@ -5,19 +5,50 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ApiError, webApi } from '@/lib/api/client';
-import type { LearnerDashboardView } from '@/lib/types';
-import { PageHeader, MetricCard, SectionCard, StatusBadge, SkeletonSet } from '@/components/ui/v2';
+import type { LearnerDashboardView, LearnerProgressView } from '@/lib/types';
+import { MetricCard, PageHeader, SectionCard, SkeletonSet, StatusBadge } from '@/components/ui/v2';
 
 type ModuleKey = 'speaking' | 'writing' | 'reading' | 'listening';
 
-const moduleConfig: Record<ModuleKey, { materialIcon: string; accentBg: string; accentText: string; href: string }> = {
-  speaking: { materialIcon: 'record_voice_over', accentBg: 'bg-violet-100 dark:bg-violet-500/20', accentText: 'text-violet-600 dark:text-violet-400', href: '/app/speaking' },
-  writing: { materialIcon: 'edit_note', accentBg: 'bg-amber-100 dark:bg-amber-500/20', accentText: 'text-amber-600 dark:text-amber-400', href: '/app/writing' },
-  reading: { materialIcon: 'auto_stories', accentBg: 'bg-blue-100 dark:bg-blue-500/20', accentText: 'text-blue-600 dark:text-blue-400', href: '/app/reading' },
-  listening: { materialIcon: 'headphones', accentBg: 'bg-emerald-100 dark:bg-emerald-500/20', accentText: 'text-emerald-600 dark:text-emerald-400', href: '/app/listening' }
+const moduleConfig: Record<
+  ModuleKey,
+  {
+    label: string;
+    materialIcon: string;
+    accentBg: string;
+    accentText: string;
+    href: string;
+  }
+> = {
+  speaking: {
+    label: 'Speaking',
+    materialIcon: 'record_voice_over',
+    accentBg: 'bg-violet-100 dark:bg-violet-500/20',
+    accentText: 'text-violet-600 dark:text-violet-400',
+    href: '/app/speaking',
+  },
+  writing: {
+    label: 'Writing',
+    materialIcon: 'edit_note',
+    accentBg: 'bg-amber-100 dark:bg-amber-500/20',
+    accentText: 'text-amber-600 dark:text-amber-400',
+    href: '/app/writing',
+  },
+  reading: {
+    label: 'Reading',
+    materialIcon: 'auto_stories',
+    accentBg: 'bg-blue-100 dark:bg-blue-500/20',
+    accentText: 'text-blue-600 dark:text-blue-400',
+    href: '/app/reading',
+  },
+  listening: {
+    label: 'Listening',
+    materialIcon: 'headphones',
+    accentBg: 'bg-emerald-100 dark:bg-emerald-500/20',
+    accentText: 'text-emerald-600 dark:text-emerald-400',
+    href: '/app/listening',
+  },
 };
-
-const titleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 const formatDate = (iso?: string) => {
   if (!iso) return '--';
@@ -25,37 +56,116 @@ const formatDate = (iso?: string) => {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
-    minute: '2-digit'
+    minute: '2-digit',
   });
 };
 
+const formatBand = (value: number) => value.toFixed(1);
+
 const getStatusTone = (status: string) => {
-  const s = status.toLowerCase();
-  if (s.includes('complete')) return 'success';
-  if (s.includes('progress')) return 'warning';
+  const normalized = status.toLowerCase();
+  if (normalized.includes('complete')) return 'success';
+  if (normalized.includes('progress')) return 'warning';
   return 'neutral';
+};
+
+const deriveTargetBand = (
+  dashboardView: LearnerDashboardView | null,
+  progressView: LearnerProgressView | null,
+) => {
+  if (typeof dashboardView?.kpis.nextGoalBand === 'number') {
+    return dashboardView.kpis.nextGoalBand;
+  }
+
+  if (!progressView) return null;
+
+  return Math.min(
+    9,
+    Math.ceil((progressView.totals.overallBand + 0.5) * 2) / 2,
+  );
+};
+
+const buildWeakestSkill = (
+  progressView: LearnerProgressView | null,
+  targetBand: number | null,
+) => {
+  if (!progressView || targetBand == null) return null;
+
+  const ranked = (Object.entries(progressView.skillBreakdown) as Array<
+    [ModuleKey, number]
+  >).sort((left, right) => {
+    const leftGap = Math.max(0, targetBand - left[1]);
+    const rightGap = Math.max(0, targetBand - right[1]);
+    if (rightGap !== leftGap) return rightGap - leftGap;
+    return left[1] - right[1];
+  });
+
+  const [module, band] = ranked[0] || [];
+  if (!module || typeof band !== 'number') return null;
+
+  const meta = moduleConfig[module];
+  const gap = Math.max(0, targetBand - band);
+
+  let reason = `${meta.label} is your lowest-scoring module right now.`;
+  if (gap >= 1) {
+    reason = `${meta.label} has the biggest gap to your Band ${formatBand(targetBand)} target.`;
+  } else if (gap > 0) {
+    reason = `${meta.label} is the clearest place to gain your next band movement.`;
+  }
+
+  return {
+    module,
+    band,
+    gap,
+    targetBand,
+    reason,
+    ...meta,
+  };
 };
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [view, setView] = useState<LearnerDashboardView | null>(null);
+  const [progressView, setProgressView] = useState<LearnerProgressView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let active = true;
+
     void (async () => {
       setLoading(true);
       setError('');
-      try {
-        const payload = await webApi.getLearnerDashboardView();
-        setView(payload);
-      } catch (err: unknown) {
-        const message = err instanceof ApiError ? err.message : 'Failed to load learner dashboard';
+
+      const [dashboardResult, progressResult] = await Promise.allSettled([
+        webApi.getLearnerDashboardView(),
+        webApi.getLearnerProgressView({ range: '90d', module: 'all' }),
+      ]);
+
+      if (!active) return;
+
+      if (dashboardResult.status === 'rejected') {
+        const message =
+          dashboardResult.reason instanceof ApiError
+            ? dashboardResult.reason.message
+            : 'Failed to load learner dashboard';
         setError(message);
-      } finally {
+        setView(null);
+        setProgressView(null);
         setLoading(false);
+        return;
       }
+
+      setView(dashboardResult.value);
+      setProgressView(
+        progressResult.status === 'fulfilled' ? progressResult.value : null,
+      );
+      setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const quickCards = useMemo(() => {
@@ -64,20 +174,95 @@ export default function DashboardPage() {
       .filter(item => item.module in moduleConfig)
       .map(item => ({
         ...item,
-        ...moduleConfig[item.module as ModuleKey]
+        ...moduleConfig[item.module as ModuleKey],
       }));
   }, [view]);
 
-  /* ── Loading skeleton ── */
+  const targetBand = useMemo(
+    () => deriveTargetBand(view, progressView),
+    [view, progressView],
+  );
+
+  const weakestSkill = useMemo(
+    () => buildWeakestSkill(progressView, targetBand),
+    [progressView, targetBand],
+  );
+
+  const fallbackQuickCard = quickCards[0] || null;
+
+  const supportingQuickCards = useMemo(() => {
+    return quickCards
+      .filter(card => card.module !== weakestSkill?.module)
+      .slice(0, 3);
+  }, [quickCards, weakestSkill]);
+
+  const primaryAction = useMemo(() => {
+    if (view?.resume) {
+      return {
+        eyebrow: 'Active session',
+        title: 'Resume your current session',
+        description: `${view.resume.title} is still in progress. Pick up from ${Math.round(
+          view.resume.progressPercent,
+        )}% and keep your momentum today.`,
+        ctaLabel: 'Resume now',
+        href: view.resume.href,
+        icon: 'play_arrow',
+        tone: 'warning' as const,
+      };
+    }
+
+    if (weakestSkill) {
+      return {
+        eyebrow: 'Next best step',
+        title: 'Focus on your weakest skill',
+        description: weakestSkill.reason,
+        ctaLabel: `Practice ${weakestSkill.label}`,
+        href: weakestSkill.href,
+        icon: 'arrow_forward',
+        tone: 'brand' as const,
+      };
+    }
+
+    if (fallbackQuickCard) {
+      return {
+        eyebrow: 'Next practice',
+        title: 'Pick up your next practice session',
+        description:
+          fallbackQuickCard.description ||
+          `Start a focused ${fallbackQuickCard.label.toLowerCase()} session and keep your streak moving.`,
+        ctaLabel: `Start ${fallbackQuickCard.label}`,
+        href: fallbackQuickCard.href,
+        icon: 'arrow_forward',
+        tone: 'brand' as const,
+      };
+    }
+
+    return {
+      eyebrow: 'Next practice',
+      title: 'Pick up your next practice session',
+      description:
+        'Start with a short speaking drill to rebuild momentum and get quick feedback.',
+      ctaLabel: 'Start Speaking',
+      href: '/app/speaking',
+      icon: 'arrow_forward',
+      tone: 'brand' as const,
+    };
+  }, [fallbackQuickCard, view, weakestSkill]);
+
   if (loading && !view) {
     return (
       <div className="space-y-8 max-w-7xl mx-auto">
         <SkeletonSet rows={2} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonSet rows={8} />
           <SkeletonSet rows={6} />
           <SkeletonSet rows={6} />
-          <SkeletonSet rows={6} />
-          <SkeletonSet rows={6} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+          <SkeletonSet rows={5} />
+          <SkeletonSet rows={5} />
+          <SkeletonSet rows={5} />
+          <SkeletonSet rows={5} />
         </div>
       </div>
     );
@@ -85,223 +270,383 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-[1440px] mx-auto w-full">
-      {/* ── Page header ── */}
       <PageHeader
         kicker="Dashboard"
-        title={`Welcome back, ${user?.firstName || 'Student'} 👋`}
-        subtitle="Ready to boost your IELTS score today? Your next session is waiting."
-        actions={
-          <Link
-            href="/app/tests"
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-2xl bg-violet-600 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-violet-500/25 transition-all hover:bg-violet-700 hover:-translate-y-0.5"
-          >
-            <span className="material-symbols-outlined text-[20px] transition-transform group-hover:rotate-90">add</span>
-            Start New Test
-          </Link>
-        }
+        title={`Welcome back, ${user?.firstName || 'Student'}`}
+        subtitle="Pick up where you left off or focus on the skill most likely to improve your score next."
       />
 
       {view ? (
         <div className="space-y-8">
-          {/* ── KPI grid ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MetricCard
-              tone="brand"
-              label="Average Band"
-              value={view.kpis.averageBand.toFixed(1)}
-              delta="↗ +0.5"
-            />
+          <section className="relative overflow-hidden rounded-[32px] border border-violet-200/60 bg-gradient-to-br from-white via-violet-50 to-indigo-50 px-6 py-6 shadow-[0_18px_60px_-30px_rgba(79,70,229,0.45)] dark:border-violet-500/20 dark:from-gray-950 dark:via-violet-950/40 dark:to-slate-950 lg:px-8 lg:py-8">
+            <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-violet-300/30 blur-3xl dark:bg-violet-500/20" />
+            <div className="absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl dark:bg-indigo-500/20" />
 
-            <MetricCard
-              tone="success"
-              label="Current Streak"
-              value={`${view.kpis.currentStreak} Days`}
-              helper={
-                <div className="flex gap-1.5 mt-1" aria-hidden>
-                  {[0, 1, 2, 3, 4].map(index => (
-                    <span
-                      key={index}
-                      className={`h-1.5 w-8 rounded-full transition-all duration-500 ${index < Math.min(5, view.kpis.currentStreak)
-                          ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-sm shadow-emerald-500/30'
-                          : 'bg-gray-200 dark:bg-gray-700'
-                        }`}
-                    />
-                  ))}
+            <div className="relative z-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.9fr] lg:items-start">
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={primaryAction.tone}>
+                    {primaryAction.eyebrow}
+                  </StatusBadge>
+                  {weakestSkill && !view.resume ? (
+                    <StatusBadge tone="neutral">
+                      Gap {formatBand(weakestSkill.gap)} bands
+                    </StatusBadge>
+                  ) : null}
                 </div>
-              }
-            />
 
-            <MetricCard
-              tone="info"
-              label="Tests Completed"
-              value={view.kpis.testsCompleted}
-              helper="Total monitored sessions"
-            />
+                <div className="space-y-3">
+                  <h2 className="text-3xl font-black tracking-tight text-gray-950 dark:text-white sm:text-[2.5rem]">
+                    {primaryAction.title}
+                  </h2>
+                  <p className="max-w-2xl text-base leading-7 text-gray-600 dark:text-gray-300">
+                    {primaryAction.description}
+                  </p>
+                </div>
 
-            <MetricCard
-              tone="warning"
-              label="Next Goal"
-              value={`Band ${view.kpis.nextGoalBand.toFixed(1)}`}
-              helper="Target: Intermediate Level"
-            />
-          </div>
+                <div className="flex flex-wrap gap-2">
+                  {view.resume ? (
+                    <>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                        {view.resume.title}
+                      </span>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                        {view.resume.subtitle}
+                      </span>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                        {Math.round(view.resume.progressPercent)}% complete
+                      </span>
+                    </>
+                  ) : weakestSkill ? (
+                    <>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                        Current band {formatBand(weakestSkill.band)}
+                      </span>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                        Target band {formatBand(weakestSkill.targetBand)}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
 
-          {/* ── Main + Rail ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8 items-start">
-
-            {/* Left Main Column: Quick Practice */}
-            <SectionCard
-              title="Quick Practice"
-              subtitle="Jump right into your lowest-scoring modules."
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {quickCards.map((item, index) => (
-                  <article
-                    key={`${item.module}-${item.title}`}
-                    className={`group relative overflow-hidden rounded-3xl p-6 flex flex-col gap-4 min-h-[240px] shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${index === 0
-                        ? 'bg-gradient-to-br from-violet-600 via-violet-700 to-indigo-800 border-[rgba(255,255,255,0.1)] text-white shadow-violet-500/20'
-                        : 'bg-white border-2 border-gray-100 dark:bg-gray-900 dark:border-gray-800'
-                      }`}
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <Link
+                    href={primaryAction.href}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-violet-500/25 transition-all hover:-translate-y-0.5 hover:bg-violet-700"
                   >
-                    {/* Background decoration */}
-                    {index === 0 && (
-                      <div className="absolute -bottom-10 -right-10 opacity-30 blur-2xl transition-transform duration-700 group-hover:scale-150">
-                        <div className="w-48 h-48 rounded-full bg-violet-400 mix-blend-screen" />
-                      </div>
-                    )}
+                    {primaryAction.ctaLabel}
+                    <span className="material-symbols-outlined text-[18px]">
+                      {primaryAction.icon}
+                    </span>
+                  </Link>
 
-                    <div className="relative z-10 flex items-center justify-between">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${index === 0 ? 'bg-white/20 backdrop-blur-sm shadow-white/10' : item.accentBg}`}>
-                        <span className={`material-symbols-outlined text-[28px] ${index === 0 ? 'text-white' : item.accentText}`}>
-                          {item.materialIcon}
+                  {view.resume ? (
+                    <Link
+                      href="/app/study-plan"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/80 px-5 py-3 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-white dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200 dark:hover:bg-gray-900"
+                    >
+                      Review study plan
+                    </Link>
+                  ) : weakestSkill ? (
+                    <Link
+                      href="/app/study-plan"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/80 px-5 py-3 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-white dark:border-gray-700 dark:bg-gray-900/70 dark:text-gray-200 dark:hover:bg-gray-900"
+                    >
+                      Open study plan
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/60 bg-white/75 p-5 shadow-lg backdrop-blur dark:border-white/10 dark:bg-white/5">
+                {view.resume ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-500 dark:text-indigo-300">
+                          Resume path
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-gray-900 dark:text-white">
+                          {view.resume.title}
+                        </p>
+                      </div>
+                      <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${moduleConfig.speaking.accentBg}`}>
+                        <span className={`material-symbols-outlined text-[22px] ${moduleConfig.speaking.accentText}`}>
+                          play_circle
                         </span>
                       </div>
                     </div>
 
-                    <div className="relative z-10 flex-1 space-y-1.5 mt-2">
-                      <h3 className={`text-xl font-bold tracking-tight ${index === 0 ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                        {item.title}
-                      </h3>
-                      <p className={`text-sm leading-relaxed ${index === 0 ? 'text-violet-100/90' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {item.description}
-                      </p>
-                    </div>
-
-                    <Link
-                      href={item.href}
-                      className={`relative z-10 mt-2 flex items-center justify-between gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-all ${index === 0
-                          ? 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
-                        }`}
-                    >
-                      {index === 0 ? 'Start Speaking' : `Start ${titleCase(item.module)}`}
-                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                    </Link>
-                  </article>
-                ))}
-              </div>
-            </SectionCard>
-
-            {/* Right rail */}
-            <aside className="space-y-6">
-              {/* Resume Card */}
-              {view.resume ? (
-                <article className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 shadow-2xl shadow-indigo-900/20">
-                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-30" />
-
-                  <div className="relative z-10 space-y-4">
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-indigo-300 backdrop-blur-md">
-                      <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-                      Session active
-                    </div>
-
-                    <div>
-                      <h3 className="text-xl font-bold tracking-tight">{view.resume.title}</h3>
-                      <p className="mt-1 text-sm text-slate-300 leading-relaxed">{view.resume.subtitle}</p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-semibold text-slate-400">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold text-gray-500 dark:text-gray-400">
                         <span>Progress</span>
                         <span>{Math.round(view.resume.progressPercent)}%</span>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden shadow-inner flex">
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]"
-                          style={{ width: `${Math.max(4, Math.min(100, view.resume.progressPercent))}%` }}
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400"
+                          style={{
+                            width: `${Math.max(
+                              6,
+                              Math.min(100, view.resume.progressPercent),
+                            )}%`,
+                          }}
                         />
                       </div>
                     </div>
 
-                    <Link
-                      href={view.resume.href}
-                      className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20 transition-all backdrop-blur-sm border border-white/20"
-                    >
-                      Resume Now
-                      <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-                    </Link>
+                    <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      Finish this attempt first, then come back for a focused skill block.
+                    </p>
                   </div>
-                </article>
-              ) : null}
-
-              {/* Recommended Topics */}
-              <SectionCard title="Recommended for you" className="bg-white px-1">
-                <ul className="space-y-3 mt-1">
-                  {view.recommended.slice(0, 3).map(item => (
-                    <li
-                      key={item.topicId}
-                      className="group flex flex-col gap-1 rounded-2xl border border-gray-100 bg-gray-50/50 p-4 transition-all hover:border-violet-200 hover:bg-violet-50/50 dark:border-gray-800 dark:bg-gray-800/30 dark:hover:border-violet-500/30 dark:hover:bg-violet-500/10"
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="font-bold text-gray-900 dark:text-white leading-snug group-hover:text-violet-700 dark:group-hover:text-violet-300 transition-colors">
-                          {item.title}
-                        </p>
-                        <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-700 dark:text-gray-300 dark:ring-white/10">
-                          {item.difficulty || `Part ${item.part}`}
+                ) : weakestSkill ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${weakestSkill.accentBg}`}>
+                        <span className={`material-symbols-outlined text-[22px] ${weakestSkill.accentText}`}>
+                          {weakestSkill.materialIcon}
                         </span>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/app/speaking"
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
-                  Browse Library
-                </Link>
-              </SectionCard>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-violet-500 dark:text-violet-300">
+                          Why this focus
+                        </p>
+                        <p className="mt-1 text-lg font-bold text-gray-900 dark:text-white">
+                          {weakestSkill.label}
+                        </p>
+                      </div>
+                    </div>
 
-              {/* Premium Upsell */}
-              <article className="group overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-black p-1 shadow-2xl">
-                <div className="rounded-[22px] bg-gradient-to-br from-gray-900 to-black p-6 text-center space-y-4 relative overflow-hidden backdrop-blur-xl h-full border border-gray-800">
-                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 rounded-full blur-2xl transition-transform duration-700 group-hover:scale-150" />
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl bg-gray-100 px-3 py-3 text-center dark:bg-gray-900/70">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Current
+                        </p>
+                        <p className="mt-1 text-lg font-black text-gray-900 dark:text-white">
+                          {formatBand(weakestSkill.band)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-gray-100 px-3 py-3 text-center dark:bg-gray-900/70">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Target
+                        </p>
+                        <p className="mt-1 text-lg font-black text-gray-900 dark:text-white">
+                          {formatBand(weakestSkill.targetBand)}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-gray-100 px-3 py-3 text-center dark:bg-gray-900/70">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Gap
+                        </p>
+                        <p className="mt-1 text-lg font-black text-gray-900 dark:text-white">
+                          {formatBand(weakestSkill.gap)}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="relative z-10 mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-500/20 text-white">
-                    <span className="material-symbols-outlined text-[32px]">workspace_premium</span>
+                    <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      A focused session here should improve your overall score faster than spreading attention across every module.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-violet-500 dark:text-violet-300">
+                      Fallback action
+                    </p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      Keep today simple
+                    </p>
+                    <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                      Progress data is unavailable right now, so start with one focused practice block and keep your study streak moving.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {view.resume && weakestSkill ? (
+              <SectionCard
+                title="Weakest skill focus"
+                subtitle="Use this as your next targeted improvement block after you finish the active session."
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${weakestSkill.accentBg}`}>
+                      <span className={`material-symbols-outlined text-[22px] ${weakestSkill.accentText}`}>
+                        {weakestSkill.materialIcon}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {weakestSkill.label}
+                      </h3>
+                      <p className="text-sm leading-6 text-gray-500 dark:text-gray-400">
+                        {weakestSkill.reason}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="relative z-10">
-                    <h3 className="text-xl font-extrabold tracking-tight text-white mb-1">Go Premium</h3>
-                    <p className="text-sm text-gray-400">Unlock unlimited tests, adaptive AI insights, and the band score guarantee.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone="warning">
+                      Current {formatBand(weakestSkill.band)}
+                    </StatusBadge>
+                    <StatusBadge tone="brand">
+                      Target {formatBand(weakestSkill.targetBand)}
+                    </StatusBadge>
+                    <StatusBadge tone="neutral">
+                      Gap {formatBand(weakestSkill.gap)}
+                    </StatusBadge>
                   </div>
 
-                  <Link
-                    href="/app/billing"
-                    className="relative z-10 inline-flex w-full justify-center rounded-xl bg-yellow-400 px-4 py-3 text-sm font-bold text-gray-900 transition-transform hover:scale-105 shadow-xl shadow-yellow-500/20"
-                  >
-                    View Upgrade Plans
-                  </Link>
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <Link
+                      href={weakestSkill.href}
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Practice {weakestSkill.label}
+                    </Link>
+                    <Link
+                      href="/app/study-plan"
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Open study plan
+                    </Link>
+                  </div>
                 </div>
-              </article>
-            </aside>
+              </SectionCard>
+            ) : (
+              <SectionCard
+                title="Other ways to practice"
+                subtitle="Keep these options secondary so your main next step stays obvious."
+              >
+                <div className="space-y-3">
+                  {supportingQuickCards.length > 0 ? (
+                    supportingQuickCards.map(card => (
+                      <article
+                        key={`${card.module}-${card.title}`}
+                        className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 transition-colors hover:border-violet-200 hover:bg-violet-50/60 dark:border-gray-800 dark:bg-gray-800/40 dark:hover:border-violet-500/30 dark:hover:bg-violet-500/10"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`h-10 w-10 rounded-2xl flex items-center justify-center ${card.accentBg}`}>
+                            <span className={`material-symbols-outlined text-[20px] ${card.accentText}`}>
+                              {card.materialIcon}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div>
+                              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                                {card.title}
+                              </h3>
+                              <p className="text-sm leading-6 text-gray-500 dark:text-gray-400">
+                                {card.description}
+                              </p>
+                            </div>
+                            <Link
+                              href={card.href}
+                              className="inline-flex items-center gap-2 text-sm font-bold text-violet-600 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                            >
+                              Start {card.label}
+                              <span className="material-symbols-outlined text-[16px]">
+                                arrow_forward
+                              </span>
+                            </Link>
+                          </div>
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      More practice paths will appear here as you build activity across modules.
+                    </p>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
+            <SectionCard
+              title="Suggested speaking prompts"
+              subtitle="Use these to warm up when you want a lighter session before a full practice block."
+            >
+              <div className="space-y-3">
+                {view.recommended.length > 0 ? (
+                  <>
+                    <ul className="space-y-3">
+                      {view.recommended.slice(0, 3).map(item => (
+                        <li
+                          key={item.topicId}
+                          className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-800/40"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                {item.title}
+                              </p>
+                              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                Part {item.part}
+                                {item.difficulty ? ` • ${item.difficulty}` : ''}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 shadow-sm ring-1 ring-gray-900/5 dark:bg-gray-700 dark:text-gray-300 dark:ring-white/10">
+                              Prompt
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link
+                      href="/app/speaking"
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Browse speaking library
+                    </Link>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    New speaking prompts will appear here after more practice activity is recorded.
+                  </p>
+                )}
+              </div>
+            </SectionCard>
           </div>
 
-          {/* ── Recent Activity ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            <MetricCard
+              tone="brand"
+              label="Average Band"
+              value={formatBand(view.kpis.averageBand)}
+              helper="Current overall benchmark"
+            />
+            <MetricCard
+              tone="success"
+              label="Current Streak"
+              value={`${view.kpis.currentStreak} Days`}
+              helper="Stay consistent to keep improving"
+            />
+            <MetricCard
+              tone="info"
+              label="Tests Completed"
+              value={view.kpis.testsCompleted}
+              helper="Tracked attempts across your account"
+            />
+            <MetricCard
+              tone="warning"
+              label="Next Goal"
+              value={`Band ${formatBand(view.kpis.nextGoalBand)}`}
+              helper="Use the dashboard focus to close the gap"
+            />
+          </div>
+
           <SectionCard
             title="Recent Activity"
             actions={
-              <Link href="/app/progress" className="text-sm font-bold text-violet-600 dark:text-violet-400 hover:text-violet-700 transition-colors">
-                View Full Timeline
+              <Link
+                href="/app/progress"
+                className="text-sm font-bold text-violet-600 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+              >
+                View full timeline
               </Link>
             }
           >
@@ -309,51 +654,70 @@ export default function DashboardPage() {
               <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b-2 border-gray-100 dark:border-gray-800/80">
-                    <th className="px-4 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Module</th>
-                    <th className="px-4 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest min-w-[200px]">Topic</th>
-                    <th className="px-4 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Date</th>
-                    <th className="px-4 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Score</th>
-                    <th className="px-4 py-4 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      Module
+                    </th>
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      Topic
+                    </th>
+                    <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      Date
+                    </th>
+                    <th className="px-4 py-4 text-right text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      Score
+                    </th>
+                    <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      Status
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dashed dark:divide-gray-800/60">
-                  {view.activity.slice(0, 6).map((item, index) => (
-                    <tr key={`${item.module}-${item.itemId}`} className="group hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition-colors">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
+                  {view.activity.slice(0, 6).map(item => (
+                    <tr
+                      key={`${item.module}-${item.itemId}`}
+                      className="group transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/30"
+                    >
                       <td className="px-4 py-5">
                         <span className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300">
-                          <span className={`material-symbols-outlined text-[18px] opacity-70 ${moduleConfig[item.module as ModuleKey]?.accentText}`}>
+                          <span className={`material-symbols-outlined text-[18px] ${moduleConfig[item.module as ModuleKey]?.accentText}`}>
                             {moduleConfig[item.module as ModuleKey]?.materialIcon}
                           </span>
-                          {titleCase(item.module)}
+                          {moduleConfig[item.module as ModuleKey]?.label || item.module}
                         </span>
                       </td>
                       <td className="px-4 py-5">
-                        <Link href={item.href} className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors line-clamp-1">
+                        <Link
+                          href={item.href}
+                          className="line-clamp-1 text-sm font-semibold text-gray-900 transition-colors hover:text-violet-600 dark:text-white dark:hover:text-violet-400"
+                        >
                           {item.title}
                         </Link>
                       </td>
-                      <td className="px-4 py-5 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <td className="px-4 py-5 text-sm font-medium text-gray-500 dark:text-gray-400">
                         {formatDate(item.createdAt)}
                       </td>
                       <td className="px-4 py-5 text-right">
-                        <span className="inline-flex items-center justify-center rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-black text-gray-900 dark:bg-gray-800 dark:text-white ring-1 ring-inset ring-gray-900/5 dark:ring-white/10">
-                          {item.score ? item.score.toFixed(1) : '--'}
+                        <span className="inline-flex items-center justify-center rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-black text-gray-900 ring-1 ring-inset ring-gray-900/5 dark:bg-gray-800 dark:text-white dark:ring-white/10">
+                          {item.score ? formatBand(item.score) : '--'}
                         </span>
                       </td>
-                      <td className="px-4 py-5 text-center whitespace-nowrap">
+                      <td className="px-4 py-5 text-center">
                         <StatusBadge tone={getStatusTone(item.status)}>
                           {item.status}
                         </StatusBadge>
                       </td>
                     </tr>
                   ))}
-                  {view.activity.length === 0 && (
+                  {view.activity.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-sm font-medium text-gray-500">
-                        No recent activity found. Start a practice session!
+                      <td
+                        colSpan={5}
+                        className="px-4 py-12 text-center text-sm font-medium text-gray-500"
+                      >
+                        No recent activity found. Start a practice session to build your dashboard.
                       </td>
                     </tr>
-                  )}
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -362,11 +726,17 @@ export default function DashboardPage() {
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm dark:border-red-500/20 dark:bg-red-500/10 flex items-start gap-4">
-          <span className="material-symbols-outlined text-red-600 dark:text-red-400 mt-0.5">error</span>
+        <div className="flex items-start gap-4 rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm dark:border-red-500/20 dark:bg-red-500/10">
+          <span className="material-symbols-outlined mt-0.5 text-red-600 dark:text-red-400">
+            error
+          </span>
           <div>
-            <h3 className="text-sm font-bold text-red-800 dark:text-red-300">Dashboard Unavailable</h3>
-            <p className="mt-1 text-sm text-red-700 dark:text-red-400/90">{error}</p>
+            <h3 className="text-sm font-bold text-red-800 dark:text-red-300">
+              Dashboard Unavailable
+            </h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-400/90">
+              {error}
+            </p>
           </div>
         </div>
       ) : null}
