@@ -123,9 +123,10 @@ const buildStartPayload = (runtimeOverrides: Record<string, any> = {}) => ({
     examinerProfile: {
       id: "british",
       label: "British examiner",
-      accent: "british",
-      ttsProvider: "openai",
-      ttsVoice: "alloy",
+      accent: "British",
+      provider: "openai",
+      voiceId: "alloy",
+      autoAssigned: true,
     },
     segments: [
       {
@@ -316,6 +317,21 @@ describe("AuthenticFullTestV2", () => {
   });
 
   it("falls back to live synthesis for an adaptive follow-up after the learner answer", async () => {
+    mockStart.mockResolvedValue({
+      ...buildStartPayload(),
+      sessionPackage: {
+        ...buildStartPayload().sessionPackage,
+        examinerProfile: {
+          id: "australian",
+          label: "Australian examiner",
+          accent: "Australian",
+          provider: "openai",
+          voiceId: "echo",
+          autoAssigned: true,
+        },
+      },
+    });
+
     const { findByRole, findByTestId, findByText } = render(
       <AuthenticFullTestV2 onComplete={jest.fn()} onExit={jest.fn()} />
     );
@@ -335,7 +351,10 @@ describe("AuthenticFullTestV2", () => {
     await waitFor(() =>
       expect(mockSpeak).toHaveBeenCalledWith(
         "Why do you enjoy that hobby so much?",
-        expect.objectContaining({ onDone: expect.any(Function) })
+        expect.objectContaining({
+          onDone: expect.any(Function),
+          voiceId: "echo",
+        })
       )
     );
   });

@@ -637,6 +637,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
           setPlaybackState("speaking");
           await ttsService.speak(promptText, {
             onDone,
+            voiceId: session.sessionPackage?.examinerProfile.voiceId,
           });
         }
       } catch (error: any) {

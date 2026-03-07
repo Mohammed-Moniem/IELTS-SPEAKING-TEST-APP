@@ -16,6 +16,7 @@ interface TTSOptions {
   rate?: number;
   pitch?: number;
   language?: string;
+  voiceId?: string;
   onDone?: () => void;
   onStopped?: () => void;
   onError?: (error: Error) => void;
@@ -103,7 +104,10 @@ class TextToSpeechService {
       if (this.remoteSynthesisDisabled) {
         await this.speakWithSystemVoice(trimmed);
       } else {
-        const audioDataUri = await this.getAudioDataUri(trimmed);
+        const audioDataUri = await this.getAudioDataUri(
+          trimmed,
+          options.voiceId
+        );
 
         if (this.stopRequested) {
           return;
@@ -378,9 +382,15 @@ class TextToSpeechService {
     }
   }
 
-  private async getAudioDataUri(text: string): Promise<string> {
-    // First, try to get pre-cached audio by matching exact text
-    const cachedFileUri = await audioCacheService.getCachedAudioByText(text);
+  private async getAudioDataUri(
+    text: string,
+    voiceId?: string
+  ): Promise<string> {
+    // Pre-cached phrase audio is voice-agnostic, so only reuse it when no
+    // explicit examiner voice is required for this turn.
+    const cachedFileUri = voiceId
+      ? null
+      : await audioCacheService.getCachedAudioByText(text);
 
     if (cachedFileUri) {
       console.log("♻️ Using pre-cached audio file");
@@ -400,7 +410,7 @@ class TextToSpeechService {
     }
 
     // Fallback: Check in-memory cache for recently synthesized audio
-    const cacheKey = `tts_${text.substring(0, 50)}`;
+    const cacheKey = `tts_${voiceId || "default"}_${text.substring(0, 50)}`;
 
     this.pruneExpiredCache();
 
@@ -412,7 +422,7 @@ class TextToSpeechService {
 
     // Last resort: Synthesize via backend API
     console.log("🔊 Synthesizing via backend API (no cache available)");
-    const dataUri = await synthesizeSpeech(text);
+    const dataUri = await synthesizeSpeech(text, voiceId);
 
     const expiresAt = Date.now() + this.cacheTtlMs;
     this.audioCache.set(cacheKey, { dataUri, expiresAt });
