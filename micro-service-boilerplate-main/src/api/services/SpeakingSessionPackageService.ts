@@ -15,6 +15,11 @@ export interface SpeakingSessionPackagePartDefinition {
   tips: string[];
 }
 
+interface BuildSpeakingSessionPackageOptions {
+  requestedProfileId?: string;
+  selectionSeed?: string;
+}
+
 const FIXED_PHRASE_PART: Record<ExaminerPhraseId, number> = {
   welcome_intro: 0,
   id_check: 0,
@@ -60,9 +65,13 @@ export class SpeakingSessionPackageService {
   ) {}
 
   public async buildSessionPackage(
-    parts: SpeakingSessionPackagePartDefinition[]
+    parts: SpeakingSessionPackagePartDefinition[],
+    options: BuildSpeakingSessionPackageOptions = {}
   ): Promise<SpeakingSessionPackageDto> {
-    const examinerProfile = this.examinerProfileService.resolveProfile();
+    const examinerProfile = this.examinerProfileService.resolveProfile(
+      options.requestedProfileId,
+      options.selectionSeed
+    );
     const segments: SpeakingSessionSegmentDto[] = [];
 
     for (const phrase of this.examinerPhraseService.listCacheablePhrases()) {

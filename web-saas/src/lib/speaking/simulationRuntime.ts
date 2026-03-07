@@ -79,12 +79,19 @@ export const retrySimulationRuntimeStep = (simulationId: string) =>
     body: JSON.stringify({})
   });
 
-export const synthesizeSimulationSegment = (text: string, cacheKey?: string) =>
+export const synthesizeSimulationSegment = (
+  text: string,
+  options?: {
+    cacheKey?: string;
+    voiceId?: string;
+  }
+) =>
   apiRequest<SynthesizeResponse>('/speech/synthesize', {
     method: 'POST',
     body: JSON.stringify({
       text,
-      cacheKey
+      cacheKey: options?.cacheKey,
+      voiceId: options?.voiceId
     })
   });
 

@@ -245,7 +245,10 @@ describe('TestSimulationService runtime contract', () => {
         expect.objectContaining({ part: 1 }),
         expect.objectContaining({ part: 2 }),
         expect.objectContaining({ part: 3 })
-      ])
+      ]),
+      expect.objectContaining({
+        selectionSeed: 'user-1:test-urc'
+      })
     );
   });
 

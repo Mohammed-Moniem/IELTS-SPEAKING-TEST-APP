@@ -625,19 +625,30 @@ export default function AuthenticSimulationStage({
       stopActiveAudio();
 
       try {
-        let blob: Blob;
+        const synthesizePrompt = async () => {
+          setPlaybackState('synthesizing');
+          const synthesis = await synthesizeSimulationSegment(promptText, {
+            cacheKey: segment.phraseId || segmentKey,
+            voiceId: session.sessionPackage?.examinerProfile.voiceId
+          });
+          if (cancelled) return null;
+          return decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+        };
+
+        let blob: Blob | null;
 
         if (activePackageSegment?.audioUrl) {
           setPlaybackState('loading-package');
-          blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl);
+          try {
+            blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl);
+          } catch {
+            blob = await synthesizePrompt();
+          }
         } else {
-          setPlaybackState('synthesizing');
-          const synthesis = await synthesizeSimulationSegment(promptText, segment.phraseId || segmentKey);
-          if (cancelled) return;
-          blob = decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+          blob = await synthesizePrompt();
         }
 
-        if (cancelled) return;
+        if (cancelled || !blob) return;
         await playSynthesizedPrompt(blob);
       } catch (error: any) {
         if (cancelled) return;

@@ -76,7 +76,9 @@ export class TestSimulationService {
     const parts = await this.buildSimulationParts(userId, headers);
     const runtime = this.buildInitialRuntime();
     const packageBuildStartedAt = Date.now();
-    const sessionPackage = await this.sessionPackageService.buildSessionPackage(parts);
+    const sessionPackage = await this.sessionPackageService.buildSessionPackage(parts, {
+      selectionSeed: this.buildExaminerSelectionSeed(userId, headers?.urc)
+    });
     const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
     const simulation = (await TestSimulationModel.create({
       user: userId,
@@ -479,7 +481,10 @@ export class TestSimulationService {
           question: part.question,
           timeLimit: part.timeLimit || 0,
           tips: part.tips || []
-        }))
+        })),
+        {
+          selectionSeed: this.buildExaminerSelectionSeed(userId, simulationId)
+        }
       );
       const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
       this.recordSessionPackageTelemetry(
@@ -506,6 +511,10 @@ export class TestSimulationService {
       sessionPackage: simulation.sessionPackage,
       telemetry: this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)
     };
+  }
+
+  private buildExaminerSelectionSeed(userId: string, requestSeed?: string) {
+    return `${userId}:${requestSeed || 'default-session'}`;
   }
 
   private recordSessionPackageTelemetry(

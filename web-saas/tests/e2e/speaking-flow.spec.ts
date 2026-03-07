@@ -226,6 +226,10 @@ const installMockAudioPlayback = async (page: Page) => {
 };
 
 const buildSpeakingSessionPackage = (overrides?: {
+  examinerProfileId?: string;
+  examinerProfileLabel?: string;
+  examinerAccent?: string;
+  examinerVoiceId?: string;
   welcomeText?: string;
   firstQuestionText?: string;
   welcomeAudioUrl?: string;
@@ -234,11 +238,11 @@ const buildSpeakingSessionPackage = (overrides?: {
   version: 1,
   preparedAt: '2026-03-07T00:00:00.000Z',
   examinerProfile: {
-    id: 'british',
-    label: 'British Examiner',
-    accent: 'British',
+    id: overrides?.examinerProfileId || 'british',
+    label: overrides?.examinerProfileLabel || 'British Examiner',
+    accent: overrides?.examinerAccent || 'British',
     provider: 'openai',
-    voiceId: 'alloy',
+    voiceId: overrides?.examinerVoiceId || 'alloy',
     autoAssigned: true
   },
   segments: [
@@ -988,6 +992,114 @@ test.describe('Speaking flow', () => {
     releaseAudioFetch();
 
     await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+  });
+
+  test('package synthesis fallback keeps the selected examiner voice profile', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let synthesizedVoiceId: string | undefined;
+
+    await page.route('https://cdn.spokio.com/**', route =>
+      route.fulfill({
+        status: 404,
+        body: 'missing'
+      })
+    );
+
+    await page.route('**/api/v1/speech/synthesize', async route => {
+      synthesizedVoiceId = route.request().postDataJSON()?.voiceId;
+      return route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-package-fallback-voice',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage({
+              examinerProfileId: 'australian',
+              examinerProfileLabel: 'Australian Examiner',
+              examinerAccent: 'Australian',
+              examinerVoiceId: 'echo'
+            })
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-package-fallback-voice/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-package-fallback-voice',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            examinerProfileId: 'australian',
+            examinerProfileLabel: 'Australian Examiner',
+            examinerAccent: 'Australian',
+            examinerVoiceId: 'echo'
+          })
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect.poll(() => synthesizedVoiceId).toBe('echo');
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
   });
 
