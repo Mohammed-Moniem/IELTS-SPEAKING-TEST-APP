@@ -176,6 +176,19 @@ describe('Speaking flows compatibility contract', () => {
   it('keeps /test-simulations start/complete/list/detail contracts stable', async () => {
     const startedSimulation = {
       simulationId: '507f1f77bcf86cd799439013',
+      sessionPackage: {
+        version: 1,
+        examinerProfile: {
+          id: 'british',
+          accent: 'British'
+        },
+        segments: [
+          {
+            segmentId: 'fixed:welcome_intro',
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+          }
+        ]
+      },
       parts: [
         { part: 1, question: 'Part 1 question', timeLimit: 60, tips: ['Keep it concise'] },
         { part: 2, question: 'Part 2 cue card', timeLimit: 180, tips: ['Cover all bullet points'] },
@@ -220,6 +233,17 @@ describe('Speaking flows compatibility contract', () => {
     expect(startResponse.body.message).toBe('Simulation started');
     expect(startResponse.body.data).toMatchObject({
       simulationId: '507f1f77bcf86cd799439013',
+      sessionPackage: expect.objectContaining({
+        examinerProfile: expect.objectContaining({
+          id: 'british'
+        }),
+        segments: expect.arrayContaining([
+          expect.objectContaining({
+            segmentId: 'fixed:welcome_intro',
+            audioUrl: expect.any(String)
+          })
+        ])
+      }),
       parts: expect.any(Array)
     });
     expect(mockSimulationService.startSimulation).toHaveBeenCalledWith(

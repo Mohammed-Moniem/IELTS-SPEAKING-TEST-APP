@@ -39,6 +39,9 @@ describe('TestSimulationService runtime contract', () => {
   const speechService = {
     generateExaminerResponse: jest.fn()
   };
+  const sessionPackageService = {
+    buildSessionPackage: jest.fn()
+  };
 
   let savedSimulation: any;
 
@@ -47,7 +50,8 @@ describe('TestSimulationService runtime contract', () => {
       usageService as any,
       feedbackService as any,
       questionGenerationService as any,
-      speechService as any
+      speechService as any,
+      sessionPackageService as any
     );
 
   const startThroughFirstPart1CandidateTurn = async (service: TestSimulationService) => {
@@ -122,6 +126,34 @@ describe('TestSimulationService runtime contract', () => {
     speechService.generateExaminerResponse.mockResolvedValue(
       'Could you tell me a little more about that?'
     );
+    sessionPackageService.buildSessionPackage.mockResolvedValue({
+      version: 1,
+      preparedAt: new Date('2026-03-07T00:00:00.000Z'),
+      examinerProfile: {
+        id: 'british',
+        label: 'British Examiner',
+        accent: 'British',
+        provider: 'openai',
+        voiceId: 'alloy',
+        autoAssigned: true
+      },
+      segments: [
+        {
+          segmentId: 'fixed:welcome_intro',
+          part: 0,
+          phase: 'check-in',
+          kind: 'fixed_phrase',
+          turnType: 'examiner',
+          canAutoAdvance: true,
+          phraseId: 'welcome_intro',
+          text: 'Good morning. My name is Dr. Smith and I will be your examiner today. Can you tell me your full name please?',
+          audioAssetId: 'asset-welcome',
+          audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+          cacheKey: 'fixed:british:welcome_intro',
+          provider: 'openai'
+        }
+      ]
+    });
   });
 
   it('starts a simulation with intro examiner runtime metadata', async () => {
@@ -143,8 +175,8 @@ describe('TestSimulationService runtime contract', () => {
             part: 0,
             turnType: 'examiner',
             canAutoAdvance: true,
-            audioAssetId: 'fixed:british:welcome_intro',
-            audioUrl: expect.stringContaining('/speaking/fixed/british/welcome_intro.mp3')
+            audioAssetId: 'asset-welcome',
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
           })
         ])
       })
@@ -184,12 +216,19 @@ describe('TestSimulationService runtime contract', () => {
               part: 0,
               turnType: 'examiner',
               canAutoAdvance: true,
-              audioAssetId: 'fixed:british:welcome_intro',
-              audioUrl: expect.stringContaining('/speaking/fixed/british/welcome_intro.mp3')
+              audioAssetId: 'asset-welcome',
+              audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
             })
           ])
         })
       })
+    );
+    expect(sessionPackageService.buildSessionPackage).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ part: 1 }),
+        expect.objectContaining({ part: 2 }),
+        expect.objectContaining({ part: 3 })
+      ])
     );
   });
 
