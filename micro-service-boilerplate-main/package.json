@@ -31,7 +31,9 @@
     "seed:blog": "ts-node scripts/seed-blog-posts.ts",
     "perf:checkpoint6": "bash scripts/perf/run_checkpoint6_load.sh",
     "listening:pipeline": "ts-node -r tsconfig-paths/register scripts/listening-gen/run-pipeline.ts",
-    "listening:pipeline:from": "ts-node -r tsconfig-paths/register scripts/listening-gen/run-pipeline.ts --from"
+    "listening:pipeline:from": "ts-node -r tsconfig-paths/register scripts/listening-gen/run-pipeline.ts --from",
+    "speaking:pipeline": "ts-node -r tsconfig-paths/register scripts/speaking-gen/run-pipeline.ts",
+    "speaking:pipeline:from": "ts-node -r tsconfig-paths/register scripts/speaking-gen/run-pipeline.ts --from"
   },
   "keywords": [
     "NodeJS",
