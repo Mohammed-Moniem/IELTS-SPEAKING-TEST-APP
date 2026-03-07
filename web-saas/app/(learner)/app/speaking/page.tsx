@@ -487,13 +487,13 @@ export default function SpeakingPage() {
       await primeSimulationMicrophone();
 
       const started = await startSimulationRuntime();
-      const hydrated =
-        started.runtime && started.sessionPackage
-          ? started
-          : mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
-
-      setSimulation(hydrated);
+      setSimulation(started);
       startSimulationTimer();
+
+      if (!started.runtime) {
+        const hydrated = mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
+        setSimulation(hydrated);
+      }
     } catch (error: any) {
       if (handleUsageLimitRedirect(error)) return;
       const message =
@@ -520,26 +520,33 @@ export default function SpeakingPage() {
   }, []);
 
   useEffect(() => {
-    if (!simulation || (simulation.runtime && simulation.sessionPackage)) return;
+    if (!simulation || simulation.runtime) {
+      return;
+    }
 
     let cancelled = false;
+    const simulationId = simulation.simulationId;
 
     const hydrateMissingRuntime = async () => {
       try {
-        const response = await getSimulationRuntime(simulation.simulationId);
+        const response = await getSimulationRuntime(simulationId);
         if (cancelled) return;
         setSimulation(current => {
           if (
             !current
-            || current.simulationId !== simulation.simulationId
-            || (current.runtime && current.sessionPackage)
+            || current.simulationId !== simulationId
+            || current.runtime
           ) {
             return current;
           }
+
           return mergeRuntimeIntoSimulation(current, response);
         });
       } catch (error: any) {
         if (cancelled) return;
+        if (simulation.runtime) {
+          return;
+        }
         setErrorMessage(current => current || error?.message || 'Failed to restore the speaking simulation runtime.');
       }
     };

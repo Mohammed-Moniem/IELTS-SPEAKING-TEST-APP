@@ -704,11 +704,8 @@ export default function AuthenticSimulationStage({
       }, prepDurationMs);
     } else {
       clearPrepCountdown();
-      autoAdvanceTimeoutRef.current = window.setTimeout(() => {
-        scheduledAutoAdvanceKeyRef.current = '';
-        lastAutoAdvanceKeyRef.current = segmentKey;
-        void continueAfterPrompt();
-      }, 200);
+      lastAutoAdvanceKeyRef.current = segmentKey;
+      void continueAfterPrompt();
     }
 
     return () => {

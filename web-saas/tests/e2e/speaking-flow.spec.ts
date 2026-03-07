@@ -1065,7 +1065,6 @@ test.describe('Speaking flow', () => {
     await page.getByRole('tab', { name: 'Simulation' }).click();
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
-    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
     await expect(page.getByText('Good morning. My name is Anna. I will be your examiner today.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
@@ -1173,11 +1172,8 @@ test.describe('Speaking flow', () => {
 
     await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockGetUserMediaCalls?: number }).__mockGetUserMediaCalls || 0)).toBe(1);
     await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
-    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeDisabled();
     await expect(page.getByPlaceholder('Write or paste your response for this speaking part')).toHaveCount(0);
-
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
   });
