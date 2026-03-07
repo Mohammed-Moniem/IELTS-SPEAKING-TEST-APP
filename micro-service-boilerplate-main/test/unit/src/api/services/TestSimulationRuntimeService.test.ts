@@ -130,6 +130,25 @@ describe('TestSimulationService runtime contract', () => {
     const result = await service.startSimulation('user-1', { urc: 'test-urc' } as any);
 
     expect(result.parts).toHaveLength(3);
+    expect(result.sessionPackage).toEqual(
+      expect.objectContaining({
+        examinerProfile: expect.objectContaining({
+          id: 'british',
+          accent: 'British',
+          provider: 'openai'
+        }),
+        segments: expect.arrayContaining([
+          expect.objectContaining({
+            segmentId: 'fixed:welcome_intro',
+            part: 0,
+            turnType: 'examiner',
+            canAutoAdvance: true,
+            audioAssetId: 'fixed:british:welcome_intro',
+            audioUrl: expect.stringContaining('/speaking/fixed/british/welcome_intro.mp3')
+          })
+        ])
+      })
+    );
     expect(result.runtime).toEqual(
       expect.objectContaining({
         state: 'intro-examiner',
@@ -152,6 +171,23 @@ describe('TestSimulationService runtime contract', () => {
             kind: 'cached_phrase',
             phraseId: 'welcome_intro'
           })
+        }),
+        sessionPackage: expect.objectContaining({
+          examinerProfile: expect.objectContaining({
+            id: 'british',
+            accent: 'British',
+            provider: 'openai'
+          }),
+          segments: expect.arrayContaining([
+            expect.objectContaining({
+              segmentId: 'fixed:welcome_intro',
+              part: 0,
+              turnType: 'examiner',
+              canAutoAdvance: true,
+              audioAssetId: 'fixed:british:welcome_intro',
+              audioUrl: expect.stringContaining('/speaking/fixed/british/welcome_intro.mp3')
+            })
+          ])
         })
       })
     );

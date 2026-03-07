@@ -8,7 +8,8 @@ import { TestPreferenceModel } from '@models/TestPreferenceModel';
 import { TestSimulationDocument, TestSimulationModel } from '@models/TestSimulationModel';
 import { UserModel } from '@models/UserModel';
 import { Service } from 'typedi';
-import { TestSimulationRuntimeDto } from '@dto/TestSimulationDto';
+import { SpeakingSessionPackageDto, SpeakingSessionSegmentDto } from '@dto/SpeakingSessionPackageDto';
+import { TestSimulationRuntimeDto, TestSimulationSessionResponseDto } from '@dto/TestSimulationDto';
 
 import { FeedbackService } from './FeedbackService';
 import { ExaminerPhraseService } from './ExaminerPhraseService';
@@ -63,6 +64,7 @@ export class TestSimulationService {
 
     const parts = await this.buildSimulationParts(userId, headers);
     const runtime = this.buildInitialRuntime();
+    const sessionPackage = this.buildInitialSessionPackage(parts);
     const simulation = (await TestSimulationModel.create({
       user: userId,
       status: 'in_progress',
@@ -78,6 +80,7 @@ export class TestSimulationService {
         feedback: undefined
       })),
       runtime,
+      sessionPackage,
       startedAt: new Date()
     })) as TestSimulationDocument;
 
@@ -86,7 +89,8 @@ export class TestSimulationService {
     return {
       simulationId: simulation._id,
       parts,
-      runtime
+      runtime,
+      sessionPackage
     };
   }
 
@@ -442,13 +446,152 @@ export class TestSimulationService {
     return simulation;
   }
 
-  private buildRuntimeResponse(simulation: TestSimulationDocument) {
+  private buildRuntimeResponse(simulation: TestSimulationDocument): TestSimulationSessionResponseDto {
     return {
       simulationId: simulation._id,
       status: simulation.status,
       runtime: simulation.runtime,
-      currentPart: simulation.parts.find(part => part.part === simulation.runtime?.currentPart)
+      currentPart: simulation.parts.find(part => part.part === simulation.runtime?.currentPart),
+      sessionPackage: simulation.sessionPackage
     };
+  }
+
+  private buildInitialSessionPackage(parts: SimulationPartDefinition[]): SpeakingSessionPackageDto {
+    const examinerProfile = {
+      id: 'british',
+      label: 'British Examiner',
+      accent: 'British',
+      provider: 'openai' as const,
+      voiceId: 'alloy',
+      autoAssigned: true
+    };
+
+    const fixedSegments: SpeakingSessionSegmentDto[] = this.examinerPhraseService.listCacheablePhrases().map(phrase => ({
+      segmentId: `fixed:${phrase.id}`,
+      part: this.getFixedPhrasePart(phrase.id),
+      phase: this.getFixedPhrasePhase(phrase.id),
+      kind: this.getFixedPhraseKind(phrase.id),
+      turnType: 'examiner' as const,
+      canAutoAdvance: true,
+      phraseId: phrase.id,
+      text: phrase.text,
+      audioAssetId: `fixed:${examinerProfile.id}:${phrase.id}`,
+      audioUrl: this.buildPlaceholderAudioUrl(`/speaking/fixed/${examinerProfile.id}/${phrase.id}.mp3`),
+      cacheKey: `fixed:${examinerProfile.id}:${phrase.id}`,
+      provider: examinerProfile.provider
+    }));
+
+    const questionSegments = parts.flatMap(part => this.buildQuestionSegments(examinerProfile.id, examinerProfile.provider, part));
+
+    return {
+      version: 1,
+      preparedAt: new Date(),
+      examinerProfile,
+      segments: [...fixedSegments, ...questionSegments]
+    };
+  }
+
+  private buildQuestionSegments(
+    voiceProfileId: string,
+    provider: SpeakingSessionPackageDto['examinerProfile']['provider'],
+    part: SimulationPartDefinition
+  ): SpeakingSessionSegmentDto[] {
+    const prompts = part.part === 2
+      ? [part.question]
+      : part.question
+        .split('\n')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+
+    return prompts.map((text, index) => {
+      const partKey = part.part === 2 ? 'cue-card' : `question-${index}`;
+      const audioPath = part.part === 2
+        ? `/speaking/questions/${voiceProfileId}/part2/${part.topicId}/cue-card.mp3`
+        : `/speaking/questions/${voiceProfileId}/part${part.part}/${part.topicId}/${index}.mp3`;
+      const kind: SpeakingSessionSegmentDto['kind'] = part.part === 2 ? 'cue_card' : 'seed_prompt';
+
+      return {
+        segmentId: `part${part.part}:${part.topicId}:${partKey}`,
+        part: part.part,
+        phase: part.part === 2 ? 'cue-card' : 'question-seed',
+        kind,
+        turnType: 'examiner' as const,
+        canAutoAdvance: true,
+        promptIndex: index,
+        text,
+        audioAssetId: `question:${voiceProfileId}:part${part.part}:${part.topicId}:${partKey}`,
+        audioUrl: this.buildPlaceholderAudioUrl(audioPath),
+        cacheKey: `question:${voiceProfileId}:part${part.part}:${part.topicId}:${partKey}`,
+        provider
+      };
+    });
+  }
+
+  private buildPlaceholderAudioUrl(pathname: string) {
+    return `https://storage.spokio.local${pathname}`;
+  }
+
+  private getFixedPhrasePart(phraseId: Parameters<ExaminerPhraseService['getPhrase']>[0]) {
+    switch (phraseId) {
+      case 'welcome_intro':
+      case 'id_check':
+      case 'part1_begin':
+        return 0;
+      case 'part1_transition':
+        return 1;
+      case 'part2_intro':
+      case 'part2_begin_speaking':
+      case 'part2_transition':
+        return 2;
+      case 'part3_intro':
+      case 'test_complete':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  private getFixedPhrasePhase(phraseId: Parameters<ExaminerPhraseService['getPhrase']>[0]) {
+    switch (phraseId) {
+      case 'welcome_intro':
+      case 'id_check':
+        return 'check-in';
+      case 'part1_begin':
+        return 'part1-intro';
+      case 'part1_transition':
+        return 'part1-transition';
+      case 'part2_intro':
+        return 'part2-intro';
+      case 'part2_begin_speaking':
+        return 'part2-launch';
+      case 'part2_transition':
+        return 'part2-transition';
+      case 'part3_intro':
+        return 'part3-intro';
+      case 'test_complete':
+        return 'evaluation';
+      default:
+        return 'general';
+    }
+  }
+
+  private getFixedPhraseKind(phraseId: Parameters<ExaminerPhraseService['getPhrase']>[0]) {
+    switch (phraseId) {
+      case 'welcome_intro':
+      case 'id_check':
+      case 'part1_begin':
+      case 'part2_begin_speaking':
+      case 'part3_intro':
+      case 'test_complete':
+        return 'fixed_phrase' as const;
+      case 'part2_intro':
+        return 'cue_card' as const;
+      case 'part1_transition':
+      case 'part2_transition':
+        return 'transition' as const;
+      default:
+        return 'fixed_phrase' as const;
+    }
   }
 
   private moveToCachedPhrase(
