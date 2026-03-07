@@ -285,9 +285,10 @@ export class TestSimulationService {
       const seedPrompt = this.getSeedPrompt(simulation, partNumber, runtime.seedQuestionIndex || 0);
 
       try {
-        const followUp = await this.speechService.generateExaminerResponse(baseConversation, partNumber, {
+        const followUp = await this.speechService.generateBufferedExaminerFollowUp(baseConversation, partNumber, {
           seedPrompt,
-          followUpMode: 'single_narrow'
+          followUpMode: 'single_narrow',
+          voiceProfileId: simulation.sessionPackage?.examinerProfile.id || 'british'
         });
 
         runtime.state = partNumber === 1 ? 'part1-examiner' : 'part3-examiner';
@@ -297,12 +298,13 @@ export class TestSimulationService {
         runtime.partFollowUpCount = (runtime.partFollowUpCount || 0) + 1;
         runtime.conversationHistory = [
           ...baseConversation,
-          { role: 'assistant', content: followUp }
+          { role: 'assistant', content: followUp.text }
         ];
         runtime.currentSegment = {
           kind: 'dynamic_prompt',
-          text: followUp
+          text: followUp.text
         };
+        this.appendDynamicFollowUpSegment(simulation, partNumber, followUp);
 
         await simulation.save();
         return this.buildRuntimeResponse(simulation);
@@ -531,6 +533,53 @@ export class TestSimulationService {
     }
 
     this.moveToCachedPhrase(simulation, 3, 'test_complete', 'evaluation');
+  }
+
+  private appendDynamicFollowUpSegment(
+    simulation: TestSimulationDocument,
+    partNumber: 1 | 3,
+    followUp: {
+      text: string;
+      audioAssetId: string;
+      audioUrl: string;
+      cacheKey: string;
+      provider: 'openai' | 'elevenlabs' | 'edge-tts';
+      durationSeconds?: number;
+    }
+  ) {
+    if (!simulation.sessionPackage) {
+      return;
+    }
+
+    const runtime = simulation.runtime!;
+    const promptIndex = runtime.seedQuestionIndex || 0;
+    const followUpIndex = (runtime.partFollowUpCount || 0) + 1;
+    const segmentId = `part${partNumber}:prompt-${promptIndex}:dynamic-follow-up-${followUpIndex}`;
+    const nextSegment = {
+      segmentId,
+      part: partNumber,
+      phase: 'follow-up',
+      kind: 'dynamic_follow_up' as const,
+      turnType: 'examiner' as const,
+      canAutoAdvance: true,
+      promptIndex,
+      text: followUp.text,
+      audioAssetId: followUp.audioAssetId,
+      audioUrl: followUp.audioUrl,
+      cacheKey: followUp.cacheKey,
+      provider: followUp.provider,
+      durationSeconds: followUp.durationSeconds
+    };
+
+    const segments = simulation.sessionPackage.segments || [];
+    const existingIndex = segments.findIndex(segment => segment.segmentId === segmentId);
+    if (existingIndex >= 0) {
+      segments[existingIndex] = nextSegment;
+      simulation.sessionPackage.segments = segments;
+      return;
+    }
+
+    simulation.sessionPackage.segments = [...segments, nextSegment];
   }
 
   private shouldAskAdaptiveFollowUp(simulation: TestSimulationDocument, partNumber: 1 | 3) {

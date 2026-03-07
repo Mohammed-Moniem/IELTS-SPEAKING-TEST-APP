@@ -37,7 +37,8 @@ describe('TestSimulationService runtime contract', () => {
     generateCompleteTest: jest.fn()
   };
   const speechService = {
-    generateExaminerResponse: jest.fn()
+    generateExaminerResponse: jest.fn(),
+    generateBufferedExaminerFollowUp: jest.fn()
   };
   const sessionPackageService = {
     buildSessionPackage: jest.fn()
@@ -123,9 +124,15 @@ describe('TestSimulationService runtime contract', () => {
     });
 
     mockSimulationFindOne.mockImplementation(async () => savedSimulation);
-    speechService.generateExaminerResponse.mockResolvedValue(
-      'Could you tell me a little more about that?'
-    );
+    speechService.generateExaminerResponse.mockResolvedValue('Could you tell me a little more about that?');
+    speechService.generateBufferedExaminerFollowUp.mockResolvedValue({
+      text: 'Could you tell me a little more about that?',
+      audioAssetId: 'asset-follow-up',
+      audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3',
+      cacheKey: 'dynamic-follow-up:british:could-you-tell-me-a-little-more-about-that',
+      provider: 'openai',
+      cacheHit: false
+    });
     sessionPackageService.buildSessionPackage.mockResolvedValue({
       version: 1,
       preparedAt: new Date('2026-03-07T00:00:00.000Z'),
@@ -293,20 +300,31 @@ describe('TestSimulationService runtime contract', () => {
     expect(followUp.runtime.currentSegment.text).toBe(
       'Could you tell me a little more about that?'
     );
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledWith(
+    expect(followUp.sessionPackage?.segments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'dynamic_follow_up',
+          part: 1,
+          turnType: 'examiner',
+          text: 'Could you tell me a little more about that?',
+          audioAssetId: 'asset-follow-up',
+          audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3'
+        })
+      ])
+    );
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledWith(
       expect.any(Array),
       1,
       expect.objectContaining({
         seedPrompt: 'Do you live in a house or an apartment?',
-        followUpMode: 'single_narrow'
+        followUpMode: 'single_narrow',
+        voiceProfileId: 'british'
       })
     );
   });
 
   it('pauses on the first examiner generation failure and terminally fails on the second', async () => {
-    speechService.generateExaminerResponse.mockRejectedValue(
-      new Error('examiner generation failed')
-    );
+    speechService.generateBufferedExaminerFollowUp.mockRejectedValue(new Error('examiner generation failed'));
 
     const service = createService();
     await startThroughFirstPart1CandidateTurn(service);
@@ -386,7 +404,7 @@ describe('TestSimulationService runtime contract', () => {
     );
 
     expect(transition.runtime.state).toBe('part1-transition');
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledTimes(1);
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledTimes(1);
   });
 
   it('limits part three to four examiner prompts before auto-transitioning to evaluation', async () => {
@@ -438,6 +456,8 @@ describe('TestSimulationService runtime contract', () => {
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-prep' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-launch' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-candidate' } as any);
+    speechService.generateBufferedExaminerFollowUp.mockClear();
+
     await service.submitRuntimeAnswer(
       'user-1',
       'simulation-1',
@@ -447,11 +467,12 @@ describe('TestSimulationService runtime contract', () => {
       },
       { urc: 'answer-part2' } as any
     );
+    expect(speechService.generateBufferedExaminerFollowUp).not.toHaveBeenCalled();
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-intro' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-first-question' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-candidate-turn' } as any);
 
-    speechService.generateExaminerResponse.mockClear();
+    speechService.generateBufferedExaminerFollowUp.mockClear();
 
     const part3FollowUp = await service.submitRuntimeAnswer(
       'user-1',
@@ -490,13 +511,14 @@ describe('TestSimulationService runtime contract', () => {
     );
 
     expect(evaluation.runtime.state).toBe('evaluation');
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledTimes(1);
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledWith(
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledTimes(1);
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledWith(
       expect.any(Array),
       3,
       expect.objectContaining({
         seedPrompt: 'How has tourism changed in recent years?',
-        followUpMode: 'single_narrow'
+        followUpMode: 'single_narrow',
+        voiceProfileId: 'british'
       })
     );
   });
