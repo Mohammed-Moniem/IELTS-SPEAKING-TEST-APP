@@ -24,6 +24,7 @@ import type {
   SimulationPart,
   SimulationRuntimeResponse,
   SimulationStart,
+  SpeakingSessionSegment,
   TestSimulation,
   TestSimulationRuntime,
   TestSimulationRuntimeState,
@@ -111,7 +112,74 @@ const mergeRuntimeIntoSession = (
 ): SimulationStart => ({
   ...session,
   runtime: response.runtime,
+  sessionPackage: response.sessionPackage || session.sessionPackage,
 });
+
+const resolvePackageSegment = (
+  session: SimulationStart | null
+): SpeakingSessionSegment | null => {
+  if (!session?.sessionPackage?.segments?.length) {
+    return null;
+  }
+
+  const { runtime } = session;
+  const { currentSegment } = runtime;
+  const segments = session.sessionPackage.segments;
+
+  if (currentSegment.phraseId) {
+    return (
+      segments.find((segment) => segment.phraseId === currentSegment.phraseId) ||
+      null
+    );
+  }
+
+  const promptText = currentSegment.text?.trim();
+  if (!promptText) {
+    return null;
+  }
+
+  const promptIndex =
+    typeof runtime.seedQuestionIndex === "number"
+      ? runtime.seedQuestionIndex
+      : runtime.currentTurnIndex || 0;
+
+  return (
+    segments.find(
+      (segment) =>
+        segment.text.trim() === promptText &&
+        segment.part === runtime.currentPart &&
+        (typeof segment.promptIndex === "number"
+          ? segment.promptIndex === promptIndex
+          : true)
+    ) || null
+  );
+};
+
+const getUpcomingPackageSegments = (
+  session: SimulationStart | null,
+  count: number
+) => {
+  if (!session?.sessionPackage?.segments?.length) {
+    return [];
+  }
+
+  const examinerSegments = session.sessionPackage.segments.filter(
+    (segment) => segment.turnType === "examiner" && Boolean(segment.audioUrl)
+  );
+  const currentSegment = resolvePackageSegment(session);
+  if (!currentSegment) {
+    return examinerSegments.slice(0, count);
+  }
+
+  const currentIndex = examinerSegments.findIndex(
+    (segment) => segment.segmentId === currentSegment.segmentId
+  );
+  if (currentIndex < 0) {
+    return examinerSegments.slice(0, count);
+  }
+
+  return examinerSegments.slice(currentIndex + 1, currentIndex + 1 + count);
+};
 
 const buildCompletionPayload = (session: SimulationStart) => {
   const turnHistory = session.runtime.turnHistory || [];
@@ -355,7 +423,7 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
   const [session, setSession] = useState<SimulationStart | null>(null);
   const [turnState, setTurnState] = useState<TurnState>("idle");
   const [playbackState, setPlaybackState] = useState<
-    "idle" | "speaking" | "ready"
+    "idle" | "loading-package" | "speaking" | "ready"
   >("idle");
   const [promptReady, setPromptReady] = useState(false);
   const [localPause, setLocalPause] = useState<LocalPauseState | null>(null);
@@ -380,6 +448,10 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     }
     return session.parts.find((part) => part.part === runtime.currentPart);
   }, [runtime, session]);
+  const activePackageSegment = useMemo(
+    () => resolvePackageSegment(session),
+    [session]
+  );
 
   const isExaminerTurn = Boolean(runtime && isExaminerRuntimeState(runtime.state));
   const isCandidateTurn = Boolean(
@@ -472,8 +544,16 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
         return;
       }
 
-      sessionRef.current = started;
-      setSession(started);
+      const hydrated =
+        started.runtime && started.sessionPackage
+          ? started
+          : mergeRuntimeIntoSession(
+              started,
+              await simulationApi.getRuntime(started.simulationId)
+            );
+
+      sessionRef.current = hydrated;
+      setSession(hydrated);
     } catch (error: any) {
       logger.warn("Failed to start authentic speaking simulation", error);
       if (!mountedRef.current) {
@@ -535,18 +615,30 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
 
     const playSegment = async () => {
       setPromptReady(false);
-      setPlaybackState("speaking");
+      setPlaybackState(
+        activePackageSegment?.audioUrl ? "loading-package" : "speaking"
+      );
 
       try {
-        await ttsService.speak(promptText, {
-          onDone: () => {
-            if (cancelled || !mountedRef.current) {
-              return;
-            }
-            setPlaybackState("ready");
-            setPromptReady(true);
-          },
-        });
+        const onDone = () => {
+          if (cancelled || !mountedRef.current) {
+            return;
+          }
+          setPlaybackState("ready");
+          setPromptReady(true);
+        };
+
+        if (activePackageSegment?.audioUrl) {
+          setPlaybackState("loading-package");
+          await ttsService.speakPackageAudio(activePackageSegment.audioUrl, {
+            onDone,
+          });
+        } else {
+          setPlaybackState("speaking");
+          await ttsService.speak(promptText, {
+            onDone,
+          });
+        }
       } catch (error: any) {
         if (cancelled || !mountedRef.current) {
           return;
@@ -576,7 +668,27 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isExaminerTurn, localPause, runtime, session]);
+  }, [activePackageSegment, isExaminerTurn, localPause, runtime, session]);
+
+  useEffect(() => {
+    if (!session?.sessionPackage) {
+      return;
+    }
+
+    const segmentsToPreload = [
+      activePackageSegment,
+      ...getUpcomingPackageSegments(session, 2),
+    ].filter(
+      (candidate): candidate is SpeakingSessionSegment =>
+        Boolean(candidate?.audioUrl)
+    );
+
+    for (const nextSegment of segmentsToPreload) {
+      void ttsService.preloadPackageAudio(nextSegment.audioUrl).catch(() => {
+        // Speculative preload failures should not interrupt the active turn.
+      });
+    }
+  }, [activePackageSegment, session]);
 
   const answerRuntime = useCallback(
     async (transcript: string, durationSeconds: number) => {
@@ -1036,6 +1148,8 @@ export const AuthenticFullTestV2: React.FC<TestProps> = ({
                 <Text style={styles.helperText}>
                   {turnState === "scoring"
                     ? "Scoring the full simulation..."
+                    : playbackState === "loading-package"
+                    ? "Loading examiner prompt..."
                     : playbackState === "speaking"
                     ? "Examiner audio is playing now."
                     : promptReady
