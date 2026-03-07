@@ -601,6 +601,48 @@ export type TestSimulationRuntimeState =
 
 export type TestSimulationRuntimeSegmentKind = 'cached_phrase' | 'dynamic_prompt';
 
+export type SpeakingTtsProvider = 'openai' | 'elevenlabs' | 'edge-tts';
+export type SpeakingSessionTurnType = 'examiner' | 'candidate' | 'system';
+export type SpeakingSessionSegmentKind =
+  | 'fixed_phrase'
+  | 'seed_prompt'
+  | 'cue_card'
+  | 'transition'
+  | 'dynamic_follow_up';
+
+export interface SpeakingExaminerProfile {
+  id: string;
+  label: string;
+  accent: string;
+  provider: SpeakingTtsProvider;
+  voiceId: string;
+  autoAssigned: boolean;
+}
+
+export interface SpeakingSessionSegment {
+  segmentId: string;
+  part: number;
+  phase: string;
+  kind: SpeakingSessionSegmentKind;
+  turnType: SpeakingSessionTurnType;
+  canAutoAdvance: boolean;
+  phraseId?: string;
+  promptIndex?: number;
+  text: string;
+  audioAssetId: string;
+  audioUrl: string;
+  cacheKey?: string;
+  provider: SpeakingTtsProvider;
+  durationSeconds?: number;
+}
+
+export interface SpeakingSessionPackage {
+  version: number;
+  preparedAt: string;
+  examinerProfile: SpeakingExaminerProfile;
+  segments: SpeakingSessionSegment[];
+}
+
 export interface TestSimulationRuntimeSegment {
   kind: TestSimulationRuntimeSegmentKind;
   phraseId?: string;
@@ -640,6 +682,7 @@ export interface SimulationStartPayload {
   simulationId: string;
   parts: SimulationPartDefinition[];
   runtime: TestSimulationRuntime;
+  sessionPackage?: SpeakingSessionPackage;
 }
 
 export interface SimulationRuntimeResponse {
@@ -647,6 +690,7 @@ export interface SimulationRuntimeResponse {
   status: 'in_progress' | 'completed';
   runtime: TestSimulationRuntime;
   currentPart?: SimulationPartDefinition;
+  sessionPackage?: SpeakingSessionPackage;
 }
 
 export interface SimulationSession {

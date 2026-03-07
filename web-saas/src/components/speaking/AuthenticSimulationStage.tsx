@@ -9,11 +9,14 @@ import {
   advanceSimulationRuntime,
   completeSimulationRuntime,
   decodeAudioBase64,
+  getUpcomingSimulationPackageSegments,
   isCandidateRuntimeState,
   isExaminerRuntimeState,
   isRetryablePauseState,
   isTerminalRuntimeState,
   mergeRuntimeIntoSimulation,
+  preloadSimulationPackageAudio,
+  resolveSimulationPackageSegment,
   retrySimulationRuntimeStep,
   submitSimulationRuntimeAnswer,
   synthesizeSimulationSegment,
@@ -116,7 +119,7 @@ export default function AuthenticSimulationStage({
   const turnStateRef = useRef<TurnState>('idle');
 
   const [turnState, setTurnState] = useState<TurnState>('idle');
-  const [playbackState, setPlaybackState] = useState<'idle' | 'synthesizing' | 'playing' | 'ready'>('idle');
+  const [playbackState, setPlaybackState] = useState<'idle' | 'loading-package' | 'synthesizing' | 'playing' | 'ready'>('idle');
   const [promptReady, setPromptReady] = useState(false);
   const [localPause, setLocalPause] = useState<LocalPause | null>(null);
   const [lastTranscript, setLastTranscript] = useState('');
@@ -124,6 +127,7 @@ export default function AuthenticSimulationStage({
 
   const runtime = session?.runtime ?? null;
   const segment = runtime?.currentSegment ?? null;
+  const activePackageSegment = useMemo(() => resolveSimulationPackageSegment(session), [session]);
 
   const currentPart = useMemo(() => {
     if (!session || !runtime) return undefined;
@@ -617,15 +621,23 @@ export default function AuthenticSimulationStage({
     let cancelled = false;
 
     const run = async () => {
-      setPlaybackState('synthesizing');
       setPromptReady(false);
       stopActiveAudio();
 
       try {
-        const synthesis = await synthesizeSimulationSegment(promptText, segment.phraseId || segmentKey);
-        if (cancelled) return;
+        let blob: Blob;
 
-        const blob = decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+        if (activePackageSegment?.audioUrl) {
+          setPlaybackState('loading-package');
+          blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl);
+        } else {
+          setPlaybackState('synthesizing');
+          const synthesis = await synthesizeSimulationSegment(promptText, segment.phraseId || segmentKey);
+          if (cancelled) return;
+          blob = decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+        }
+
+        if (cancelled) return;
         await playSynthesizedPrompt(blob);
       } catch (error: any) {
         if (cancelled) return;
@@ -656,6 +668,7 @@ export default function AuthenticSimulationStage({
     schedulePromptCompletionFallback,
     segment,
     session,
+    activePackageSegment,
     stopActiveAudio
   ]);
 
@@ -723,6 +736,23 @@ export default function AuthenticSimulationStage({
       stopRecorder();
     };
   }, [stopActiveAudio, stopRecorder]);
+
+  useEffect(() => {
+    if (!session?.sessionPackage) {
+      return;
+    }
+
+    const segmentsToPreload = [
+      activePackageSegment,
+      ...getUpcomingSimulationPackageSegments(session, 2)
+    ].filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate?.audioUrl));
+
+    for (const nextSegment of segmentsToPreload) {
+      void preloadSimulationPackageAudio(nextSegment.audioUrl).catch(() => {
+        // Speculative preload failures should not break the active turn.
+      });
+    }
+  }, [activePackageSegment, session]);
 
   useEffect(() => {
     if (!session || !runtime || !isCandidateTurn || !shouldAutoRecordCandidateTurn || localPause || turnState !== 'idle') {
@@ -919,7 +949,9 @@ export default function AuthenticSimulationStage({
                   Replay prompt
                 </button>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {playbackState === 'synthesizing'
+                  {playbackState === 'loading-package'
+                    ? 'Loading examiner prompt.'
+                    : playbackState === 'synthesizing'
                     ? 'Preparing examiner audio...'
                     : playbackState === 'playing'
                       ? 'Examiner audio is playing.'

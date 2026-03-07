@@ -225,6 +225,55 @@ const installMockAudioPlayback = async (page: Page) => {
   });
 };
 
+const buildSpeakingSessionPackage = (overrides?: {
+  welcomeText?: string;
+  firstQuestionText?: string;
+  welcomeAudioUrl?: string;
+  firstQuestionAudioUrl?: string;
+}) => ({
+  version: 1,
+  preparedAt: '2026-03-07T00:00:00.000Z',
+  examinerProfile: {
+    id: 'british',
+    label: 'British Examiner',
+    accent: 'British',
+    provider: 'openai',
+    voiceId: 'alloy',
+    autoAssigned: true
+  },
+  segments: [
+    {
+      segmentId: 'fixed:welcome_intro',
+      part: 0,
+      phase: 'check-in',
+      kind: 'fixed_phrase',
+      turnType: 'examiner',
+      canAutoAdvance: true,
+      phraseId: 'welcome_intro',
+      text: overrides?.welcomeText || 'Good morning. My name is Anna. I will be your examiner today.',
+      audioAssetId: 'asset-welcome',
+      audioUrl: overrides?.welcomeAudioUrl || 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+      cacheKey: 'fixed:british:welcome_intro',
+      provider: 'openai'
+    },
+    {
+      segmentId: 'part1:weather:question-0',
+      part: 1,
+      phase: 'question-seed',
+      kind: 'seed_prompt',
+      turnType: 'examiner',
+      canAutoAdvance: true,
+      promptIndex: 0,
+      text: overrides?.firstQuestionText || 'What kind of weather do you enjoy most?',
+      audioAssetId: 'asset-part1-q1',
+      audioUrl:
+        overrides?.firstQuestionAudioUrl || 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-0.mp3',
+      cacheKey: 'question:british:part1:weather:0:what-kind-of-weather-do-you-enjoy-most',
+      provider: 'openai'
+    }
+  ]
+});
+
 const mockSpeakingRoutes = async (page: Page) => {
   await page.route('**/api/v1/topics/practice**', route =>
     route.fulfill(
@@ -723,6 +772,223 @@ test.describe('Speaking flow', () => {
     releaseSimulationStart();
 
     await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toBeVisible();
+  });
+
+  test('preloaded speaking package plays the first examiner segment from package audio', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let synthesizeCalls = 0;
+
+    await page.route('https://cdn.spokio.com/**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        headers: {
+          'access-control-allow-origin': '*'
+        },
+        body: 'mock-audio'
+      })
+    );
+
+    await page.route('**/api/v1/speech/synthesize', async route => {
+      synthesizeCalls += 1;
+      return route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-package-audio-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage()
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-package-audio-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-package-audio-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          },
+          sessionPackage: buildSpeakingSessionPackage()
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
+    await expect.poll(() => synthesizeCalls).toBe(0);
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+  });
+
+  test('preloaded speaking package avoids live synthesis for package-backed base prompts', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let synthesizeCalls = 0;
+    let releaseAudioFetch: () => void = () => {};
+    const audioFetchGate = new Promise<void>(resolve => {
+      releaseAudioFetch = resolve;
+    });
+
+    await page.route('https://cdn.spokio.com/**', async route => {
+      await audioFetchGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        headers: {
+          'access-control-allow-origin': '*'
+        },
+        body: 'mock-audio'
+      });
+    });
+
+    await page.route('**/api/v1/speech/synthesize', async route => {
+      synthesizeCalls += 1;
+      return route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-package-loading-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage()
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-package-loading-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-package-loading-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          },
+          sessionPackage: buildSpeakingSessionPackage()
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
+    await expect(page.getByText('Loading examiner prompt.')).toBeVisible();
+    await expect(page.getByText('Preparing examiner audio...')).toHaveCount(0);
+    await expect.poll(() => synthesizeCalls).toBe(0);
+
+    releaseAudioFetch();
+
+    await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
   });
 
   test('hydrates missing simulation runtime after start so the examiner flow can continue', async ({ page }) => {

@@ -488,7 +488,7 @@ export default function SpeakingPage() {
 
       const started = await startSimulationRuntime();
       const hydrated =
-        started.runtime
+        started.runtime && started.sessionPackage
           ? started
           : mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
 
@@ -520,7 +520,7 @@ export default function SpeakingPage() {
   }, []);
 
   useEffect(() => {
-    if (!simulation || simulation.runtime) return;
+    if (!simulation || (simulation.runtime && simulation.sessionPackage)) return;
 
     let cancelled = false;
 
@@ -529,7 +529,11 @@ export default function SpeakingPage() {
         const response = await getSimulationRuntime(simulation.simulationId);
         if (cancelled) return;
         setSimulation(current => {
-          if (!current || current.simulationId !== simulation.simulationId || current.runtime) {
+          if (
+            !current
+            || current.simulationId !== simulation.simulationId
+            || (current.runtime && current.sessionPackage)
+          ) {
             return current;
           }
           return mergeRuntimeIntoSimulation(current, response);
