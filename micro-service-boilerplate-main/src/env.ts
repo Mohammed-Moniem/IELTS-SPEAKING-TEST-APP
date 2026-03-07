@@ -149,6 +149,10 @@ export const env = {
     cacheTtlSeconds: toNumber(getOsEnv('ELEVENLABS_CACHE_TTL_SECONDS')) || 86400,
     optimizeStreamingLatency: toNumber(getOsEnv('ELEVENLABS_STREAMING_LATENCY')) || 0
   },
+  speaking: {
+    audioBaseUrl: getOsEnv('SPEAKING_AUDIO_BASE_URL') || 'https://storage.spokio.local/speaking',
+    defaultExaminerProfile: getOsEnv('SPEAKING_DEFAULT_EXAMINER_PROFILE') || 'auto'
+  },
   storage: {
     provider: getOsEnv('STORAGE_PROVIDER') || 'supabase', // 'supabase', 'mongodb', or 's3'
     mongodb: {
