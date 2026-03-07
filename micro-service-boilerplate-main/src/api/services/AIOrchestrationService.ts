@@ -604,6 +604,90 @@ Use concrete, exam-practical language. Keep JSON valid with no markdown.`,
     });
   }
 
+  public async generateListeningDeepFeedback(
+    input: {
+      track: 'academic' | 'general';
+      score: number;
+      totalQuestions: number;
+      sectionStats: Array<{ sectionId: string; score: number; total: number }>;
+      questionTypeStats: Array<{ type: string; correct: number; total: number }>;
+      mistakes: Array<{
+        sectionId: string;
+        questionId: string;
+        type: string;
+        userAnswer: string | string[] | Record<string, string>;
+        expectedAnswer: string | string[] | Record<string, string>;
+        feedbackHint?: string;
+      }>;
+    },
+    options: { userId?: string; plan?: SubscriptionPlan }
+  ) {
+    return this.runStructuredTask({
+      userId: options.userId,
+      module: 'listening',
+      operation: 'evaluate-listening-deep',
+      plan: options.plan,
+      systemPrompt:
+        `You are an IELTS Listening tutor. Return strict JSON with keys:
+overallSummary, sectionCoaching[], questionTypeCoaching[], top5Fixes[], next24hPlan[], next7dPlan[].
+sectionCoaching[] item keys: sectionId, focusAreas[], traps[], drills[].
+questionTypeCoaching[] item keys: type, whyWrong[], fixes[], drills[].
+Use concrete, exam-practical language. Keep JSON valid with no markdown.`,
+      userPrompt: JSON.stringify(input),
+      fallback: () => {
+        const accuracy = input.totalQuestions > 0 ? (input.score / input.totalQuestions) * 100 : 0;
+        return {
+          overallSummary: `Estimated listening accuracy ${accuracy.toFixed(0)}%. Improve by sharpening audio comprehension, strengthening note-taking under real-time pressure, and building prediction skills before each section plays.`,
+          sectionCoaching: input.sectionStats.map(section => ({
+            sectionId: section.sectionId,
+            focusAreas: [
+              `Section accuracy: ${section.score}/${section.total}`,
+              'Pre-read questions before playback to anticipate answer slots.'
+            ],
+            traps: [
+              'Missing answers due to spelling or plural/singular mismatches.',
+              'Losing place when the speaker changes topic or corrects themselves.'
+            ],
+            drills: [
+              'Practice with audio segments: pause after each answer window and verify.',
+              'Dictation exercises to improve real-time transcription accuracy.'
+            ]
+          })),
+          questionTypeCoaching: input.questionTypeStats.map(stat => ({
+            type: stat.type,
+            whyWrong:
+              stat.correct < stat.total
+                ? [
+                    'Missed keyword signposts or discourse markers in the audio.',
+                    'Wrote an answer too late while the recording moved on.'
+                  ]
+                : ['Performance is stable; maintain active listening discipline.'],
+            fixes: [
+              'Underline key nouns and limits in each question before playback.',
+              'Use shorthand notes and transcribe answers during the transfer time.'
+            ],
+            drills: ['10-question focused set on this type with immediate review.']
+          })),
+          top5Fixes: [
+            'Pre-read all questions in each section before the audio starts.',
+            'Listen for speaker corrections and hedging that change the answer.',
+            'Practice note-taking with abbreviations to keep pace with the audio.',
+            'Train with varied accents (British, Australian, North American) regularly.',
+            'Track recurring errors by question type after every practice test.'
+          ],
+          next24hPlan: [
+            'Complete one full listening practice test under timed conditions.',
+            'Review all incorrect answers and classify by error pattern (spelling, mishear, late capture).'
+          ],
+          next7dPlan: [
+            'Do 5 mixed listening sets and monitor section-level accuracy trends.',
+            'Repeat weakest two question families until >=80% accuracy.'
+          ]
+        };
+      }
+    });
+  }
+
   public async generateModuleTask(
     input: { module: 'writing'; track: 'academic' | 'general'; hints?: string[] },
     options: { userId?: string; plan?: SubscriptionPlan }

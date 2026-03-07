@@ -99,10 +99,11 @@ const installMockAudioContextPlayback = async (
   page: Page,
   options: {
     fireEnded?: boolean;
+    analyserSpeechReads?: number;
   } = {}
 ) => {
   await page.addInitScript(
-    ({ fireEnded }) => {
+    ({ fireEnded, analyserSpeechReads }) => {
     type MockWindow = typeof window & {
       __mockAudioContextStarts?: number;
       webkitAudioContext?: typeof AudioContext;
@@ -152,6 +153,41 @@ const installMockAudioContextPlayback = async (
       public createBufferSource() {
         return new FakeBufferSource() as unknown as AudioBufferSourceNode;
       }
+
+      public createMediaStreamSource() {
+        return {
+          connect() {
+            return undefined;
+          },
+          disconnect() {
+            return undefined;
+          }
+        } as unknown as MediaStreamAudioSourceNode;
+      }
+
+      public createAnalyser() {
+        let readCount = 0;
+
+        return {
+          fftSize: 2048,
+          frequencyBinCount: 1024,
+          connect() {
+            return undefined;
+          },
+          disconnect() {
+            return undefined;
+          },
+          getByteTimeDomainData(array: Uint8Array) {
+            readCount += 1;
+            array.fill(128);
+
+            if ((analyserSpeechReads ?? 0) > 0 && readCount <= (analyserSpeechReads ?? 0)) {
+              array[0] = 160;
+              array[1] = 96;
+            }
+          }
+        } as unknown as AnalyserNode;
+      }
     }
 
     (window as MockWindow).__mockAudioContextStarts = 0;
@@ -164,7 +200,7 @@ const installMockAudioContextPlayback = async (
       value: FakeAudioContext
     });
     },
-    { fireEnded: options.fireEnded ?? true }
+    { fireEnded: options.fireEnded ?? true, analyserSpeechReads: options.analyserSpeechReads ?? 0 }
   );
 };
 
@@ -964,6 +1000,395 @@ test.describe('Speaking flow', () => {
 
     await expect(page.getByRole('button', { name: 'Continue after prompt' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
+  });
+
+  test('auto-advances from part 1 intro into the first examiner question', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let advanceCalls = 0;
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-part1-handoff-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'part1_begin',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'part1_begin',
+                text: "Thank you. Let's begin with Part 1 of the test."
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-part1-handoff-123/runtime/advance', async route => {
+      advanceCalls += 1;
+
+      if (advanceCalls === 1) {
+        return route.fulfill(
+          mockJsonSuccess({
+            simulationId: 'simulation-part1-handoff-123',
+            status: 'in_progress',
+            runtime: {
+              state: 'part1-examiner',
+              currentPart: 1,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'What kind of weather do you enjoy most?'
+              }
+            }
+          })
+        );
+      }
+
+      return route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-part1-handoff-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-candidate-turn',
+            currentPart: 1,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'What kind of weather do you enjoy most?'
+            }
+          }
+        })
+      );
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByText('What kind of weather do you enjoy most?')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect.poll(() => advanceCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('waits for examiner audio synthesis before switching into the candidate turn', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let releaseSynthesis: () => void = () => {};
+    const synthesisGate = new Promise<void>(resolve => {
+      releaseSynthesis = resolve;
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-delayed-synthesis-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'part1-examiner',
+              currentPart: 1,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'What kind of weather do you enjoy most?'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/speech/synthesize', async route => {
+      await synthesisGate;
+      return route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-delayed-synthesis-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-delayed-synthesis-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-candidate-turn',
+            currentPart: 1,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'What kind of weather do you enjoy most?'
+            }
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
+    await expect(page.getByText('Preparing examiner audio...')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toHaveCount(0);
+
+    releaseSynthesis();
+
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+  });
+
+  test('auto-starts and auto-submits part 1 recording after silence', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page, { analyserSpeechReads: 4 });
+    await page.addInitScript(() => {
+      (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs = 250;
+    });
+
+    let answerCalls = 0;
+    let submittedTranscript = '';
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-silence-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'part1-candidate-turn',
+              currentPart: 1,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'What kind of weather do you enjoy most?'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/speech/transcribe', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          text: 'I enjoy cool weather because it is easier to walk outside.',
+          duration: 8
+        })
+      )
+    );
+
+    await page.route('**/api/v1/test-simulations/simulation-silence-123/runtime/answer', async route => {
+      answerCalls += 1;
+      submittedTranscript = JSON.parse(route.request().postData() || '{}').transcript || '';
+      return route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-silence-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-examiner',
+            currentPart: 1,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 0,
+            followUpCount: 1,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'Why do you like that kind of weather?'
+            },
+            turnHistory: [
+              {
+                part: 1,
+                prompt: 'What kind of weather do you enjoy most?',
+                transcript: 'I enjoy cool weather because it is easier to walk outside.',
+                durationSeconds: 8
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-silence-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-silence-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-candidate-turn',
+            currentPart: 1,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 0,
+            followUpCount: 1,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'Why do you like that kind of weather?'
+            },
+            turnHistory: [
+              {
+                part: 1,
+                prompt: 'What kind of weather do you enjoy most?',
+                transcript: 'I enjoy cool weather because it is easier to walk outside.',
+                durationSeconds: 8
+              }
+            ]
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByText('Recording in progress.')).toBeVisible();
+    await expect(page.getByText('Why do you like that kind of weather?')).toBeVisible();
+    await expect.poll(() => answerCalls).toBe(1);
+    await expect.poll(() => submittedTranscript).toBe('I enjoy cool weather because it is easier to walk outside.');
+  });
+
+  test('does not auto-start or auto-submit part 2 during the long turn', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page, { analyserSpeechReads: 4 });
+    await page.addInitScript(() => {
+      (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs = 250;
+    });
+
+    let answerCalls = 0;
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-part2-manual-123',
+            parts: [
+              {
+                part: 2,
+                topicId: 'trip',
+                topicTitle: 'Trip',
+                question: 'Describe a memorable journey you took.',
+                timeLimit: 180,
+                tips: ['Speak for 1-2 minutes']
+              }
+            ],
+            runtime: {
+              state: 'part2-candidate-turn',
+              currentPart: 2,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'Describe a memorable journey you took.'
+              }
+            }
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-part2-manual-123/runtime/answer', async route => {
+      answerCalls += 1;
+      return route.fallback();
+    });
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByText('Recording unlocks only during your turn.')).toBeVisible();
+    await page.waitForTimeout(800);
+    await expect.poll(() => answerCalls).toBe(0);
     await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
   });
 

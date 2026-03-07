@@ -29,7 +29,9 @@
     "test:full": "npm run test:e2e:setup && npm test && npm run test:e2e:cleanup",
     "seed:achievements": "ts-node scripts/seedAchievements.ts",
     "seed:blog": "ts-node scripts/seed-blog-posts.ts",
-    "perf:checkpoint6": "bash scripts/perf/run_checkpoint6_load.sh"
+    "perf:checkpoint6": "bash scripts/perf/run_checkpoint6_load.sh",
+    "listening:pipeline": "ts-node -r tsconfig-paths/register scripts/listening-gen/run-pipeline.ts",
+    "listening:pipeline:from": "ts-node -r tsconfig-paths/register scripts/listening-gen/run-pipeline.ts --from"
   },
   "keywords": [
     "NodeJS",
@@ -42,6 +44,7 @@
     "node": ">=8.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.65.0",
     "@aws-sdk/client-s3": "3.901.0",
     "@aws-sdk/s3-request-presigner": "3.901.0",
     "@opentelemetry/api": "1.4.1",
