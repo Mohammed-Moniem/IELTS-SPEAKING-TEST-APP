@@ -1,4 +1,5 @@
 import { HydratedDocument, Schema, Types, model } from '@lib/db/mongooseCompat';
+import { FullTestEvaluationResult } from '@interfaces/ITestEvaluation';
 import { IPracticeFeedback } from './PracticeSessionModel';
 
 export type TestSimulationStatus = 'in_progress' | 'completed';
@@ -123,6 +124,7 @@ export interface ITestSimulation {
   sessionPackage?: ITestSimulationSessionPackage;
   overallFeedback?: IPracticeFeedback;
   overallBand?: number;
+  fullEvaluation?: FullTestEvaluationResult;
   startedAt: Date;
   completedAt?: Date;
   createdAt: Date;
@@ -341,6 +343,9 @@ const TestSimulationSchema = new Schema<ITestSimulation>(
     },
     overallBand: {
       type: Number
+    },
+    fullEvaluation: {
+      type: Schema.Types.Mixed
     },
     startedAt: {
       type: Date,

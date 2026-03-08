@@ -234,6 +234,7 @@ const buildSpeakingSessionPackage = (overrides?: {
   firstQuestionText?: string;
   welcomeAudioUrl?: string;
   firstQuestionAudioUrl?: string;
+  extraSegments?: Array<Record<string, unknown>>;
 }) => ({
   version: 1,
   preparedAt: '2026-03-07T00:00:00.000Z',
@@ -274,7 +275,8 @@ const buildSpeakingSessionPackage = (overrides?: {
         overrides?.firstQuestionAudioUrl || 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-0.mp3',
       cacheKey: 'question:british:part1:weather:0:what-kind-of-weather-do-you-enjoy-most',
       provider: 'openai'
-    }
+    },
+    ...(overrides?.extraSegments || [])
   ]
 });
 
@@ -778,6 +780,164 @@ test.describe('Speaking flow', () => {
     await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toBeVisible();
   });
 
+  test('opens a completed simulation from history into the detailed report page', async ({ page }) => {
+    await page.route('**/api/v1/test-simulations?limit=8&offset=0', route =>
+      route.fulfill(
+        mockJsonSuccess([
+          {
+            _id: 'simulation-report-123',
+            simulationId: 'simulation-report-123',
+            status: 'completed',
+            overallBand: 6.5,
+            createdAt: '2026-03-08T08:00:00.000Z',
+            overallFeedback: {
+              summary: 'Band 6.5 with stronger performance in Part 2 than Parts 1 and 3.'
+            },
+            parts: [
+              {
+                part: 1,
+                question: 'Tell me about your hometown.',
+                feedback: {
+                  overallBand: 6.0,
+                  summary: 'Clear but could be more specific.'
+                }
+              },
+              {
+                part: 2,
+                question: 'Describe a memorable trip you took.',
+                feedback: {
+                  overallBand: 6.5,
+                  summary: 'Good coherence across the long turn.'
+                }
+              },
+              {
+                part: 3,
+                question: 'How does travel change people?',
+                feedback: {
+                  overallBand: 7.0,
+                  summary: 'Thoughtful ideas but vocabulary could be wider.'
+                }
+              }
+            ]
+          }
+        ])
+      )
+    );
+
+    await page.route('**/api/v1/test-simulations/simulation-report-123', route =>
+      route.fulfill(
+        mockJsonSuccess({
+          _id: 'simulation-report-123',
+          simulationId: 'simulation-report-123',
+          status: 'completed',
+          overallBand: 6.5,
+          createdAt: '2026-03-08T08:00:00.000Z',
+          completedAt: '2026-03-08T08:14:00.000Z',
+          overallFeedback: {
+            summary: 'Band 6.5 with stronger performance in Part 2 than Parts 1 and 3.',
+            improvements: ['Use more precise lexical items in Part 1 and Part 3.']
+          },
+          parts: [
+            {
+              part: 1,
+              topicTitle: 'Hometown',
+              question: 'Tell me about your hometown.',
+              response: 'My hometown is Khartoum and it is busy but welcoming.',
+              feedback: {
+                overallBand: 6.0,
+                summary: 'Clear but could be more specific.',
+                improvements: ['Add one concrete example in each answer.']
+              }
+            },
+            {
+              part: 2,
+              topicTitle: 'Travel',
+              question: 'Describe a memorable trip you took.',
+              response: 'I travelled to Istanbul with my family and explained what I learned there.',
+              feedback: {
+                overallBand: 6.5,
+                summary: 'Good coherence across the long turn.',
+                improvements: ['Use richer linking phrases in the middle of the story.']
+              }
+            },
+            {
+              part: 3,
+              topicTitle: 'Travel',
+              question: 'How does travel change people?',
+              response: 'Travel changes people by making them more open to other perspectives.',
+              feedback: {
+                overallBand: 7.0,
+                summary: 'Thoughtful ideas but vocabulary could be wider.',
+                improvements: ['Support abstract claims with one short example.']
+              }
+            }
+          ],
+          fullEvaluation: {
+            overallBand: 6.5,
+            spokenSummary: 'You achieved Band 6.5 overall, with your strongest control in Part 2.',
+            detailedFeedback:
+              'Your test showed solid fluency and clear organization in the long turn. The shorter interview turns would be stronger with more precise vocabulary and one supporting detail per answer.',
+            criteria: {
+              fluencyCoherence: {
+                band: 6.5,
+                feedback: 'Generally clear and easy to follow.',
+                strengths: ['Maintained flow in Part 2.'],
+                improvements: ['Extend short Part 1 answers more naturally.']
+              },
+              lexicalResource: {
+                band: 6.0,
+                feedback: 'Meaning was clear, but word choice was repetitive.',
+                strengths: ['Used understandable everyday vocabulary.'],
+                improvements: ['Add more precise descriptive vocabulary.']
+              },
+              grammaticalRange: {
+                band: 6.0,
+                feedback: 'Mostly accurate simple structures.',
+                strengths: ['Sentences were usually controlled.'],
+                improvements: ['Use a wider range of clause patterns.']
+              },
+              pronunciation: {
+                band: 6.5,
+                feedback: 'Pronunciation was mostly clear.',
+                strengths: ['Key ideas were understandable.'],
+                improvements: ['Keep word stress more consistent in longer phrases.']
+              }
+            },
+            corrections: [
+              {
+                original: 'I go there last year',
+                corrected: 'I went there last year',
+                explanation: 'Use the past tense for completed past events.',
+                category: 'grammar'
+              }
+            ],
+            suggestions: [
+              {
+                category: 'lexical',
+                suggestion: 'Prepare topic-specific descriptive vocabulary before the next simulation.',
+                priority: 'high'
+              }
+            ],
+            partScores: {
+              part1: 6,
+              part2: 6.5,
+              part3: 7
+            }
+          }
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('link', { name: 'Open' }).click();
+
+    await expect(page).toHaveURL(/\/app\/speaking\/simulations\/simulation-report-123$/);
+    await expect(page.getByRole('heading', { name: /Full speaking simulation report/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Why this score happened' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Stronger answer examples by part' })).toBeVisible();
+  });
+
   test('preloaded speaking package plays the first examiner segment from package audio', async ({ page }) => {
     await installMockMediaStack(page);
     await installMockAudioContextPlayback(page);
@@ -985,14 +1145,207 @@ test.describe('Speaking flow', () => {
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
     await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
-    await expect(page.getByText('Loading examiner prompt.')).toBeVisible();
+    await expect(page.getByText('Loading examiner prompt.')).toHaveCount(0);
     await expect(page.getByText('Preparing examiner audio...')).toHaveCount(0);
+    await expect(page.getByText('Please listen to the examiner.')).toBeVisible();
     await expect.poll(() => synthesizeCalls).toBe(0);
 
     releaseAudioFetch();
 
     await expect.poll(() => page.evaluate(() => (window as typeof window & { __mockAudioContextStarts?: number }).__mockAudioContextStarts || 0)).toBeGreaterThan(0);
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+  });
+
+  test('preloads every known examiner segment in the packaged base session before later turns', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    const requestedUrls: string[] = [];
+
+    await page.route('https://cdn.spokio.com/**', route => {
+      requestedUrls.push(route.request().url());
+      return route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        headers: {
+          'access-control-allow-origin': '*'
+        },
+        body: 'mock-audio'
+      });
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-full-preload-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              },
+              {
+                part: 2,
+                topicId: 'trip',
+                topicTitle: 'Trip',
+                question: 'Describe a memorable journey you took.',
+                timeLimit: 180,
+                tips: ['Speak for 1-2 minutes']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage({
+              extraSegments: [
+                {
+                  segmentId: 'part1:weather:question-1',
+                  part: 1,
+                  phase: 'question-seed',
+                  kind: 'seed_prompt',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  promptIndex: 1,
+                  text: 'How does the weather change during the year where you live?',
+                  audioAssetId: 'asset-part1-q2',
+                  audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-1.mp3',
+                  cacheKey: 'question:british:part1:weather:1',
+                  provider: 'openai'
+                },
+                {
+                  segmentId: 'part1:weather:question-2',
+                  part: 1,
+                  phase: 'question-seed',
+                  kind: 'seed_prompt',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  promptIndex: 2,
+                  text: 'Does the weather affect your mood?',
+                  audioAssetId: 'asset-part1-q3',
+                  audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-2.mp3',
+                  cacheKey: 'question:british:part1:weather:2',
+                  provider: 'openai'
+                },
+                {
+                  segmentId: 'fixed:part2_intro',
+                  part: 2,
+                  phase: 'transition',
+                  kind: 'transition',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  phraseId: 'part2_intro',
+                  text: 'Now I am going to give you a topic and I would like you to talk about it for one to two minutes.',
+                  audioAssetId: 'asset-part2-intro',
+                  audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/part2_intro.mp3',
+                  cacheKey: 'fixed:british:part2_intro',
+                  provider: 'openai'
+                }
+              ]
+            })
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-full-preload-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-full-preload-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            extraSegments: [
+              {
+                segmentId: 'part1:weather:question-1',
+                part: 1,
+                phase: 'question-seed',
+                kind: 'seed_prompt',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                promptIndex: 1,
+                text: 'How does the weather change during the year where you live?',
+                audioAssetId: 'asset-part1-q2',
+                audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-1.mp3',
+                cacheKey: 'question:british:part1:weather:1',
+                provider: 'openai'
+              },
+              {
+                segmentId: 'part1:weather:question-2',
+                part: 1,
+                phase: 'question-seed',
+                kind: 'seed_prompt',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                promptIndex: 2,
+                text: 'Does the weather affect your mood?',
+                audioAssetId: 'asset-part1-q3',
+                audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/weather-question-2.mp3',
+                cacheKey: 'question:british:part1:weather:2',
+                provider: 'openai'
+              },
+              {
+                segmentId: 'fixed:part2_intro',
+                part: 2,
+                phase: 'transition',
+                kind: 'transition',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                phraseId: 'part2_intro',
+                text: 'Now I am going to give you a topic and I would like you to talk about it for one to two minutes.',
+                audioAssetId: 'asset-part2-intro',
+                audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/part2_intro.mp3',
+                cacheKey: 'fixed:british:part2_intro',
+                provider: 'openai'
+              }
+            ]
+          })
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect.poll(() =>
+      requestedUrls.filter(url => url.includes('/speaking/fixed/british/part2_intro.mp3')).length
+    ).toBeGreaterThan(0);
   });
 
   test('package synthesis fallback keeps the selected examiner voice profile', async ({ page }) => {
@@ -1564,7 +1917,8 @@ test.describe('Speaking flow', () => {
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
     await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
-    await expect(page.getByText('Preparing examiner audio...')).toBeVisible();
+    await expect(page.getByText('Please listen to the examiner.')).toBeVisible();
+    await expect(page.getByText('Preparing examiner audio...')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your turn' })).toHaveCount(0);
 
     releaseSynthesis();
@@ -1697,19 +2051,17 @@ test.describe('Speaking flow', () => {
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
     await expect(page.getByText('Recording in progress.')).toBeVisible();
+    await expect(
+      page.getByText('Recording starts automatically and submits after a short silence. Use Stop + Submit only if you want to finish early.')
+    ).toBeVisible();
     await expect(page.getByText('Why do you like that kind of weather?')).toBeVisible();
     await expect.poll(() => answerCalls).toBe(1);
     await expect.poll(() => submittedTranscript).toBe('I enjoy cool weather because it is easier to walk outside.');
   });
 
-  test('does not auto-start or auto-submit part 2 during the long turn', async ({ page }) => {
+  test('auto-starts part 2 recording after the examiner tells the candidate to begin', async ({ page }) => {
     await installMockMediaStack(page);
     await installMockAudioContextPlayback(page, { analyserSpeechReads: 4 });
-    await page.addInitScript(() => {
-      (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs = 250;
-    });
-
-    let answerCalls = 0;
 
     await page.route('**/api/v1/test-simulations', async route => {
       if (route.request().method() !== 'POST') {
@@ -1731,7 +2083,7 @@ test.describe('Speaking flow', () => {
               }
             ],
             runtime: {
-              state: 'part2-candidate-turn',
+              state: 'part2-examiner-launch',
               currentPart: 2,
               currentTurnIndex: 0,
               retryCount: 0,
@@ -1739,8 +2091,9 @@ test.describe('Speaking flow', () => {
               seedQuestionIndex: 0,
               followUpCount: 0,
               currentSegment: {
-                kind: 'dynamic_prompt',
-                text: 'Describe a memorable journey you took.'
+                kind: 'cached_phrase',
+                phraseId: 'part2_begin_speaking',
+                text: 'Please begin speaking now.'
               }
             }
           },
@@ -1750,20 +2103,39 @@ test.describe('Speaking flow', () => {
       );
     });
 
-    await page.route('**/api/v1/test-simulations/simulation-part2-manual-123/runtime/answer', async route => {
-      answerCalls += 1;
-      return route.fallback();
-    });
+    await page.route('**/api/v1/test-simulations/simulation-part2-manual-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-part2-manual-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part2-candidate-turn',
+            currentPart: 2,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'Describe a memorable journey you took.'
+            }
+          }
+        })
+      )
+    );
 
     await page.goto('/app/speaking');
     await page.getByRole('tab', { name: 'Simulation' }).click();
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
+    await expect(page.getByText('Please begin speaking now.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
-    await expect(page.getByText('Recording unlocks only during your turn.')).toBeVisible();
-    await page.waitForTimeout(800);
-    await expect.poll(() => answerCalls).toBe(0);
-    await expect(page.getByRole('button', { name: 'Start Recording' })).toBeEnabled();
+    await expect(page.getByText('Recording in progress.')).toBeVisible();
+    await expect(
+      page.getByText('Recording starts automatically after the examiner prompt. Use Stop + Submit when you are ready to finish Part 2.')
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop + Submit' })).toBeEnabled();
   });
 
   test('shows a retryable pause when a simulation step fails', async ({ page }) => {

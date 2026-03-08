@@ -492,6 +492,46 @@ export interface SpeakingEvaluation {
   suggestions: Array<string | { suggestion?: string }>;
 }
 
+export interface SimulationEvaluationCriterion {
+  band: number;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+}
+
+export interface SimulationEvaluationSuggestion {
+  category: string;
+  suggestion: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface SimulationEvaluationCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+  category: string;
+}
+
+export interface SimulationFullEvaluation {
+  overallBand: number;
+  spokenSummary: string;
+  detailedFeedback: string;
+  criteria: {
+    fluencyCoherence: SimulationEvaluationCriterion;
+    lexicalResource: SimulationEvaluationCriterion;
+    grammaticalRange: SimulationEvaluationCriterion;
+    pronunciation: SimulationEvaluationCriterion;
+  };
+  corrections: SimulationEvaluationCorrection[];
+  suggestions: SimulationEvaluationSuggestion[];
+  partScores?: {
+    part1?: number;
+    part2?: number;
+    part3?: number;
+  };
+  evaluatorModel?: string;
+}
+
 export interface PracticeTopic {
   _id?: string;
   slug: string;
@@ -700,6 +740,7 @@ export interface SimulationSession {
   parts: SimulationPartDefinition[];
   overallBand?: number;
   overallFeedback?: PracticeSessionFeedback;
+  fullEvaluation?: SimulationFullEvaluation;
   startedAt?: string;
   completedAt?: string;
   createdAt?: string;

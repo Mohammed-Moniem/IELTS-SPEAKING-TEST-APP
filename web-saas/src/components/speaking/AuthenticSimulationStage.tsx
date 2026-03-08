@@ -9,7 +9,6 @@ import {
   advanceSimulationRuntime,
   completeSimulationRuntime,
   decodeAudioBase64,
-  getUpcomingSimulationPackageSegments,
   isCandidateRuntimeState,
   isExaminerRuntimeState,
   isRetryablePauseState,
@@ -146,7 +145,10 @@ export default function AuthenticSimulationStage({
   const canStartRecording = isCandidateTurn && turnState === 'idle' && !localPause;
   const canStopRecording = turnState === 'recording';
   const shouldAutoAdvanceAfterPrompt = Boolean(runtime && isExaminerRuntimeState(runtime.state));
-  const shouldAutoRecordCandidateTurn = runtime?.state === 'part1-candidate-turn' || runtime?.state === 'part3-candidate-turn';
+  const shouldAutoRecordCandidateTurn =
+    runtime?.state === 'part1-candidate-turn'
+    || runtime?.state === 'part2-candidate-turn'
+    || runtime?.state === 'part3-candidate-turn';
   const silenceThresholdMs =
     typeof window !== 'undefined' &&
     Number.isFinite((window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs)
@@ -343,6 +345,58 @@ export default function AuthenticSimulationStage({
     }
     streamRef.current = null;
   }, [clearSilenceMonitor]);
+
+  const examinerStatusText = useMemo(() => {
+    if (runtime?.state === 'part2-prep' && promptReady) {
+      return `Prep time remaining: ${part2PrepRemaining ?? 60}s`;
+    }
+
+    if (runtime?.state === 'evaluation' && promptReady) {
+      return 'Preparing your detailed report...';
+    }
+
+    if (promptReady && shouldAutoAdvanceAfterPrompt) {
+      return 'Your turn begins automatically after the examiner prompt.';
+    }
+
+    return 'Please listen to the examiner.';
+  }, [part2PrepRemaining, promptReady, runtime?.state, shouldAutoAdvanceAfterPrompt]);
+
+  const candidateHelperText = useMemo(() => {
+    if (runtime?.state === 'part2-candidate-turn') {
+      return 'Recording starts automatically after the examiner prompt. Use Stop + Submit when you are ready to finish Part 2.';
+    }
+
+    if (runtime?.state === 'part1-candidate-turn' || runtime?.state === 'part3-candidate-turn') {
+      return 'Recording starts automatically and submits after a short silence. Use Stop + Submit only if you want to finish early.';
+    }
+
+    if (runtime?.state === 'intro-candidate-turn') {
+      return 'Answer the examiner naturally. Use Stop + Submit when you are ready to continue.';
+    }
+
+    return 'Recording unlocks only during your turn.';
+  }, [runtime?.state]);
+
+  const candidateStatusText = useMemo(() => {
+    if (turnState === 'recording') {
+      return 'Recording in progress.';
+    }
+
+    if (turnState === 'transcribing') {
+      return 'Transcribing your response...';
+    }
+
+    if (turnState === 'submitting') {
+      return 'Sending your answer to the examiner...';
+    }
+
+    if (turnState === 'scoring') {
+      return 'Scoring the full simulation...';
+    }
+
+    return null;
+  }, [turnState]);
 
   const beginSilenceMonitor = useCallback(
     async (stream: MediaStream) => {
@@ -750,10 +804,10 @@ export default function AuthenticSimulationStage({
       return;
     }
 
-    const segmentsToPreload = [
-      activePackageSegment,
-      ...getUpcomingSimulationPackageSegments(session, 2)
-    ].filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate?.audioUrl));
+    const segmentsToPreload = session.sessionPackage.segments.filter(
+      (candidate): candidate is NonNullable<typeof candidate> =>
+        candidate.turnType === 'examiner' && Boolean(candidate.audioUrl)
+    );
 
     for (const nextSegment of segmentsToPreload) {
       void preloadSimulationPackageAudio(nextSegment.audioUrl).catch(() => {
@@ -956,23 +1010,7 @@ export default function AuthenticSimulationStage({
                 >
                   Replay prompt
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {playbackState === 'loading-package'
-                    ? 'Loading examiner prompt.'
-                    : playbackState === 'synthesizing'
-                    ? 'Preparing examiner audio...'
-                    : playbackState === 'playing'
-                      ? 'Examiner audio is playing.'
-                      : runtime?.state === 'part2-prep' && promptReady
-                        ? `Prep time remaining: ${part2PrepRemaining ?? 60}s`
-                      : runtime?.state === 'evaluation' && promptReady
-                        ? 'Preparing your score...'
-                      : promptReady && shouldAutoAdvanceAfterPrompt
-                        ? 'Switching to your turn...'
-                      : promptReady
-                        ? 'Prompt finished. Continue when ready.'
-                        : 'Loading examiner prompt.'}
-                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{examinerStatusText}</span>
               </div>
             </div>
           ) : null}
@@ -1030,17 +1068,12 @@ export default function AuthenticSimulationStage({
                   <span className="material-symbols-outlined text-[18px]">stop</span>
                   Stop + Submit
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {turnState === 'recording'
-                    ? 'Recording in progress.'
-                    : turnState === 'transcribing'
-                      ? 'Transcribing your response...'
-                      : turnState === 'submitting'
-                        ? 'Sending your answer to the examiner...'
-                        : turnState === 'scoring'
-                          ? 'Scoring the full simulation...'
-                          : 'Recording unlocks only during your turn.'}
-                </span>
+                <div className="space-y-1">
+                  {candidateStatusText ? (
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{candidateStatusText}</p>
+                  ) : null}
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{candidateHelperText}</p>
+                </div>
               </div>
 
               {lastTranscript ? (

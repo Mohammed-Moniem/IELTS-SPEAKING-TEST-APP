@@ -434,11 +434,87 @@ export class TestSimulationService {
     }
 
     const aggregated = this.aggregateFeedback(feedbackResults);
+    const completedAt = new Date();
+
+    const evaluationParts = (simulation.parts as any[]).map(part => ({
+      partNumber: part.part as 1 | 2 | 3,
+      questions: [
+        {
+          question: part.question,
+          category: (`part${part.part}` as 'part1' | 'part2' | 'part3'),
+          topic: part.topicTitle || part.topicId
+        }
+      ],
+      responses: [
+        {
+          transcript: String(part.response || '').trim(),
+          questionIndex: 0,
+          durationSeconds: part.timeSpent
+        }
+      ]
+    }));
+
+    const fullTranscript = evaluationParts
+      .flatMap(part => part.responses.map(response => response.transcript?.trim()).filter(Boolean))
+      .join('\n\n')
+      .trim();
+
+    let fullEvaluation: Awaited<ReturnType<SpeechService['evaluateFullTest']>> | undefined;
+
+    if (fullTranscript) {
+      try {
+        fullEvaluation = await this.speechService.evaluateFullTest({
+          userId,
+          fullTranscript,
+          durationSeconds: evaluationParts.reduce(
+            (total, part) => total + part.responses.reduce((partTotal, response) => partTotal + (response.durationSeconds || 0), 0),
+            0
+          ),
+          parts: evaluationParts,
+          metadata: {
+            testStartedAt: simulation.startedAt?.toISOString?.(),
+            testCompletedAt: completedAt.toISOString()
+          }
+        });
+      } catch (error: any) {
+        this.log.warn(
+          `${logMessage} :: Full simulation evaluation fallback for ${simulationId}: ${error?.message || 'Unknown error'}`
+        );
+      }
+    }
 
     simulation.status = 'completed';
-    simulation.completedAt = new Date();
-    simulation.overallFeedback = aggregated;
-    simulation.overallBand = aggregated.overallBand;
+    simulation.completedAt = completedAt;
+    simulation.fullEvaluation = fullEvaluation;
+    simulation.overallFeedback = fullEvaluation
+      ? {
+          ...aggregated,
+          overallBand: fullEvaluation.overallBand,
+          summary: fullEvaluation.spokenSummary,
+          strengths:
+            Array.from(
+              new Set(
+                [
+                  ...(aggregated.strengths || []),
+                  ...(fullEvaluation.criteria.fluencyCoherence.strengths || []),
+                  ...(fullEvaluation.criteria.lexicalResource.strengths || []),
+                  ...(fullEvaluation.criteria.grammaticalRange.strengths || []),
+                  ...(fullEvaluation.criteria.pronunciation.strengths || [])
+                ].filter(Boolean)
+              )
+            ).slice(0, 4) || aggregated.strengths,
+          improvements:
+            Array.from(
+              new Set(
+                [
+                  ...(aggregated.improvements || []),
+                  ...(fullEvaluation.suggestions || []).map(item => item.suggestion).filter(Boolean)
+                ]
+              )
+            ).slice(0, 4) || aggregated.improvements
+        }
+      : aggregated;
+    simulation.overallBand = fullEvaluation?.overallBand ?? aggregated.overallBand;
 
     await simulation.save();
 
