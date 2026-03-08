@@ -1,7 +1,16 @@
 import { HydratedDocument, Schema, Types, model } from '@lib/db/mongooseCompat';
+import { FullTestEvaluationResult } from '@interfaces/ITestEvaluation';
 import { IPracticeFeedback } from './PracticeSessionModel';
 
 export type TestSimulationStatus = 'in_progress' | 'completed';
+export type SpeakingSessionTurnType = 'examiner' | 'candidate' | 'system';
+export type SpeakingSessionSegmentKind =
+  | 'fixed_phrase'
+  | 'seed_prompt'
+  | 'cue_card'
+  | 'transition'
+  | 'dynamic_follow_up';
+export type SpeakingTtsProvider = 'openai' | 'elevenlabs' | 'edge-tts';
 export type TestSimulationRuntimeState =
   | 'preflight'
   | 'intro-examiner'
@@ -62,6 +71,39 @@ export interface ITestSimulationRuntime {
   currentSegment: ITestSimulationRuntimeSegment;
 }
 
+export interface ITestSimulationExaminerProfile {
+  id: string;
+  label: string;
+  accent: string;
+  provider: SpeakingTtsProvider;
+  voiceId: string;
+  autoAssigned: boolean;
+}
+
+export interface ITestSimulationSessionSegment {
+  segmentId: string;
+  part: number;
+  phase: string;
+  kind: SpeakingSessionSegmentKind;
+  turnType: SpeakingSessionTurnType;
+  canAutoAdvance: boolean;
+  phraseId?: string;
+  promptIndex?: number;
+  text: string;
+  audioAssetId: string;
+  audioUrl: string;
+  cacheKey?: string;
+  provider: SpeakingTtsProvider;
+  durationSeconds?: number;
+}
+
+export interface ITestSimulationSessionPackage {
+  version: number;
+  preparedAt: Date;
+  examinerProfile: ITestSimulationExaminerProfile;
+  segments: ITestSimulationSessionSegment[];
+}
+
 export interface ITestPart {
   part: number;
   question: string;
@@ -79,8 +121,10 @@ export interface ITestSimulation {
   status: TestSimulationStatus;
   parts: ITestPart[];
   runtime?: ITestSimulationRuntime;
+  sessionPackage?: ITestSimulationSessionPackage;
   overallFeedback?: IPracticeFeedback;
   overallBand?: number;
+  fullEvaluation?: FullTestEvaluationResult;
   startedAt: Date;
   completedAt?: Date;
   createdAt: Date;
@@ -210,6 +254,64 @@ const RuntimeSchema = new Schema<ITestSimulationRuntime>(
   { _id: false }
 );
 
+const SessionExaminerProfileSchema = new Schema<ITestSimulationExaminerProfile>(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+    accent: { type: String, required: true },
+    provider: {
+      type: String,
+      enum: ['openai', 'elevenlabs', 'edge-tts'],
+      required: true
+    },
+    voiceId: { type: String, required: true },
+    autoAssigned: { type: Boolean, default: true }
+  },
+  { _id: false }
+);
+
+const SessionSegmentSchema = new Schema<ITestSimulationSessionSegment>(
+  {
+    segmentId: { type: String, required: true },
+    part: { type: Number, required: true },
+    phase: { type: String, required: true },
+    kind: {
+      type: String,
+      enum: ['fixed_phrase', 'seed_prompt', 'cue_card', 'transition', 'dynamic_follow_up'],
+      required: true
+    },
+    turnType: {
+      type: String,
+      enum: ['examiner', 'candidate', 'system'],
+      required: true
+    },
+    canAutoAdvance: { type: Boolean, default: false },
+    phraseId: { type: String },
+    promptIndex: { type: Number },
+    text: { type: String, required: true },
+    audioAssetId: { type: String, required: true },
+    audioUrl: { type: String, required: true },
+    cacheKey: { type: String },
+    provider: {
+      type: String,
+      enum: ['openai', 'elevenlabs', 'edge-tts'],
+      required: true
+    },
+    durationSeconds: { type: Number }
+  },
+  { _id: false }
+);
+
+const SessionPackageSchema = new Schema<ITestSimulationSessionPackage>(
+  {
+    version: { type: Number, required: true, default: 1 },
+    preparedAt: { type: Date, required: true, default: () => new Date() },
+    examinerProfile: { type: SessionExaminerProfileSchema, required: true },
+    segments: { type: [SessionSegmentSchema], default: [] }
+  },
+  { _id: false }
+);
+
 const TestSimulationSchema = new Schema<ITestSimulation>(
   {
     user: {
@@ -233,11 +335,17 @@ const TestSimulationSchema = new Schema<ITestSimulation>(
     runtime: {
       type: RuntimeSchema
     },
+    sessionPackage: {
+      type: SessionPackageSchema
+    },
     overallFeedback: {
       type: FeedbackSchema
     },
     overallBand: {
       type: Number
+    },
+    fullEvaluation: {
+      type: Schema.Types.Mixed
     },
     startedAt: {
       type: Date,

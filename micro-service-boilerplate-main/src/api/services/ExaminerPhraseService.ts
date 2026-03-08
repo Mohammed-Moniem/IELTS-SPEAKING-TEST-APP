@@ -78,4 +78,8 @@ export class ExaminerPhraseService {
   public listCacheablePhrases(): ExaminerPhrase[] {
     return Object.values(EXAMINER_PHRASES).filter(phrase => phrase.cacheable);
   }
+
+  public buildAudioCacheKey(voiceProfileId: string, phraseId: ExaminerPhraseId) {
+    return `fixed:${voiceProfileId}:${phraseId}`;
+  }
 }

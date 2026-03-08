@@ -40,3 +40,5 @@ coverage/
 mydb.sql
 ormconfig.json
 .vscode
+.listening-gen-state/
+.speaking-gen-state/

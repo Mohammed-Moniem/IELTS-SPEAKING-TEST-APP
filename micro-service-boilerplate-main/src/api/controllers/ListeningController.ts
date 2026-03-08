@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Body, Get, HttpCode, JsonController, Param, Post, QueryParams, Req, Res, UseBefore } from 'routing-controllers';
 
 import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestContext';
-import { ListeningHistoryQuery, StartListeningTestRequest, SubmitListeningTestRequest } from '@dto/ListeningDto';
+import { ListeningHistoryQuery, SaveListeningProgressRequest, StartListeningTestRequest, SubmitListeningTestRequest } from '@dto/ListeningDto';
 import { HTTP_STATUS_CODES } from '@errors/errorCodeConstants';
 import { IRequestHeaders } from '@interfaces/IRequestHeaders';
 import { AuthMiddleware } from '@middlewares/AuthMiddleware';
@@ -56,6 +56,29 @@ export class ListeningController {
         headers
       );
       return StandardResponse.success(res, attempt, 'Listening test submitted', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/tests/:attemptId/progress')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  public async saveProgress(
+    @Param('attemptId') attemptId: string,
+    @Body() body: SaveListeningProgressRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'listening-progress');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const attempt = await this.listeningService.saveProgress(req.currentUser.id, attemptId, body, headers);
+      return StandardResponse.success(res, attempt, 'Progress saved', HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }

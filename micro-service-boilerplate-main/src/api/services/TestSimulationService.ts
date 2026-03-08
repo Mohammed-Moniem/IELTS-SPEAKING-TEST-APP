@@ -8,11 +8,12 @@ import { TestPreferenceModel } from '@models/TestPreferenceModel';
 import { TestSimulationDocument, TestSimulationModel } from '@models/TestSimulationModel';
 import { UserModel } from '@models/UserModel';
 import { Service } from 'typedi';
-import { TestSimulationRuntimeDto } from '@dto/TestSimulationDto';
+import { TestSimulationRuntimeDto, TestSimulationSessionResponseDto } from '@dto/TestSimulationDto';
 
 import { FeedbackService } from './FeedbackService';
 import { ExaminerPhraseService } from './ExaminerPhraseService';
 import { QuestionGenerationService } from './QuestionGenerationService';
+import { SpeakingSessionPackageService } from './SpeakingSessionPackageService';
 import { SpeechService } from './SpeechService';
 import { UsageService } from './UsageService';
 
@@ -35,16 +36,27 @@ interface RuntimeAnswerPayload {
   durationSeconds?: number;
 }
 
+interface SimulationRuntimeTelemetry {
+  packageBuildDurationMs: number;
+  baseAudioAssetHits: number;
+  baseAudioAssetMisses: number;
+  followUpCacheHits: number;
+  followUpCacheMisses: number;
+  examinerProfileId: string;
+}
+
 @Service()
 export class TestSimulationService {
   private log = new Logger(__filename);
   private readonly examinerPhraseService = new ExaminerPhraseService();
+  private readonly runtimeTelemetryBySimulation = new Map<string, SimulationRuntimeTelemetry>();
 
   constructor(
     private readonly usageService: UsageService,
     private readonly feedbackService: FeedbackService,
     private readonly questionGenerationService: QuestionGenerationService,
-    private readonly speechService: SpeechService = new SpeechService()
+    private readonly speechService: SpeechService = new SpeechService(),
+    private readonly sessionPackageService: SpeakingSessionPackageService = new SpeakingSessionPackageService()
   ) {}
 
   public async startSimulation(userId: string, headers: IRequestHeaders) {
@@ -63,6 +75,11 @@ export class TestSimulationService {
 
     const parts = await this.buildSimulationParts(userId, headers);
     const runtime = this.buildInitialRuntime();
+    const packageBuildStartedAt = Date.now();
+    const sessionPackage = await this.sessionPackageService.buildSessionPackage(parts, {
+      selectionSeed: this.buildExaminerSelectionSeed(userId, headers?.urc)
+    });
+    const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
     const simulation = (await TestSimulationModel.create({
       user: userId,
       status: 'in_progress',
@@ -78,15 +95,27 @@ export class TestSimulationService {
         feedback: undefined
       })),
       runtime,
+      sessionPackage,
       startedAt: new Date()
     })) as TestSimulationDocument;
 
+    this.recordSessionPackageTelemetry(
+      simulation._id,
+      sessionPackage,
+      packageBuildDurationMs
+    );
+
     this.log.info(`${logMessage} :: Started simulation ${simulation._id}`);
+    this.log.info(
+      `${logMessage} :: Speaking package telemetry buildMs=${packageBuildDurationMs} baseHits=${this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)?.baseAudioAssetHits ?? 0} baseMisses=${this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)?.baseAudioAssetMisses ?? 0} examiner=${sessionPackage.examinerProfile.id}`
+    );
 
     return {
       simulationId: simulation._id,
       parts,
-      runtime
+      runtime,
+      sessionPackage,
+      telemetry: this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)
     };
   }
 
@@ -280,9 +309,10 @@ export class TestSimulationService {
       const seedPrompt = this.getSeedPrompt(simulation, partNumber, runtime.seedQuestionIndex || 0);
 
       try {
-        const followUp = await this.speechService.generateExaminerResponse(baseConversation, partNumber, {
+        const followUp = await this.speechService.generateBufferedExaminerFollowUp(baseConversation, partNumber, {
           seedPrompt,
-          followUpMode: 'single_narrow'
+          followUpMode: 'single_narrow',
+          voiceProfileId: simulation.sessionPackage?.examinerProfile.id || 'british'
         });
 
         runtime.state = partNumber === 1 ? 'part1-examiner' : 'part3-examiner';
@@ -292,12 +322,14 @@ export class TestSimulationService {
         runtime.partFollowUpCount = (runtime.partFollowUpCount || 0) + 1;
         runtime.conversationHistory = [
           ...baseConversation,
-          { role: 'assistant', content: followUp }
+          { role: 'assistant', content: followUp.text }
         ];
         runtime.currentSegment = {
           kind: 'dynamic_prompt',
-          text: followUp
+          text: followUp.text
         };
+        this.appendDynamicFollowUpSegment(simulation, partNumber, followUp);
+        this.recordFollowUpCacheTelemetry(simulation._id, followUp.cacheHit);
 
         await simulation.save();
         return this.buildRuntimeResponse(simulation);
@@ -402,11 +434,87 @@ export class TestSimulationService {
     }
 
     const aggregated = this.aggregateFeedback(feedbackResults);
+    const completedAt = new Date();
+
+    const evaluationParts = (simulation.parts as any[]).map(part => ({
+      partNumber: part.part as 1 | 2 | 3,
+      questions: [
+        {
+          question: part.question,
+          category: (`part${part.part}` as 'part1' | 'part2' | 'part3'),
+          topic: part.topicTitle || part.topicId
+        }
+      ],
+      responses: [
+        {
+          transcript: String(part.response || '').trim(),
+          questionIndex: 0,
+          durationSeconds: part.timeSpent
+        }
+      ]
+    }));
+
+    const fullTranscript = evaluationParts
+      .flatMap(part => part.responses.map(response => response.transcript?.trim()).filter(Boolean))
+      .join('\n\n')
+      .trim();
+
+    let fullEvaluation: Awaited<ReturnType<SpeechService['evaluateFullTest']>> | undefined;
+
+    if (fullTranscript) {
+      try {
+        fullEvaluation = await this.speechService.evaluateFullTest({
+          userId,
+          fullTranscript,
+          durationSeconds: evaluationParts.reduce(
+            (total, part) => total + part.responses.reduce((partTotal, response) => partTotal + (response.durationSeconds || 0), 0),
+            0
+          ),
+          parts: evaluationParts,
+          metadata: {
+            testStartedAt: simulation.startedAt?.toISOString?.(),
+            testCompletedAt: completedAt.toISOString()
+          }
+        });
+      } catch (error: any) {
+        this.log.warn(
+          `${logMessage} :: Full simulation evaluation fallback for ${simulationId}: ${error?.message || 'Unknown error'}`
+        );
+      }
+    }
 
     simulation.status = 'completed';
-    simulation.completedAt = new Date();
-    simulation.overallFeedback = aggregated;
-    simulation.overallBand = aggregated.overallBand;
+    simulation.completedAt = completedAt;
+    simulation.fullEvaluation = fullEvaluation;
+    simulation.overallFeedback = fullEvaluation
+      ? {
+          ...aggregated,
+          overallBand: fullEvaluation.overallBand,
+          summary: fullEvaluation.spokenSummary,
+          strengths:
+            Array.from(
+              new Set(
+                [
+                  ...(aggregated.strengths || []),
+                  ...(fullEvaluation.criteria.fluencyCoherence.strengths || []),
+                  ...(fullEvaluation.criteria.lexicalResource.strengths || []),
+                  ...(fullEvaluation.criteria.grammaticalRange.strengths || []),
+                  ...(fullEvaluation.criteria.pronunciation.strengths || [])
+                ].filter(Boolean)
+              )
+            ).slice(0, 4) || aggregated.strengths,
+          improvements:
+            Array.from(
+              new Set(
+                [
+                  ...(aggregated.improvements || []),
+                  ...(fullEvaluation.suggestions || []).map(item => item.suggestion).filter(Boolean)
+                ]
+              )
+            ).slice(0, 4) || aggregated.improvements
+        }
+      : aggregated;
+    simulation.overallBand = fullEvaluation?.overallBand ?? aggregated.overallBand;
 
     await simulation.save();
 
@@ -439,16 +547,121 @@ export class TestSimulationService {
       simulation.runtime = this.buildInitialRuntime();
     }
 
+    if (!simulation.sessionPackage) {
+      const packageBuildStartedAt = Date.now();
+      simulation.sessionPackage = await this.sessionPackageService.buildSessionPackage(
+        simulation.parts.map(part => ({
+          part: part.part,
+          topicId: part.topicId,
+          topicTitle: part.topicTitle || part.topicId,
+          question: part.question,
+          timeLimit: part.timeLimit || 0,
+          tips: part.tips || []
+        })),
+        {
+          selectionSeed: this.buildExaminerSelectionSeed(userId, simulationId)
+        }
+      );
+      const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
+      this.recordSessionPackageTelemetry(
+        simulation._id,
+        simulation.sessionPackage,
+        packageBuildDurationMs
+      );
+      this.log.info(
+        `Hydrated missing speaking session package for simulation ${simulationId} (buildMs=${packageBuildDurationMs})`
+      );
+
+      await simulation.save();
+    }
+
     return simulation;
   }
 
-  private buildRuntimeResponse(simulation: TestSimulationDocument) {
+  private buildRuntimeResponse(simulation: TestSimulationDocument): TestSimulationSessionResponseDto {
     return {
       simulationId: simulation._id,
       status: simulation.status,
       runtime: simulation.runtime,
-      currentPart: simulation.parts.find(part => part.part === simulation.runtime?.currentPart)
+      currentPart: simulation.parts.find(part => part.part === simulation.runtime?.currentPart),
+      sessionPackage: simulation.sessionPackage,
+      telemetry: this.getSimulationTelemetry(simulation._id, simulation.sessionPackage)
     };
+  }
+
+  private buildExaminerSelectionSeed(userId: string, requestSeed?: string) {
+    return `${userId}:${requestSeed || 'default-session'}`;
+  }
+
+  private recordSessionPackageTelemetry(
+    simulationId: string,
+    sessionPackage: TestSimulationDocument['sessionPackage'],
+    packageBuildDurationMs: number
+  ) {
+    if (!sessionPackage) {
+      return;
+    }
+
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    const baseSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    const baseAudioAssetHits = baseSegments.filter(segment => this.isPrebuiltAudioHit(segment)).length;
+    const baseAudioAssetMisses = Math.max(baseSegments.length - baseAudioAssetHits, 0);
+
+    this.runtimeTelemetryBySimulation.set(simulationId, {
+      packageBuildDurationMs,
+      baseAudioAssetHits,
+      baseAudioAssetMisses,
+      followUpCacheHits: existing?.followUpCacheHits ?? 0,
+      followUpCacheMisses: existing?.followUpCacheMisses ?? 0,
+      examinerProfileId: sessionPackage.examinerProfile.id
+    });
+  }
+
+  private recordFollowUpCacheTelemetry(simulationId: string, cacheHit: boolean) {
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    if (!existing) {
+      return;
+    }
+
+    this.runtimeTelemetryBySimulation.set(simulationId, {
+      ...existing,
+      followUpCacheHits: existing.followUpCacheHits + (cacheHit ? 1 : 0),
+      followUpCacheMisses: existing.followUpCacheMisses + (cacheHit ? 0 : 1)
+    });
+  }
+
+  private getSimulationTelemetry(
+    simulationId: string,
+    sessionPackage: TestSimulationDocument['sessionPackage']
+  ) {
+    const existing = this.runtimeTelemetryBySimulation.get(simulationId);
+    if (existing) {
+      return existing;
+    }
+
+    if (!sessionPackage) {
+      return undefined;
+    }
+
+    const baseSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    const baseAudioAssetHits = baseSegments.filter(segment => this.isPrebuiltAudioHit(segment)).length;
+    const telemetry: SimulationRuntimeTelemetry = {
+      packageBuildDurationMs: 0,
+      baseAudioAssetHits,
+      baseAudioAssetMisses: Math.max(baseSegments.length - baseAudioAssetHits, 0),
+      followUpCacheHits: 0,
+      followUpCacheMisses: 0,
+      examinerProfileId: sessionPackage.examinerProfile.id
+    };
+
+    this.runtimeTelemetryBySimulation.set(simulationId, telemetry);
+    return telemetry;
+  }
+
+  private isPrebuiltAudioHit(
+    segment: NonNullable<TestSimulationDocument['sessionPackage']>['segments'][number]
+  ) {
+    return Boolean(segment.audioAssetId && segment.cacheKey && segment.audioAssetId !== segment.cacheKey);
   }
 
   private moveToCachedPhrase(
@@ -510,6 +723,53 @@ export class TestSimulationService {
     }
 
     this.moveToCachedPhrase(simulation, 3, 'test_complete', 'evaluation');
+  }
+
+  private appendDynamicFollowUpSegment(
+    simulation: TestSimulationDocument,
+    partNumber: 1 | 3,
+    followUp: {
+      text: string;
+      audioAssetId: string;
+      audioUrl: string;
+      cacheKey: string;
+      provider: 'openai' | 'elevenlabs' | 'edge-tts';
+      durationSeconds?: number;
+    }
+  ) {
+    if (!simulation.sessionPackage) {
+      return;
+    }
+
+    const runtime = simulation.runtime!;
+    const promptIndex = runtime.seedQuestionIndex || 0;
+    const followUpIndex = (runtime.partFollowUpCount || 0) + 1;
+    const segmentId = `part${partNumber}:prompt-${promptIndex}:dynamic-follow-up-${followUpIndex}`;
+    const nextSegment = {
+      segmentId,
+      part: partNumber,
+      phase: 'follow-up',
+      kind: 'dynamic_follow_up' as const,
+      turnType: 'examiner' as const,
+      canAutoAdvance: true,
+      promptIndex,
+      text: followUp.text,
+      audioAssetId: followUp.audioAssetId,
+      audioUrl: followUp.audioUrl,
+      cacheKey: followUp.cacheKey,
+      provider: followUp.provider,
+      durationSeconds: followUp.durationSeconds
+    };
+
+    const segments = simulation.sessionPackage.segments || [];
+    const existingIndex = segments.findIndex(segment => segment.segmentId === segmentId);
+    if (existingIndex >= 0) {
+      segments[existingIndex] = nextSegment;
+      simulation.sessionPackage.segments = segments;
+      return;
+    }
+
+    simulation.sessionPackage.segments = [...segments, nextSegment];
   }
 
   private shouldAskAdaptiveFollowUp(simulation: TestSimulationDocument, partNumber: 1 | 3) {

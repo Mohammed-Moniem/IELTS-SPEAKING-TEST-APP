@@ -3,6 +3,31 @@ import path from 'node:path';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+const toOrigin = (value: string | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
+const speakingAudioOrigins = Array.from(
+  new Set(
+    [
+      process.env.NEXT_PUBLIC_SPEAKING_AUDIO_BASE_URL,
+      process.env.SPEAKING_AUDIO_BASE_URL,
+      'https://cdn.spokio.com',
+      'https://storage.spokio.local/speaking'
+    ]
+      .map(toOrigin)
+      .filter((value): value is string => Boolean(value))
+  )
+);
+
 const connectSrcDirectives = [
   "'self'",
   'https://*.googleapis.com',
@@ -10,11 +35,19 @@ const connectSrcDirectives = [
   'https://*.firebase.google.com',
   'wss://*.firebaseio.com',
   'https://*.google-analytics.com',
+  ...speakingAudioOrigins,
   ...(
     isDevelopment
       ? ['http://127.0.0.1:4000', 'http://localhost:4000', 'ws://127.0.0.1:4000', 'ws://localhost:4000', 'ws:', 'wss:']
       : []
   )
+].join(' ');
+
+const mediaSrcDirectives = [
+  "'self'",
+  'blob:',
+  'data:',
+  ...speakingAudioOrigins
 ].join(' ');
 
 const securityHeaders = [
@@ -31,6 +64,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
+      `media-src ${mediaSrcDirectives}`,
       `connect-src ${connectSrcDirectives}`,
       "frame-src 'self' https://*.stripe.com",
       "worker-src 'self' blob:"

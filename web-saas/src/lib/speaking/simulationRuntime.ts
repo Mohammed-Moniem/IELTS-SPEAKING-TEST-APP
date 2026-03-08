@@ -1,5 +1,6 @@
 import { apiRequest } from '@/lib/api/client';
 import {
+  SpeakingSessionSegment,
   SimulationRuntimeResponse,
   SimulationSession,
   SimulationStartPayload,
@@ -20,6 +21,8 @@ type TranscriptionResponse = {
 export type LiveSimulationSession = SimulationStartPayload & {
   status?: 'in_progress' | 'completed';
 };
+
+const packageAudioBlobCache = new Map<string, Promise<Blob>>();
 
 export const examinerRuntimeStates: TestSimulationRuntimeState[] = [
   'intro-examiner',
@@ -76,12 +79,19 @@ export const retrySimulationRuntimeStep = (simulationId: string) =>
     body: JSON.stringify({})
   });
 
-export const synthesizeSimulationSegment = (text: string, cacheKey?: string) =>
+export const synthesizeSimulationSegment = (
+  text: string,
+  options?: {
+    cacheKey?: string;
+    voiceId?: string;
+  }
+) =>
   apiRequest<SynthesizeResponse>('/speech/synthesize', {
     method: 'POST',
     body: JSON.stringify({
       text,
-      cacheKey
+      cacheKey: options?.cacheKey,
+      voiceId: options?.voiceId
     })
   });
 
@@ -114,8 +124,105 @@ export const mergeRuntimeIntoSimulation = (
 ): LiveSimulationSession => ({
   ...simulation,
   status: runtimeResponse.status,
-  runtime: runtimeResponse.runtime
+  runtime: runtimeResponse.runtime,
+  sessionPackage: runtimeResponse.sessionPackage || simulation.sessionPackage
 });
+
+export const resolveSimulationPackageSegment = (
+  session: LiveSimulationSession | null
+): SpeakingSessionSegment | null => {
+  if (!session?.sessionPackage?.segments?.length || !session.runtime) {
+    return null;
+  }
+
+  const { runtime } = session;
+  const { currentSegment } = runtime;
+  const segments = session.sessionPackage.segments;
+
+  if (currentSegment.phraseId) {
+    return segments.find(segment => segment.phraseId === currentSegment.phraseId) || null;
+  }
+
+  const promptText = currentSegment.text?.trim();
+  if (!promptText) {
+    return null;
+  }
+
+  const promptIndex =
+    typeof runtime.seedQuestionIndex === 'number' ? runtime.seedQuestionIndex : runtime.currentTurnIndex || 0;
+
+  return (
+    segments.find(
+      segment =>
+        segment.turnType === 'examiner'
+        && segment.part === runtime.currentPart
+        && segment.text === promptText
+        && (segment.promptIndex === promptIndex || segment.kind === 'cue_card' || segment.kind === 'dynamic_follow_up')
+    )
+    || segments.find(
+      segment =>
+        segment.turnType === 'examiner'
+        && segment.part === runtime.currentPart
+        && segment.text === promptText
+    )
+    || null
+  );
+};
+
+export const getUpcomingSimulationPackageSegments = (
+  session: LiveSimulationSession | null,
+  count = 2
+): SpeakingSessionSegment[] => {
+  if (!session?.sessionPackage?.segments?.length) {
+    return [];
+  }
+
+  const segments = session.sessionPackage.segments.filter(segment => segment.turnType === 'examiner' && Boolean(segment.audioUrl));
+  const currentSegment = resolveSimulationPackageSegment(session);
+  if (!currentSegment) {
+    return segments.slice(0, count);
+  }
+
+  const currentIndex = segments.findIndex(segment => segment.segmentId === currentSegment.segmentId);
+  if (currentIndex < 0) {
+    return segments.slice(0, count);
+  }
+
+  return segments.slice(currentIndex + 1, currentIndex + 1 + count);
+};
+
+export const preloadSimulationPackageAudio = async (audioUrl: string) => {
+  const normalizedUrl = audioUrl.trim();
+  if (!normalizedUrl) {
+    throw new Error('Audio URL is required to preload a package segment');
+  }
+
+  const cached = packageAudioBlobCache.get(normalizedUrl);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = fetch(normalizedUrl).then(async response => {
+    if (!response.ok) {
+      throw new Error(`Failed to load examiner audio (${response.status})`);
+    }
+
+    return response.blob();
+  }).catch(error => {
+    throw new Error(
+      `Failed to fetch packaged examiner audio from ${normalizedUrl}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  });
+
+  packageAudioBlobCache.set(normalizedUrl, promise);
+
+  try {
+    return await promise;
+  } catch (error) {
+    packageAudioBlobCache.delete(normalizedUrl);
+    throw error;
+  }
+};
 
 export const buildSimulationCompletionPayload = (simulation: LiveSimulationSession) => {
   const turnHistory = simulation.runtime.turnHistory || [];
@@ -141,4 +248,3 @@ export const completeSimulationRuntime = (simulation: LiveSimulationSession) =>
       parts: buildSimulationCompletionPayload(simulation)
     })
   });
-

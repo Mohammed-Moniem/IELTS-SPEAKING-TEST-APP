@@ -5,6 +5,8 @@ import OpenAI from 'openai';
 import { Service } from 'typedi';
 import { env } from '../../env';
 import { Logger } from '../../lib/logger';
+import { SpeakingAudioAssetService } from './SpeakingAudioAssetService';
+import { SpeakingExaminerProfileService } from './SpeakingExaminerProfileService';
 
 @Service()
 export class SpeechService {
@@ -12,8 +14,12 @@ export class SpeechService {
   private openai: OpenAI;
   private audioCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
 
-  constructor() {
-    this.openai = new OpenAI({
+  constructor(
+    private readonly speakingAudioAssetService: SpeakingAudioAssetService = new SpeakingAudioAssetService(),
+    private readonly examinerProfileService: SpeakingExaminerProfileService = new SpeakingExaminerProfileService(),
+    openaiClient?: OpenAI
+  ) {
+    this.openai = openaiClient || new OpenAI({
       apiKey: env.openai.apiKey
     });
   }
@@ -65,6 +71,7 @@ export class SpeechService {
       cacheKey?: string;
       optimizeStreamingLatency?: number;
       speed?: number;
+      provider?: 'openai' | 'elevenlabs' | 'edge-tts';
     } = {}
   ): Promise<{
     buffer: Buffer;
@@ -85,57 +92,65 @@ export class SpeechService {
     const optimizeStreamingLatency = options.optimizeStreamingLatency ?? env.elevenlabs.optimizeStreamingLatency ?? 0;
     const cacheTtlMs = Math.max(0, (env.elevenlabs.cacheTtlSeconds ?? 0) * 1000);
     const now = Date.now();
+    const elevenLabsEnabled = Boolean(env.elevenlabs?.apiKey) && !env.speaking.disableElevenLabsHotPath;
+    const requestedProvider = options.provider;
+    const preferredProvider =
+      requestedProvider === 'elevenlabs' && !elevenLabsEnabled
+        ? 'openai'
+        : requestedProvider || (elevenLabsEnabled ? 'elevenlabs' : 'openai');
 
-    const elevenLabsVoiceId = options.voiceId || env.elevenlabs.voiceId;
-    const elevenLabsCacheKey = options.cacheKey
-      || this.getSynthesisCacheKey(trimmed, `elevenlabs:${elevenLabsVoiceId || 'default'}`, modelId, stability, speed, useSpeakerBoost);
+    if (preferredProvider === 'elevenlabs') {
+      const elevenLabsVoiceId = options.voiceId || env.elevenlabs.voiceId;
+      const elevenLabsCacheKey = options.cacheKey
+        || this.getSynthesisCacheKey(trimmed, `elevenlabs:${elevenLabsVoiceId || 'default'}`, modelId, stability, speed, useSpeakerBoost);
 
-    this.pruneExpiredCache();
-    const cachedElevenLabs = this.audioCache.get(elevenLabsCacheKey);
-    if (cachedElevenLabs && cachedElevenLabs.expiresAt > now) {
-      this.log.info(`Returning cached ElevenLabs audio (voice: ${elevenLabsVoiceId})`);
-      return {
-        buffer: cachedElevenLabs.buffer,
-        cacheHit: true,
-        voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
-        cacheExpiresAt: cachedElevenLabs.expiresAt
-      };
-    }
-
-    const elevenLabsError = await this.tryElevenLabsSynthesis({
-      text: trimmed,
-      voiceId: elevenLabsVoiceId,
-      modelId,
-      stability,
-      speed,
-      useSpeakerBoost,
-      optimizeStreamingLatency,
-      cacheKey: elevenLabsCacheKey,
-      cacheTtlMs,
-      now
-    });
-
-    if (!elevenLabsError) {
-      const synthesized = this.audioCache.get(elevenLabsCacheKey);
-      if (!synthesized) {
-        throw new Error('ElevenLabs synthesis completed but no audio buffer was returned');
+      this.pruneExpiredCache();
+      const cachedElevenLabs = this.audioCache.get(elevenLabsCacheKey);
+      if (cachedElevenLabs && cachedElevenLabs.expiresAt > now) {
+        this.log.info(`Returning cached ElevenLabs audio (voice: ${elevenLabsVoiceId})`);
+        return {
+          buffer: cachedElevenLabs.buffer,
+          cacheHit: true,
+          voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
+          cacheExpiresAt: cachedElevenLabs.expiresAt
+        };
       }
 
-      return {
-        buffer: synthesized.buffer,
-        cacheHit: false,
-        voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
-        cacheExpiresAt: cacheTtlMs > 0 ? now + cacheTtlMs : null
-      };
+      const elevenLabsError = await this.tryElevenLabsSynthesis({
+        text: trimmed,
+        voiceId: elevenLabsVoiceId,
+        modelId,
+        stability,
+        speed,
+        useSpeakerBoost,
+        optimizeStreamingLatency,
+        cacheKey: elevenLabsCacheKey,
+        cacheTtlMs,
+        now
+      });
+
+      if (!elevenLabsError) {
+        const synthesized = this.audioCache.get(elevenLabsCacheKey);
+        if (!synthesized) {
+          throw new Error('ElevenLabs synthesis completed but no audio buffer was returned');
+        }
+
+        return {
+          buffer: synthesized.buffer,
+          cacheHit: false,
+          voiceId: elevenLabsVoiceId || env.elevenlabs.voiceId || 'elevenlabs',
+          cacheExpiresAt: cacheTtlMs > 0 ? now + cacheTtlMs : null
+        };
+      }
+
+      if (!this.shouldFallbackToOpenAi(elevenLabsError)) {
+        throw elevenLabsError;
+      }
+
+      this.log.warn(`Falling back to OpenAI TTS due to ElevenLabs failure: ${elevenLabsError.message}`);
     }
 
-    if (!this.shouldFallbackToOpenAi(elevenLabsError)) {
-      throw elevenLabsError;
-    }
-
-    this.log.warn(`Falling back to OpenAI TTS due to ElevenLabs failure: ${elevenLabsError.message}`);
-
-    const openAiVoice = env.openai.ttsVoice || 'alloy';
+    const openAiVoice = options.voiceId || env.openai.ttsVoice || 'alloy';
     const openAiModel = env.openai.ttsModel || 'gpt-4o-mini-tts';
     const openAiSpeed = this.clamp(options.speed ?? 1.0, 0.25, 4.0);
     const openAiCacheKey = options.cacheKey
@@ -310,6 +325,70 @@ export class SpeechService {
       this.log.error('Examiner response generation failed:', error);
       throw new Error(`Failed to generate examiner response: ${error?.message || 'Unknown error'}`);
     }
+  }
+
+  public async generateBufferedExaminerFollowUp(
+    conversationHistory: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    testPart: 1 | 2 | 3,
+    context?: {
+      topic?: string;
+      seedPrompt?: string;
+      followUpMode?: 'single_narrow';
+      timeRemaining?: number;
+      userLevel?: string;
+      voiceProfileId?: string;
+    }
+  ): Promise<{
+    text: string;
+    audioAssetId: string;
+    audioUrl: string;
+    cacheKey: string;
+    provider: 'openai' | 'elevenlabs' | 'edge-tts';
+    durationSeconds?: number;
+    cacheHit: boolean;
+  }> {
+    const text = await this.generateExaminerResponse(conversationHistory, testPart, context);
+    const examinerProfile = this.examinerProfileService.resolveProfile(context?.voiceProfileId);
+    const cacheKey = this.speakingAudioAssetService.buildDynamicFollowUpCacheKey(examinerProfile.id, text);
+    const cachedAsset = await this.speakingAudioAssetService.getDynamicFollowUpAsset(examinerProfile.id, text);
+
+    if (cachedAsset?.publicUrl && cachedAsset.status === 'ready') {
+      this.log.info(`Speaking follow-up cache hit (profile=${examinerProfile.id}, key=${cacheKey})`);
+      return {
+        text,
+        audioAssetId: typeof cachedAsset._id === 'string' ? cachedAsset._id : cachedAsset._id?.toString?.() || cacheKey,
+        audioUrl: cachedAsset.publicUrl,
+        cacheKey,
+        provider: cachedAsset.provider || examinerProfile.provider,
+        durationSeconds: cachedAsset.durationSeconds,
+        cacheHit: true
+      };
+    }
+
+    const synthesized = await this.synthesize(text, {
+      voiceId: examinerProfile.voiceId,
+      cacheKey,
+      provider: examinerProfile.provider
+    });
+    const storedAsset = await this.speakingAudioAssetService.cacheDynamicFollowUpAsset({
+      voiceProfileId: examinerProfile.id,
+      provider: examinerProfile.provider,
+      text,
+      audioBuffer: synthesized.buffer,
+      mimeType: 'audio/mpeg'
+    });
+
+    this.log.info(`Speaking follow-up cache miss (profile=${examinerProfile.id}, key=${cacheKey})`);
+
+    return {
+      text,
+      audioAssetId: typeof storedAsset._id === 'string' ? storedAsset._id : storedAsset._id?.toString?.() || cacheKey,
+      audioUrl: storedAsset.publicUrl || '',
+      cacheKey,
+      provider: storedAsset.provider || examinerProfile.provider,
+      durationSeconds: storedAsset.durationSeconds,
+      cacheHit: false
+    };
   }
 
   /**

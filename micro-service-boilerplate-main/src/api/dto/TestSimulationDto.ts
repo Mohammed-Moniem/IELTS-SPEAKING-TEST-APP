@@ -11,6 +11,7 @@ import {
   Min,
   ValidateNested
 } from 'class-validator';
+import { SpeakingSessionPackageDto } from './SpeakingSessionPackageDto';
 
 export type TestSimulationRuntimeState =
   | 'preflight'
@@ -71,6 +72,25 @@ export interface TestSimulationRuntimeDto {
   conversationHistory?: TestSimulationConversationMessageDto[];
   turnHistory?: TestSimulationTurnRecordDto[];
   currentSegment: TestSimulationRuntimeSegmentDto;
+}
+
+export interface TestSimulationTelemetryDto {
+  packageBuildDurationMs: number;
+  baseAudioAssetHits: number;
+  baseAudioAssetMisses: number;
+  followUpCacheHits: number;
+  followUpCacheMisses: number;
+  examinerProfileId: string;
+}
+
+export interface TestSimulationSessionResponseDto {
+  simulationId: string;
+  status?: string;
+  parts?: unknown[];
+  runtime: TestSimulationRuntimeDto;
+  currentPart?: unknown;
+  sessionPackage?: SpeakingSessionPackageDto;
+  telemetry?: TestSimulationTelemetryDto;
 }
 
 export class TestPartInput {

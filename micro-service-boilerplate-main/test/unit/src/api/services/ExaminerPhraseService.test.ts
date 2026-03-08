@@ -29,4 +29,12 @@ describe('ExaminerPhraseService', () => {
       ])
     );
   });
+
+  it('builds deterministic fixed-phrase cache keys by voice profile', () => {
+    const service = new ExaminerPhraseService();
+
+    expect(service.buildAudioCacheKey('british', 'welcome_intro')).toBe(
+      'fixed:british:welcome_intro'
+    );
+  });
 });

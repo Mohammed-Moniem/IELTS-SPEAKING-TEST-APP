@@ -14,6 +14,8 @@ import {
   isRetryablePauseState,
   isTerminalRuntimeState,
   mergeRuntimeIntoSimulation,
+  preloadSimulationPackageAudio,
+  resolveSimulationPackageSegment,
   retrySimulationRuntimeStep,
   submitSimulationRuntimeAnswer,
   synthesizeSimulationSegment,
@@ -97,18 +99,26 @@ export default function AuthenticSimulationStage({
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrlRef = useRef<string | null>(null);
   const currentBufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const mediaStreamSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const analyserNodeRef = useRef<AnalyserNode | null>(null);
   const promptCompletionTimeoutRef = useRef<number | null>(null);
   const autoAdvanceTimeoutRef = useRef<number | null>(null);
   const prepCountdownIntervalRef = useRef<number | null>(null);
+  const silenceAnimationFrameRef = useRef<number | null>(null);
   const lastSegmentKeyRef = useRef('');
   const lastAutoAdvanceKeyRef = useRef('');
+  const scheduledAutoAdvanceKeyRef = useRef('');
+  const lastAutoRecordTurnKeyRef = useRef('');
   const pendingAudioBlobRef = useRef<Blob | null>(null);
   const pendingDurationRef = useRef<number>(0);
   const pendingTranscriptRef = useRef<string>('');
   const turnStartedAtRef = useRef<number | null>(null);
+  const speechDetectedRef = useRef(false);
+  const lastSpeechAtRef = useRef<number | null>(null);
+  const turnStateRef = useRef<TurnState>('idle');
 
   const [turnState, setTurnState] = useState<TurnState>('idle');
-  const [playbackState, setPlaybackState] = useState<'idle' | 'synthesizing' | 'playing' | 'ready'>('idle');
+  const [playbackState, setPlaybackState] = useState<'idle' | 'loading-package' | 'synthesizing' | 'playing' | 'ready'>('idle');
   const [promptReady, setPromptReady] = useState(false);
   const [localPause, setLocalPause] = useState<LocalPause | null>(null);
   const [lastTranscript, setLastTranscript] = useState('');
@@ -116,6 +126,7 @@ export default function AuthenticSimulationStage({
 
   const runtime = session?.runtime ?? null;
   const segment = runtime?.currentSegment ?? null;
+  const activePackageSegment = useMemo(() => resolveSimulationPackageSegment(session), [session]);
 
   const currentPart = useMemo(() => {
     if (!session || !runtime) return undefined;
@@ -134,6 +145,19 @@ export default function AuthenticSimulationStage({
   const canStartRecording = isCandidateTurn && turnState === 'idle' && !localPause;
   const canStopRecording = turnState === 'recording';
   const shouldAutoAdvanceAfterPrompt = Boolean(runtime && isExaminerRuntimeState(runtime.state));
+  const shouldAutoRecordCandidateTurn =
+    runtime?.state === 'part1-candidate-turn'
+    || runtime?.state === 'part2-candidate-turn'
+    || runtime?.state === 'part3-candidate-turn';
+  const silenceThresholdMs =
+    typeof window !== 'undefined' &&
+    Number.isFinite((window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs)
+      ? Math.max(250, (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs || 7000)
+      : 7000;
+
+  useEffect(() => {
+    turnStateRef.current = turnState;
+  }, [turnState]);
 
   const clearPromptCompletionTimeout = useCallback(() => {
     if (promptCompletionTimeoutRef.current) {
@@ -155,6 +179,34 @@ export default function AuthenticSimulationStage({
       prepCountdownIntervalRef.current = null;
     }
     setPart2PrepRemaining(null);
+  }, []);
+
+  const clearSilenceMonitor = useCallback(() => {
+    if (silenceAnimationFrameRef.current) {
+      window.cancelAnimationFrame(silenceAnimationFrameRef.current);
+      silenceAnimationFrameRef.current = null;
+    }
+
+    if (mediaStreamSourceRef.current) {
+      try {
+        mediaStreamSourceRef.current.disconnect();
+      } catch {
+        // Ignore stale disconnect failures.
+      }
+      mediaStreamSourceRef.current = null;
+    }
+
+    if (analyserNodeRef.current) {
+      try {
+        analyserNodeRef.current.disconnect();
+      } catch {
+        // Ignore stale disconnect failures.
+      }
+      analyserNodeRef.current = null;
+    }
+
+    speechDetectedRef.current = false;
+    lastSpeechAtRef.current = null;
   }, []);
 
   const markPromptReady = useCallback(() => {
@@ -281,6 +333,8 @@ export default function AuthenticSimulationStage({
   );
 
   const stopRecorder = useCallback(() => {
+    clearSilenceMonitor();
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
@@ -290,7 +344,122 @@ export default function AuthenticSimulationStage({
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     streamRef.current = null;
-  }, []);
+  }, [clearSilenceMonitor]);
+
+  const examinerStatusText = useMemo(() => {
+    if (runtime?.state === 'part2-prep' && promptReady) {
+      return `Prep time remaining: ${part2PrepRemaining ?? 60}s`;
+    }
+
+    if (runtime?.state === 'evaluation' && promptReady) {
+      return 'Preparing your detailed report...';
+    }
+
+    if (promptReady && shouldAutoAdvanceAfterPrompt) {
+      return 'Your turn begins automatically after the examiner prompt.';
+    }
+
+    return 'Please listen to the examiner.';
+  }, [part2PrepRemaining, promptReady, runtime?.state, shouldAutoAdvanceAfterPrompt]);
+
+  const candidateHelperText = useMemo(() => {
+    if (runtime?.state === 'part2-candidate-turn') {
+      return 'Recording starts automatically after the examiner prompt. Use Stop + Submit when you are ready to finish Part 2.';
+    }
+
+    if (runtime?.state === 'part1-candidate-turn' || runtime?.state === 'part3-candidate-turn') {
+      return 'Recording starts automatically and submits after a short silence. Use Stop + Submit only if you want to finish early.';
+    }
+
+    if (runtime?.state === 'intro-candidate-turn') {
+      return 'Answer the examiner naturally. Use Stop + Submit when you are ready to continue.';
+    }
+
+    return 'Recording unlocks only during your turn.';
+  }, [runtime?.state]);
+
+  const candidateStatusText = useMemo(() => {
+    if (turnState === 'recording') {
+      return 'Recording in progress.';
+    }
+
+    if (turnState === 'transcribing') {
+      return 'Transcribing your response...';
+    }
+
+    if (turnState === 'submitting') {
+      return 'Sending your answer to the examiner...';
+    }
+
+    if (turnState === 'scoring') {
+      return 'Scoring the full simulation...';
+    }
+
+    return null;
+  }, [turnState]);
+
+  const beginSilenceMonitor = useCallback(
+    async (stream: MediaStream) => {
+      if (!shouldAutoRecordCandidateTurn) return;
+
+      const audioContext = audioContextRef.current;
+      if (!audioContext) return;
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      clearSilenceMonitor();
+
+      const streamSource = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      streamSource.connect(analyser);
+
+      mediaStreamSourceRef.current = streamSource;
+      analyserNodeRef.current = analyser;
+      speechDetectedRef.current = false;
+      lastSpeechAtRef.current = performance.now();
+
+      const samples = new Uint8Array(analyser.frequencyBinCount);
+
+      const tick = () => {
+        if (turnStateRef.current !== 'recording' || !analyserNodeRef.current) {
+          silenceAnimationFrameRef.current = null;
+          return;
+        }
+
+        analyserNodeRef.current.getByteTimeDomainData(samples);
+
+        let peakDelta = 0;
+        for (let i = 0; i < samples.length; i += 1) {
+          const delta = Math.abs(samples[i] - 128);
+          if (delta > peakDelta) {
+            peakDelta = delta;
+          }
+        }
+
+        const now = performance.now();
+        if (peakDelta >= 12) {
+          speechDetectedRef.current = true;
+          lastSpeechAtRef.current = now;
+        }
+
+        if (speechDetectedRef.current && lastSpeechAtRef.current && now - lastSpeechAtRef.current >= silenceThresholdMs) {
+          silenceAnimationFrameRef.current = null;
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          return;
+        }
+
+        silenceAnimationFrameRef.current = window.requestAnimationFrame(tick);
+      };
+
+      silenceAnimationFrameRef.current = window.requestAnimationFrame(tick);
+    },
+    [audioContextRef, clearSilenceMonitor, shouldAutoRecordCandidateTurn, silenceThresholdMs]
+  );
 
   const hydrateRuntime = useCallback(
     async (next: LiveSimulationSession) => {
@@ -369,7 +538,6 @@ export default function AuthenticSimulationStage({
       turnStartedAtRef.current = Date.now();
       streamRef.current = stream;
       mediaRecorderRef.current = recorder;
-
       recorder.ondataavailable = event => {
         if (event.data && event.data.size > 0) {
           chunksRef.current.push(event.data);
@@ -391,16 +559,22 @@ export default function AuthenticSimulationStage({
       };
 
       recorder.start();
+      turnStateRef.current = 'recording';
       setTurnState('recording');
+
+      if (session.runtime.state === 'part1-candidate-turn' || session.runtime.state === 'part3-candidate-turn') {
+        await beginSilenceMonitor(stream);
+      }
     } catch (error) {
       stopRecorder();
+      turnStateRef.current = 'idle';
       setTurnState('idle');
       setLocalPause({
         step: 'submission',
         message: getMicErrorMessage(error)
       });
     }
-  }, [deviceId, session, stopRecorder, transcribeAndSubmitAudio]);
+  }, [beginSilenceMonitor, deviceId, session, stopRecorder, transcribeAndSubmitAudio]);
 
   const stopRecordingTurn = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -501,18 +675,38 @@ export default function AuthenticSimulationStage({
     let cancelled = false;
 
     const run = async () => {
-      setPlaybackState('synthesizing');
       setPromptReady(false);
       stopActiveAudio();
 
       try {
-        const synthesis = await synthesizeSimulationSegment(promptText, segment.phraseId || segmentKey);
-        if (cancelled) return;
+        const synthesizePrompt = async () => {
+          setPlaybackState('synthesizing');
+          const synthesis = await synthesizeSimulationSegment(promptText, {
+            cacheKey: segment.phraseId || segmentKey,
+            voiceId: session.sessionPackage?.examinerProfile.voiceId
+          });
+          if (cancelled) return null;
+          return decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+        };
 
-        const blob = decodeAudioBase64(synthesis.audioBase64, synthesis.mimeType || 'audio/mpeg');
+        let blob: Blob | null;
+
+        if (activePackageSegment?.audioUrl) {
+          setPlaybackState('loading-package');
+          try {
+            blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl);
+          } catch {
+            blob = await synthesizePrompt();
+          }
+        } else {
+          blob = await synthesizePrompt();
+        }
+
+        if (cancelled || !blob) return;
         await playSynthesizedPrompt(blob);
       } catch (error: any) {
         if (cancelled) return;
+        clearPromptCompletionTimeout();
         const message =
           error instanceof ApiError ? error.message : error?.message || 'Examiner audio failed for the current prompt.';
         setPlaybackState('idle');
@@ -529,20 +723,33 @@ export default function AuthenticSimulationStage({
     return () => {
       cancelled = true;
     };
-  }, [clearAutoAdvanceTimeout, isExaminerTurn, localPause, playSynthesizedPrompt, runtime, segment, session, stopActiveAudio]);
+  }, [
+    clearAutoAdvanceTimeout,
+    clearPromptCompletionTimeout,
+    isExaminerTurn,
+    localPause,
+    playSynthesizedPrompt,
+    runtime,
+    schedulePromptCompletionFallback,
+    segment,
+    session,
+    activePackageSegment,
+    stopActiveAudio
+  ]);
 
   useEffect(() => {
     if (!session || !runtime || !segment || !promptReady || !shouldAutoAdvanceAfterPrompt || localPause) {
+      scheduledAutoAdvanceKeyRef.current = '';
       clearAutoAdvanceTimeout();
       clearPrepCountdown();
       return;
     }
 
     const segmentKey = buildSegmentKey(session);
-    if (lastAutoAdvanceKeyRef.current === segmentKey) {
+    if (lastAutoAdvanceKeyRef.current === segmentKey || scheduledAutoAdvanceKeyRef.current === segmentKey) {
       return;
     }
-    lastAutoAdvanceKeyRef.current = segmentKey;
+    scheduledAutoAdvanceKeyRef.current = segmentKey;
 
     if (runtime.state === 'part2-prep') {
       const prepDurationMs = 60_000;
@@ -555,17 +762,21 @@ export default function AuthenticSimulationStage({
       }, 250);
 
       autoAdvanceTimeoutRef.current = window.setTimeout(() => {
+        scheduledAutoAdvanceKeyRef.current = '';
+        lastAutoAdvanceKeyRef.current = segmentKey;
         clearPrepCountdown();
         void continueAfterPrompt();
       }, prepDurationMs);
     } else {
       clearPrepCountdown();
-      autoAdvanceTimeoutRef.current = window.setTimeout(() => {
-        void continueAfterPrompt();
-      }, 200);
+      lastAutoAdvanceKeyRef.current = segmentKey;
+      void continueAfterPrompt();
     }
 
     return () => {
+      if (scheduledAutoAdvanceKeyRef.current === segmentKey) {
+        scheduledAutoAdvanceKeyRef.current = '';
+      }
       clearAutoAdvanceTimeout();
       clearPrepCountdown();
     };
@@ -587,6 +798,48 @@ export default function AuthenticSimulationStage({
       stopRecorder();
     };
   }, [stopActiveAudio, stopRecorder]);
+
+  useEffect(() => {
+    if (!session?.sessionPackage) {
+      return;
+    }
+
+    const segmentsToPreload = session.sessionPackage.segments.filter(
+      (candidate): candidate is NonNullable<typeof candidate> =>
+        candidate.turnType === 'examiner' && Boolean(candidate.audioUrl)
+    );
+
+    for (const nextSegment of segmentsToPreload) {
+      void preloadSimulationPackageAudio(nextSegment.audioUrl).catch(() => {
+        // Speculative preload failures should not break the active turn.
+      });
+    }
+  }, [activePackageSegment, session]);
+
+  useEffect(() => {
+    if (!session || !runtime || !isCandidateTurn || !shouldAutoRecordCandidateTurn || localPause || turnState !== 'idle') {
+      return;
+    }
+
+    const turnKey = buildSegmentKey(session);
+    if (lastAutoRecordTurnKeyRef.current === turnKey) {
+      return;
+    }
+    lastAutoRecordTurnKeyRef.current = turnKey;
+
+    void startRecording();
+  }, [isCandidateTurn, localPause, runtime, session, shouldAutoRecordCandidateTurn, startRecording, turnState]);
+
+  useEffect(() => {
+    if (!session || !runtime || !segment || !isExaminerTurn) {
+      return;
+    }
+
+    const turnKey = buildSegmentKey(session);
+    if (lastAutoRecordTurnKeyRef.current === turnKey) {
+      lastAutoRecordTurnKeyRef.current = '';
+    }
+  }, [isExaminerTurn, runtime, segment, session]);
 
   const partProgress = useMemo(() => {
     const activePart = runtime?.currentPart || 0;
@@ -757,21 +1010,7 @@ export default function AuthenticSimulationStage({
                 >
                   Replay prompt
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {playbackState === 'synthesizing'
-                    ? 'Preparing examiner audio...'
-                    : playbackState === 'playing'
-                      ? 'Examiner audio is playing.'
-                      : runtime?.state === 'part2-prep' && promptReady
-                        ? `Prep time remaining: ${part2PrepRemaining ?? 60}s`
-                      : runtime?.state === 'evaluation' && promptReady
-                        ? 'Preparing your score...'
-                      : promptReady && shouldAutoAdvanceAfterPrompt
-                        ? 'Switching to your turn...'
-                      : promptReady
-                        ? 'Prompt finished. Continue when ready.'
-                        : 'Loading examiner prompt.'}
-                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{examinerStatusText}</span>
               </div>
             </div>
           ) : null}
@@ -829,17 +1068,12 @@ export default function AuthenticSimulationStage({
                   <span className="material-symbols-outlined text-[18px]">stop</span>
                   Stop + Submit
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {turnState === 'recording'
-                    ? 'Recording in progress.'
-                    : turnState === 'transcribing'
-                      ? 'Transcribing your response...'
-                      : turnState === 'submitting'
-                        ? 'Sending your answer to the examiner...'
-                        : turnState === 'scoring'
-                          ? 'Scoring the full simulation...'
-                          : 'Recording unlocks only during your turn.'}
-                </span>
+                <div className="space-y-1">
+                  {candidateStatusText ? (
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{candidateStatusText}</p>
+                  ) : null}
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{candidateHelperText}</p>
+                </div>
               </div>
 
               {lastTranscript ? (

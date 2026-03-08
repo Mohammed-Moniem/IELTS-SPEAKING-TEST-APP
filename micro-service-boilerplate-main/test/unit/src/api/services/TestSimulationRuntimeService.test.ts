@@ -37,7 +37,11 @@ describe('TestSimulationService runtime contract', () => {
     generateCompleteTest: jest.fn()
   };
   const speechService = {
-    generateExaminerResponse: jest.fn()
+    generateExaminerResponse: jest.fn(),
+    generateBufferedExaminerFollowUp: jest.fn()
+  };
+  const sessionPackageService = {
+    buildSessionPackage: jest.fn()
   };
 
   let savedSimulation: any;
@@ -47,7 +51,8 @@ describe('TestSimulationService runtime contract', () => {
       usageService as any,
       feedbackService as any,
       questionGenerationService as any,
-      speechService as any
+      speechService as any,
+      sessionPackageService as any
     );
 
   const startThroughFirstPart1CandidateTurn = async (service: TestSimulationService) => {
@@ -119,9 +124,43 @@ describe('TestSimulationService runtime contract', () => {
     });
 
     mockSimulationFindOne.mockImplementation(async () => savedSimulation);
-    speechService.generateExaminerResponse.mockResolvedValue(
-      'Could you tell me a little more about that?'
-    );
+    speechService.generateExaminerResponse.mockResolvedValue('Could you tell me a little more about that?');
+    speechService.generateBufferedExaminerFollowUp.mockResolvedValue({
+      text: 'Could you tell me a little more about that?',
+      audioAssetId: 'asset-follow-up',
+      audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3',
+      cacheKey: 'dynamic-follow-up:british:could-you-tell-me-a-little-more-about-that',
+      provider: 'openai',
+      cacheHit: false
+    });
+    sessionPackageService.buildSessionPackage.mockResolvedValue({
+      version: 1,
+      preparedAt: new Date('2026-03-07T00:00:00.000Z'),
+      examinerProfile: {
+        id: 'british',
+        label: 'British Examiner',
+        accent: 'British',
+        provider: 'openai',
+        voiceId: 'alloy',
+        autoAssigned: true
+      },
+      segments: [
+        {
+          segmentId: 'fixed:welcome_intro',
+          part: 0,
+          phase: 'check-in',
+          kind: 'fixed_phrase',
+          turnType: 'examiner',
+          canAutoAdvance: true,
+          phraseId: 'welcome_intro',
+          text: 'Good morning. My name is Dr. Smith and I will be your examiner today. Can you tell me your full name please?',
+          audioAssetId: 'asset-welcome',
+          audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+          cacheKey: 'fixed:british:welcome_intro',
+          provider: 'openai'
+        }
+      ]
+    });
   });
 
   it('starts a simulation with intro examiner runtime metadata', async () => {
@@ -130,6 +169,35 @@ describe('TestSimulationService runtime contract', () => {
     const result = await service.startSimulation('user-1', { urc: 'test-urc' } as any);
 
     expect(result.parts).toHaveLength(3);
+    expect(result.sessionPackage).toEqual(
+      expect.objectContaining({
+        examinerProfile: expect.objectContaining({
+          id: 'british',
+          accent: 'British',
+          provider: 'openai'
+        }),
+        segments: expect.arrayContaining([
+          expect.objectContaining({
+            segmentId: 'fixed:welcome_intro',
+            part: 0,
+            turnType: 'examiner',
+            canAutoAdvance: true,
+            audioAssetId: 'asset-welcome',
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+          })
+        ])
+      })
+    );
+    expect((result as any).telemetry).toEqual(
+      expect.objectContaining({
+        packageBuildDurationMs: expect.any(Number),
+        baseAudioAssetHits: 1,
+        baseAudioAssetMisses: 0,
+        followUpCacheHits: 0,
+        followUpCacheMisses: 0,
+        examinerProfileId: 'british'
+      })
+    );
     expect(result.runtime).toEqual(
       expect.objectContaining({
         state: 'intro-examiner',
@@ -152,7 +220,34 @@ describe('TestSimulationService runtime contract', () => {
             kind: 'cached_phrase',
             phraseId: 'welcome_intro'
           })
+        }),
+        sessionPackage: expect.objectContaining({
+          examinerProfile: expect.objectContaining({
+            id: 'british',
+            accent: 'British',
+            provider: 'openai'
+          }),
+          segments: expect.arrayContaining([
+            expect.objectContaining({
+              segmentId: 'fixed:welcome_intro',
+              part: 0,
+              turnType: 'examiner',
+              canAutoAdvance: true,
+              audioAssetId: 'asset-welcome',
+              audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+            })
+          ])
         })
+      })
+    );
+    expect(sessionPackageService.buildSessionPackage).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ part: 1 }),
+        expect.objectContaining({ part: 2 }),
+        expect.objectContaining({ part: 3 })
+      ]),
+      expect.objectContaining({
+        selectionSeed: 'user-1:test-urc'
       })
     );
   });
@@ -218,20 +313,67 @@ describe('TestSimulationService runtime contract', () => {
     expect(followUp.runtime.currentSegment.text).toBe(
       'Could you tell me a little more about that?'
     );
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledWith(
+    expect(followUp.sessionPackage?.segments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'dynamic_follow_up',
+          part: 1,
+          turnType: 'examiner',
+          text: 'Could you tell me a little more about that?',
+          audioAssetId: 'asset-follow-up',
+          audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3'
+        })
+      ])
+    );
+    expect((followUp as any).telemetry).toEqual(
+      expect.objectContaining({
+        examinerProfileId: 'british',
+        followUpCacheHits: 0,
+        followUpCacheMisses: 1
+      })
+    );
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledWith(
       expect.any(Array),
       1,
       expect.objectContaining({
         seedPrompt: 'Do you live in a house or an apartment?',
-        followUpMode: 'single_narrow'
+        followUpMode: 'single_narrow',
+        voiceProfileId: 'british'
+      })
+    );
+  });
+
+  it('tracks adaptive follow-up cache hits in telemetry', async () => {
+    speechService.generateBufferedExaminerFollowUp.mockResolvedValueOnce({
+      text: 'Could you tell me a little more about that?',
+      audioAssetId: 'asset-follow-up',
+      audioUrl: 'https://cdn.spokio.com/speaking/follow-ups/british/follow-up.mp3',
+      cacheKey: 'dynamic-follow-up:british:could-you-tell-me-a-little-more-about-that',
+      provider: 'openai',
+      cacheHit: true
+    });
+
+    const service = createService();
+    await startThroughFirstPart1CandidateTurn(service);
+
+    const followUp = await service.submitRuntimeAnswer(
+      'user-1',
+      'simulation-1',
+      { transcript: 'I live in an apartment near the city centre.', durationSeconds: 9 },
+      { urc: 'answer-cache-hit' } as any
+    );
+
+    expect((followUp as any).telemetry).toEqual(
+      expect.objectContaining({
+        examinerProfileId: 'british',
+        followUpCacheHits: 1,
+        followUpCacheMisses: 0
       })
     );
   });
 
   it('pauses on the first examiner generation failure and terminally fails on the second', async () => {
-    speechService.generateExaminerResponse.mockRejectedValue(
-      new Error('examiner generation failed')
-    );
+    speechService.generateBufferedExaminerFollowUp.mockRejectedValue(new Error('examiner generation failed'));
 
     const service = createService();
     await startThroughFirstPart1CandidateTurn(service);
@@ -311,7 +453,7 @@ describe('TestSimulationService runtime contract', () => {
     );
 
     expect(transition.runtime.state).toBe('part1-transition');
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledTimes(1);
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledTimes(1);
   });
 
   it('limits part three to four examiner prompts before auto-transitioning to evaluation', async () => {
@@ -363,6 +505,8 @@ describe('TestSimulationService runtime contract', () => {
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-prep' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-launch' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part2-candidate' } as any);
+    speechService.generateBufferedExaminerFollowUp.mockClear();
+
     await service.submitRuntimeAnswer(
       'user-1',
       'simulation-1',
@@ -372,11 +516,12 @@ describe('TestSimulationService runtime contract', () => {
       },
       { urc: 'answer-part2' } as any
     );
+    expect(speechService.generateBufferedExaminerFollowUp).not.toHaveBeenCalled();
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-intro' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-first-question' } as any);
     await service.advanceRuntime('user-1', 'simulation-1', { urc: 'advance-part3-candidate-turn' } as any);
 
-    speechService.generateExaminerResponse.mockClear();
+    speechService.generateBufferedExaminerFollowUp.mockClear();
 
     const part3FollowUp = await service.submitRuntimeAnswer(
       'user-1',
@@ -415,13 +560,14 @@ describe('TestSimulationService runtime contract', () => {
     );
 
     expect(evaluation.runtime.state).toBe('evaluation');
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledTimes(1);
-    expect(speechService.generateExaminerResponse).toHaveBeenCalledWith(
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledTimes(1);
+    expect(speechService.generateBufferedExaminerFollowUp).toHaveBeenCalledWith(
       expect.any(Array),
       3,
       expect.objectContaining({
         seedPrompt: 'How has tourism changed in recent years?',
-        followUpMode: 'single_narrow'
+        followUpMode: 'single_narrow',
+        voiceProfileId: 'british'
       })
     );
   });

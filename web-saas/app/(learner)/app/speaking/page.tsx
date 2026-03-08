@@ -487,13 +487,13 @@ export default function SpeakingPage() {
       await primeSimulationMicrophone();
 
       const started = await startSimulationRuntime();
-      const hydrated =
-        started.runtime
-          ? started
-          : mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
-
-      setSimulation(hydrated);
+      setSimulation(started);
       startSimulationTimer();
+
+      if (!started.runtime) {
+        const hydrated = mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
+        setSimulation(hydrated);
+      }
     } catch (error: any) {
       if (handleUsageLimitRedirect(error)) return;
       const message =
@@ -504,38 +504,38 @@ export default function SpeakingPage() {
     }
   };
 
-  const loadSimulationDetail = async (simulationId: string) => {
-    setErrorMessage('');
-    try {
-      const detail = await apiRequest<SimulationSession>(`/test-simulations/${simulationId}`);
-      setSimulationResult(detail);
-    } catch (error: any) {
-      if (handleUsageLimitRedirect(error)) return;
-      setErrorMessage(error?.message || 'Unable to load simulation details.');
-    }
-  };
-
   const handleSimulationSessionChange = useCallback((next: LiveSimulationSession | null) => {
     setSimulation(next);
   }, []);
 
   useEffect(() => {
-    if (!simulation || simulation.runtime) return;
+    if (!simulation || simulation.runtime) {
+      return;
+    }
 
     let cancelled = false;
+    const simulationId = simulation.simulationId;
 
     const hydrateMissingRuntime = async () => {
       try {
-        const response = await getSimulationRuntime(simulation.simulationId);
+        const response = await getSimulationRuntime(simulationId);
         if (cancelled) return;
         setSimulation(current => {
-          if (!current || current.simulationId !== simulation.simulationId || current.runtime) {
+          if (
+            !current
+            || current.simulationId !== simulationId
+            || current.runtime
+          ) {
             return current;
           }
+
           return mergeRuntimeIntoSimulation(current, response);
         });
       } catch (error: any) {
         if (cancelled) return;
+        if (simulation.runtime) {
+          return;
+        }
         setErrorMessage(current => current || error?.message || 'Failed to restore the speaking simulation runtime.');
       }
     };
@@ -787,8 +787,40 @@ export default function SpeakingPage() {
   const simulationWeaknessSeed = useMemo(() => {
     const feedback = simulationResult?.overallFeedback;
     if (!feedback) return '';
-    return feedback.improvements?.[0] || feedback.summary || '';
-  }, [simulationResult?.overallFeedback]);
+    return (
+      simulationResult?.fullEvaluation?.suggestions?.[0]?.suggestion
+      || feedback.improvements?.[0]
+      || feedback.summary
+      || ''
+    );
+  }, [simulationResult?.fullEvaluation?.suggestions, simulationResult?.overallFeedback]);
+
+  const simulationReportHref = useMemo(() => {
+    const simulationId = simulationResult?._id || simulationResult?.simulationId;
+    return simulationId ? `/app/speaking/simulations/${simulationId}` : '';
+  }, [simulationResult?._id, simulationResult?.simulationId]);
+
+  const simulationCriteriaRows = useMemo(() => {
+    const criteria = simulationResult?.fullEvaluation?.criteria;
+    if (!criteria) return [];
+
+    return [
+      { label: 'Fluency & Coherence', value: criteria.fluencyCoherence.band, feedback: criteria.fluencyCoherence.feedback },
+      { label: 'Lexical Resource', value: criteria.lexicalResource.band, feedback: criteria.lexicalResource.feedback },
+      { label: 'Grammar', value: criteria.grammaticalRange.band, feedback: criteria.grammaticalRange.feedback },
+      { label: 'Pronunciation', value: criteria.pronunciation.band, feedback: criteria.pronunciation.feedback }
+    ];
+  }, [simulationResult?.fullEvaluation?.criteria]);
+
+  const simulationSuggestions = useMemo(
+    () => (simulationResult?.fullEvaluation?.suggestions || []).slice(0, 4),
+    [simulationResult?.fullEvaluation?.suggestions]
+  );
+
+  const simulationCorrectionsPreview = useMemo(
+    () => (simulationResult?.fullEvaluation?.corrections || []).slice(0, 3),
+    [simulationResult?.fullEvaluation?.corrections]
+  );
 
   const simulationCtaLabel = simulationStarting ? 'Preparing simulation...' : 'Start Full Simulation';
   const simulationCtaClasses = simulationStarting
@@ -1293,7 +1325,29 @@ export default function SpeakingPage() {
             <article className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/5 p-6 space-y-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Simulation Result</h3>
               <p className="text-3xl font-extrabold text-gray-900 dark:text-white">Overall Band {simulationResult.overallBand ?? '--'}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{simulationResult.overallFeedback?.summary}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {simulationResult.fullEvaluation?.spokenSummary || simulationResult.overallFeedback?.summary}
+              </p>
+              {simulationResult.fullEvaluation?.detailedFeedback ? (
+                <div className="rounded-xl border border-emerald-100 dark:border-emerald-500/15 bg-white/80 dark:bg-gray-900/70 p-4">
+                  <p className="text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    {simulationResult.fullEvaluation.detailedFeedback}
+                  </p>
+                </div>
+              ) : null}
+              {simulationCriteriaRows.length ? (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+                  {simulationCriteriaRows.map(row => (
+                    <div key={row.label} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {row.label}
+                      </p>
+                      <p className="text-2xl font-extrabold text-violet-600 dark:text-violet-400">{row.value.toFixed(1)}</p>
+                      <p className="text-xs leading-6 text-gray-500 dark:text-gray-400">{row.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {simulationResult.parts.map(part => (
                   <div key={part.part} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-1.5">
@@ -1303,7 +1357,53 @@ export default function SpeakingPage() {
                   </div>
                 ))}
               </div>
+              {(simulationCorrectionsPreview.length || simulationSuggestions.length) ? (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-3">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                      Corrections to review
+                    </h4>
+                    <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                      {simulationCorrectionsPreview.map(item => (
+                        <li key={`${item.original}-${item.corrected}`} className="space-y-1">
+                          <p className="font-semibold text-gray-900 dark:text-white">{item.original}</p>
+                          <p>{item.corrected}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{item.explanation}</p>
+                        </li>
+                      ))}
+                      {simulationCorrectionsPreview.length ? null : (
+                        <li className="text-gray-500 dark:text-gray-400">Open the full report to review detailed speaking corrections.</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-3">
+                    <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                      Upgrade plan
+                    </h4>
+                    <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                      {simulationSuggestions.map(item => (
+                        <li key={`${item.category}-${item.suggestion}`} className="flex items-start gap-2">
+                          <span className="material-symbols-outlined mt-0.5 text-[14px] text-amber-500">arrow_upward</span>
+                          <span>{item.suggestion}</span>
+                        </li>
+                      ))}
+                      {simulationSuggestions.length ? null : (
+                        <li className="text-gray-500 dark:text-gray-400">Open the full report to see the full improvement plan for the next simulation.</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2 text-xs">
+                {simulationReportHref ? (
+                  <Link
+                    href={simulationReportHref}
+                    className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
+                  >
+                    Open full report
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </Link>
+                ) : null}
                 <Link
                   href={buildLibraryHref('collocations', 'speaking', simulationWeaknessSeed)}
                   className="font-semibold text-violet-600 dark:text-violet-400 hover:underline"
@@ -1348,12 +1448,16 @@ export default function SpeakingPage() {
                       <td className="px-5 py-3.5 text-sm font-bold text-gray-900 dark:text-white">{item.overallBand ?? '-'}</td>
                       <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400">{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</td>
                       <td className="px-5 py-3.5">
-                        <button
-                          onClick={() => void loadSimulationDetail(item._id || item.simulationId || '')}
-                          className="text-sm font-semibold text-violet-600 dark:text-violet-400 hover:underline"
-                        >
-                          Open
-                        </button>
+                        {item._id || item.simulationId ? (
+                          <Link
+                            href={`/app/speaking/simulations/${item._id || item.simulationId}`}
+                            className="text-sm font-semibold text-violet-600 dark:text-violet-400 hover:underline"
+                          >
+                            Open
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-gray-400">--</span>
+                        )}
                       </td>
                     </tr>
                   ))}

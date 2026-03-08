@@ -16,6 +16,7 @@ interface TTSOptions {
   rate?: number;
   pitch?: number;
   language?: string;
+  voiceId?: string;
   onDone?: () => void;
   onStopped?: () => void;
   onError?: (error: Error) => void;
@@ -41,10 +42,16 @@ class TextToSpeechService {
     string,
     { dataUri: string; expiresAt: number }
   >();
+  private readonly packageAudioCacheTtlMs = 1000 * 60 * 60 * 24;
+  private packageAudioCache = new Map<
+    string,
+    { fileUri: string; expiresAt: number }
+  >();
   private remoteSynthesisDisabled = false;
   private remoteDisableReason: string | null = null;
   private remoteDisableAlertShown = false;
   private isUsingSystemSpeech = false;
+  private currentAudioFileOwned = false;
 
   /**
    * Get part-specific introduction from the examiner
@@ -97,7 +104,10 @@ class TextToSpeechService {
       if (this.remoteSynthesisDisabled) {
         await this.speakWithSystemVoice(trimmed);
       } else {
-        const audioDataUri = await this.getAudioDataUri(trimmed);
+        const audioDataUri = await this.getAudioDataUri(
+          trimmed,
+          options.voiceId
+        );
 
         if (this.stopRequested) {
           return;
@@ -153,6 +163,98 @@ class TextToSpeechService {
       this.stopRequested = false;
 
       if (shouldThrow && playbackError) {
+        throw playbackError;
+      }
+    }
+  }
+
+  async preloadPackageAudio(audioUrl: string): Promise<string> {
+    const normalizedUrl = audioUrl?.trim();
+    if (!normalizedUrl) {
+      throw new Error("A package audio URL is required.");
+    }
+
+    this.pruneExpiredPackageAudioCache();
+
+    const cached = this.packageAudioCache.get(normalizedUrl);
+    if (cached) {
+      const info = await FileSystem.getInfoAsync(cached.fileUri);
+      if (info.exists && cached.expiresAt > Date.now()) {
+        return cached.fileUri;
+      }
+      this.packageAudioCache.delete(normalizedUrl);
+    }
+
+    const baseDir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+    if (!baseDir) {
+      throw new Error("File system cache directory is not available.");
+    }
+
+    const fileUri = `${baseDir}${this.createPackageAudioKey(normalizedUrl)}.mp3`;
+    await FileSystem.downloadAsync(normalizedUrl, fileUri);
+
+    this.packageAudioCache.set(normalizedUrl, {
+      fileUri,
+      expiresAt: Date.now() + this.packageAudioCacheTtlMs,
+    });
+
+    return fileUri;
+  }
+
+  async speakPackageAudio(
+    audioUrl: string,
+    options: TTSOptions = {}
+  ): Promise<void> {
+    const normalizedUrl = audioUrl?.trim();
+    if (!normalizedUrl) {
+      throw new Error("A package audio URL is required.");
+    }
+
+    if (this.isSpeaking) {
+      await this.stop();
+    }
+
+    this.isSpeaking = true;
+    this.currentUtterance = normalizedUrl;
+    this.stopRequested = false;
+    this.currentCallbacks = {
+      onDone: options.onDone,
+      onStopped: options.onStopped,
+      onError: options.onError,
+    };
+
+    let playbackError: Error | null = null;
+
+    try {
+      await this.configureAudioMode();
+      const fileUri = await this.preloadPackageAudio(normalizedUrl);
+
+      if (this.stopRequested) {
+        return;
+      }
+
+      await this.playFileUri(fileUri, false);
+    } catch (error: any) {
+      playbackError = error instanceof Error ? error : new Error(String(error));
+    } finally {
+      const wasStopped = this.stopRequested;
+      await this.cleanupPlayback();
+
+      this.isSpeaking = false;
+      this.currentUtterance = null;
+
+      if (playbackError && !wasStopped) {
+        this.currentCallbacks?.onError?.(playbackError);
+      } else if (wasStopped) {
+        this.currentCallbacks?.onStopped?.();
+      } else if (!playbackError) {
+        this.currentCallbacks?.onDone?.();
+      }
+
+      this.currentCallbacks = null;
+      this.stopRequested = false;
+
+      if (playbackError && !wasStopped) {
         throw playbackError;
       }
     }
@@ -280,9 +382,15 @@ class TextToSpeechService {
     }
   }
 
-  private async getAudioDataUri(text: string): Promise<string> {
-    // First, try to get pre-cached audio by matching exact text
-    const cachedFileUri = await audioCacheService.getCachedAudioByText(text);
+  private async getAudioDataUri(
+    text: string,
+    voiceId?: string
+  ): Promise<string> {
+    // Pre-cached phrase audio is voice-agnostic, so only reuse it when no
+    // explicit examiner voice is required for this turn.
+    const cachedFileUri = voiceId
+      ? null
+      : await audioCacheService.getCachedAudioByText(text);
 
     if (cachedFileUri) {
       console.log("♻️ Using pre-cached audio file");
@@ -302,7 +410,7 @@ class TextToSpeechService {
     }
 
     // Fallback: Check in-memory cache for recently synthesized audio
-    const cacheKey = `tts_${text.substring(0, 50)}`;
+    const cacheKey = `tts_${voiceId || "default"}_${text.substring(0, 50)}`;
 
     this.pruneExpiredCache();
 
@@ -314,7 +422,7 @@ class TextToSpeechService {
 
     // Last resort: Synthesize via backend API
     console.log("🔊 Synthesizing via backend API (no cache available)");
-    const dataUri = await synthesizeSpeech(text);
+    const dataUri = await synthesizeSpeech(text, voiceId);
 
     const expiresAt = Date.now() + this.cacheTtlMs;
     this.audioCache.set(cacheKey, { dataUri, expiresAt });
@@ -382,19 +490,48 @@ class TextToSpeechService {
     }
   }
 
+  private pruneExpiredPackageAudioCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.packageAudioCache.entries()) {
+      if (value.expiresAt <= now) {
+        this.packageAudioCache.delete(key);
+        void FileSystem.deleteAsync(value.fileUri, { idempotent: true }).catch(
+          () => null
+        );
+      }
+    }
+  }
+
   private async playDataUri(dataUri: string): Promise<void> {
     const { sound, fileUri } = await this.prepareSound(dataUri);
+    await this.playLoadedSound(sound, fileUri, true);
+  }
 
+  private async playFileUri(fileUri: string, owned: boolean): Promise<void> {
+    const sound = new Audio.Sound();
+    await sound.loadAsync({ uri: fileUri });
+
+    await this.playLoadedSound(sound, fileUri, owned);
+  }
+
+  private async playLoadedSound(
+    sound: Audio.Sound,
+    fileUri: string,
+    owned: boolean
+  ): Promise<void> {
     if (this.stopRequested) {
       await sound.unloadAsync().catch(() => null);
-      await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(
-        () => null
-      );
+      if (owned) {
+        await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(
+          () => null
+        );
+      }
       return;
     }
 
     this.currentSound = sound;
     this.currentAudioFileUri = fileUri;
+    this.currentAudioFileOwned = owned;
 
     await new Promise<void>((resolve, reject) => {
       let settled = false;
@@ -469,14 +606,26 @@ class TextToSpeechService {
       this.currentSound = null;
     }
 
-    if (this.currentAudioFileUri) {
+    if (this.currentAudioFileUri && this.currentAudioFileOwned) {
       await FileSystem.deleteAsync(this.currentAudioFileUri, {
         idempotent: true,
       }).catch(() => null);
-      this.currentAudioFileUri = null;
     }
 
+    this.currentAudioFileUri = null;
+    this.currentAudioFileOwned = false;
+
     this.playbackCompletion = null;
+  }
+
+  private createPackageAudioKey(audioUrl: string): string {
+    let hash = 0;
+
+    for (let index = 0; index < audioUrl.length; index += 1) {
+      hash = (hash * 31 + audioUrl.charCodeAt(index)) >>> 0;
+    }
+
+    return `tts-package-${hash.toString(16)}`;
   }
 
   private delay(ms: number): Promise<void> {

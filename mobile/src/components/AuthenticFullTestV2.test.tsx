@@ -7,8 +7,11 @@ const mockStart = jest.fn();
 const mockAdvance = jest.fn();
 const mockRetry = jest.fn();
 const mockComplete = jest.fn();
+const mockAnswerRuntime = jest.fn();
 const mockTranscribeAudio = jest.fn();
 const mockSpeak = jest.fn();
+const mockSpeakPackageAudio = jest.fn();
+const mockPreloadPackageAudio = jest.fn();
 const mockStop = jest.fn();
 
 jest.mock("@expo/vector-icons", () => ({
@@ -33,9 +36,10 @@ jest.mock("expo-av", () => ({
 jest.mock("../api/services", () => ({
   simulationApi: {
     start: () => mockStart(),
+    getRuntime: jest.fn(),
     advanceRuntime: (simulationId: string) => mockAdvance(simulationId),
     answerRuntime: (simulationId: string, payload: any) =>
-      Promise.resolve({ simulationId, payload }),
+      mockAnswerRuntime(simulationId, payload),
     retryRuntime: (simulationId: string) => mockRetry(simulationId),
     complete: (simulationId: string, parts: any[]) =>
       mockComplete(simulationId, parts),
@@ -49,6 +53,8 @@ jest.mock("../api/speechApi", () => ({
 jest.mock("../services/textToSpeechService", () => ({
   ttsService: {
     speak: (...args: any[]) => mockSpeak(...args),
+    speakPackageAudio: (...args: any[]) => mockSpeakPackageAudio(...args),
+    preloadPackageAudio: (...args: any[]) => mockPreloadPackageAudio(...args),
     stop: () => mockStop(),
   },
 }));
@@ -113,6 +119,53 @@ const buildStartPayload = (runtimeOverrides: Record<string, any> = {}) => ({
     },
   ],
   runtime: buildRuntimeResponse(runtimeOverrides).runtime,
+  sessionPackage: {
+    examinerProfile: {
+      id: "british",
+      label: "British examiner",
+      accent: "British",
+      provider: "openai",
+      voiceId: "alloy",
+      autoAssigned: true,
+    },
+    segments: [
+      {
+        segmentId: "welcome-segment",
+        part: 0,
+        turnType: "examiner",
+        kind: "fixed_phrase",
+        phraseId: "welcome_intro",
+        text: "Good morning. My name is Anna. I will be your examiner today.",
+        audioAssetId: "asset-welcome",
+        audioUrl:
+          "https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3",
+        canAutoAdvance: true,
+      },
+      {
+        segmentId: "part1-seed-0",
+        part: 1,
+        turnType: "examiner",
+        kind: "seed_prompt",
+        text: "What hobbies do you have?",
+        audioAssetId: "asset-part1-seed-0",
+        audioUrl:
+          "https://cdn.spokio.com/speaking/questions/british/part1/hobbies/q0.mp3",
+        canAutoAdvance: true,
+      },
+      {
+        segmentId: "part2-intro",
+        part: 2,
+        turnType: "examiner",
+        kind: "part_transition",
+        phraseId: "part2_intro",
+        text: "Now I am going to give you a topic.",
+        audioAssetId: "asset-part2-intro",
+        audioUrl:
+          "https://cdn.spokio.com/speaking/fixed/british/part2_intro.mp3",
+        canAutoAdvance: true,
+      },
+    ],
+  },
 });
 
 describe("AuthenticFullTestV2", () => {
@@ -123,11 +176,29 @@ describe("AuthenticFullTestV2", () => {
         options?.onDone?.();
       }
     );
+    mockSpeakPackageAudio.mockImplementation(
+      async (_audioUrl: string, options?: { onDone?: () => void }) => {
+        options?.onDone?.();
+      }
+    );
+    mockPreloadPackageAudio.mockResolvedValue("file:///cache/package-audio.mp3");
     mockStart.mockResolvedValue(buildStartPayload());
     mockAdvance.mockResolvedValue(
       buildRuntimeResponse({
         state: "intro-candidate-turn",
         currentPart: 0,
+      })
+    );
+    mockAnswerRuntime.mockResolvedValue(
+      buildRuntimeResponse({
+        state: "part1-examiner",
+        currentPart: 1,
+        currentTurnIndex: 1,
+        seedQuestionIndex: 1,
+        currentSegment: {
+          kind: "dynamic_prompt",
+          text: "Why do you enjoy that hobby so much?",
+        },
       })
     );
     mockRetry.mockResolvedValue(
@@ -219,5 +290,72 @@ describe("AuthenticFullTestV2", () => {
     ).toBeTruthy();
     expect(await findByRole("button", { name: "Retry step" })).toBeTruthy();
   });
-});
 
+  it("plays the current examiner turn from package audio and preloads upcoming package prompts", async () => {
+    render(<AuthenticFullTestV2 onComplete={jest.fn()} onExit={jest.fn()} />);
+
+    await waitFor(() =>
+      expect(mockSpeakPackageAudio).toHaveBeenCalledWith(
+        "https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3",
+        expect.objectContaining({ onDone: expect.any(Function) })
+      )
+    );
+
+    await waitFor(() =>
+      expect(mockPreloadPackageAudio).toHaveBeenCalledWith(
+        "https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3"
+      )
+    );
+
+    await waitFor(() =>
+      expect(mockPreloadPackageAudio).toHaveBeenCalledWith(
+        "https://cdn.spokio.com/speaking/questions/british/part1/hobbies/q0.mp3"
+      )
+    );
+
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
+
+  it("falls back to live synthesis for an adaptive follow-up after the learner answer", async () => {
+    mockStart.mockResolvedValue({
+      ...buildStartPayload(),
+      sessionPackage: {
+        ...buildStartPayload().sessionPackage,
+        examinerProfile: {
+          id: "australian",
+          label: "Australian examiner",
+          accent: "Australian",
+          provider: "openai",
+          voiceId: "echo",
+          autoAssigned: true,
+        },
+      },
+    });
+
+    const { findByRole, findByTestId, findByText } = render(
+      <AuthenticFullTestV2 onComplete={jest.fn()} onExit={jest.fn()} />
+    );
+
+    fireEvent.press(
+      await findByRole("button", { name: "Continue after prompt" })
+    );
+
+    await findByText("Your turn");
+    const startRecordingButton = await findByTestId("start-recording-button");
+    expect(startRecordingButton).toBeEnabled();
+
+    fireEvent.press(startRecordingButton);
+    await findByText("Recording in progress.");
+    fireEvent.press(await findByRole("button", { name: "Stop + Submit" }));
+
+    await waitFor(() =>
+      expect(mockSpeak).toHaveBeenCalledWith(
+        "Why do you enjoy that hobby so much?",
+        expect.objectContaining({
+          onDone: expect.any(Function),
+          voiceId: "echo",
+        })
+      )
+    );
+  });
+});

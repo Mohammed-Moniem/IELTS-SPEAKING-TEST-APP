@@ -37,6 +37,19 @@ describe('TestSimulationController runtime contract', () => {
     const runtimePayload = {
       simulationId: '507f1f77bcf86cd799439013',
       status: 'in_progress',
+      sessionPackage: {
+        version: 1,
+        examinerProfile: {
+          id: 'british',
+          accent: 'British'
+        },
+        segments: [
+          {
+            segmentId: 'fixed:welcome_intro',
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+          }
+        ]
+      },
       runtime: {
         state: 'part1-examiner',
         currentPart: 1,
@@ -92,6 +105,17 @@ describe('TestSimulationController runtime contract', () => {
     expect(getRuntimeResponse.body.success).toBe(true);
     expect(getRuntimeResponse.body.data).toMatchObject({
       simulationId: '507f1f77bcf86cd799439013',
+      sessionPackage: expect.objectContaining({
+        examinerProfile: expect.objectContaining({
+          id: 'british'
+        }),
+        segments: expect.arrayContaining([
+          expect.objectContaining({
+            segmentId: 'fixed:welcome_intro',
+            audioUrl: expect.any(String)
+          })
+        ])
+      }),
       runtime: expect.objectContaining({
         state: 'part1-examiner',
         currentSegment: expect.objectContaining({
