@@ -23,6 +23,7 @@ export type LiveSimulationSession = SimulationStartPayload & {
 };
 
 const packageAudioBlobCache = new Map<string, Promise<Blob>>();
+const packageAudioBufferCache = new Map<string, Promise<AudioBuffer>>();
 
 export const examinerRuntimeStates: TestSimulationRuntimeState[] = [
   'intro-examiner',
@@ -66,9 +67,18 @@ export const advanceSimulationRuntime = (simulationId: string) =>
 
 export const submitSimulationRuntimeAnswer = (
   simulationId: string,
-  payload: { transcript: string; durationSeconds?: number }
+  payload: { transcript?: string; durationSeconds?: number; deferTranscript?: boolean }
 ) =>
   apiRequest<SimulationRuntimeResponse>(`/test-simulations/${simulationId}/runtime/answer`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+export const attachSimulationRuntimeTranscript = (
+  simulationId: string,
+  payload: { transcript: string; durationSeconds?: number }
+) =>
+  apiRequest<SimulationRuntimeResponse>(`/test-simulations/${simulationId}/runtime/transcript`, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -191,7 +201,20 @@ export const getUpcomingSimulationPackageSegments = (
   return segments.slice(currentIndex + 1, currentIndex + 1 + count);
 };
 
-export const preloadSimulationPackageAudio = async (audioUrl: string) => {
+export const getRequiredSimulationPackageSegments = (session: LiveSimulationSession | null): SpeakingSessionSegment[] => {
+  if (!session?.sessionPackage?.segments?.length) {
+    return [];
+  }
+
+  return session.sessionPackage.segments.filter(
+    segment => segment.turnType === 'examiner' && segment.kind !== 'dynamic_follow_up' && Boolean(segment.audioUrl)
+  );
+};
+
+export const getCachedSimulationPackageAudioBuffer = (audioUrl: string) =>
+  packageAudioBufferCache.get(audioUrl.trim()) || null;
+
+export const preloadSimulationPackageAudio = async (audioUrl: string, audioContext?: AudioContext | null) => {
   const normalizedUrl = audioUrl.trim();
   if (!normalizedUrl) {
     throw new Error('Audio URL is required to preload a package segment');
@@ -217,11 +240,36 @@ export const preloadSimulationPackageAudio = async (audioUrl: string) => {
   packageAudioBlobCache.set(normalizedUrl, promise);
 
   try {
-    return await promise;
+    const blob = await promise;
+
+    if (audioContext) {
+      const cachedBuffer = packageAudioBufferCache.get(normalizedUrl);
+      if (!cachedBuffer) {
+        const decodePromise = blob.arrayBuffer().then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer.slice(0)));
+        packageAudioBufferCache.set(normalizedUrl, decodePromise);
+        await decodePromise;
+      } else {
+        await cachedBuffer;
+      }
+    }
+
+    return blob;
   } catch (error) {
     packageAudioBlobCache.delete(normalizedUrl);
+    packageAudioBufferCache.delete(normalizedUrl);
     throw error;
   }
+};
+
+export const prepareSimulationSessionPackageAudio = async (
+  session: LiveSimulationSession,
+  audioContext?: AudioContext | null
+) => {
+  const baseSegments = getRequiredSimulationPackageSegments(session);
+  const uniqueAudioUrls = Array.from(new Set(baseSegments.map(segment => segment.audioUrl).filter(Boolean)));
+
+  await Promise.all(uniqueAudioUrls.map(audioUrl => preloadSimulationPackageAudio(audioUrl, audioContext)));
+  return baseSegments;
 };
 
 export const buildSimulationCompletionPayload = (simulation: LiveSimulationSession) => {

@@ -5,6 +5,7 @@ import { SpeakingExaminerProfile, SpeakingExaminerProfileService } from '@servic
 import { Service } from 'typedi';
 
 import { env } from '../../env';
+import { SpeechService } from './SpeechService';
 
 export interface SpeakingSessionPackagePartDefinition {
   part: number;
@@ -18,6 +19,10 @@ export interface SpeakingSessionPackagePartDefinition {
 interface BuildSpeakingSessionPackageOptions {
   requestedProfileId?: string;
   selectionSeed?: string;
+}
+
+interface EnsureSpeakingSessionPackageReadyOptions {
+  simulationParts?: SpeakingSessionPackagePartDefinition[];
 }
 
 const FIXED_PHRASE_PART: Record<ExaminerPhraseId, number> = {
@@ -61,7 +66,8 @@ export class SpeakingSessionPackageService {
   constructor(
     private readonly examinerPhraseService: ExaminerPhraseService = new ExaminerPhraseService(),
     private readonly examinerProfileService: SpeakingExaminerProfileService = new SpeakingExaminerProfileService(),
-    private readonly audioAssetService: SpeakingAudioAssetService = new SpeakingAudioAssetService()
+    private readonly audioAssetService: SpeakingAudioAssetService = new SpeakingAudioAssetService(),
+    private readonly speechService: SpeechService = new SpeechService()
   ) {}
 
   public async buildSessionPackage(
@@ -83,11 +89,29 @@ export class SpeakingSessionPackageService {
       segments.push(...partSegments);
     }
 
-    return {
+    return this.ensurePackageReady({
       version: 1,
       preparedAt: new Date(),
+      prepareStatus: 'preparing',
+      requiredSegmentCount: 0,
+      readySegmentCount: 0,
       examinerProfile,
       segments
+    });
+  }
+
+  public async ensurePackageReady(
+    sessionPackage: SpeakingSessionPackageDto,
+    _options: EnsureSpeakingSessionPackageReadyOptions = {}
+  ): Promise<SpeakingSessionPackageDto> {
+    const requiredSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    const readySegmentCount = requiredSegments.filter(segment => segment.isReady).length;
+
+    return {
+      ...sessionPackage,
+      prepareStatus: readySegmentCount === requiredSegments.length ? 'ready' : 'preparing',
+      requiredSegmentCount: requiredSegments.length,
+      readySegmentCount
     };
   }
 
@@ -96,8 +120,15 @@ export class SpeakingSessionPackageService {
     phrase: ExaminerPhrase
   ): Promise<SpeakingSessionSegmentDto> {
     const cacheKey = this.audioAssetService.buildFixedPhraseCacheKey(examinerProfile.id, phrase.id);
-    const asset = await this.audioAssetService.getFixedPhraseAsset(examinerProfile.id, phrase.id);
     const storagePath = `fixed/${examinerProfile.id}/${phrase.id}.mp3`;
+    const asset = await this.ensureBaseSegmentAsset({
+      kind: this.toAssetKind(FIXED_PHRASE_KIND[phrase.id]),
+      existingAsset: await this.audioAssetService.getFixedPhraseAsset(examinerProfile.id, phrase.id),
+      cacheKey,
+      storagePath,
+      text: phrase.text,
+      examinerProfile
+    });
 
     return {
       segmentId: `fixed:${phrase.id}`,
@@ -112,7 +143,9 @@ export class SpeakingSessionPackageService {
       audioUrl: asset?.publicUrl || this.buildFallbackAudioUrl(storagePath),
       cacheKey,
       provider: asset?.provider || examinerProfile.provider,
-      durationSeconds: asset?.durationSeconds
+      durationSeconds: asset?.durationSeconds,
+      isReady: Boolean(asset?.publicUrl),
+      requiresGeneration: !asset?.publicUrl
     };
   }
 
@@ -150,14 +183,21 @@ export class SpeakingSessionPackageService {
       promptIndex: 0,
       text: part.question
     });
-    const asset = await this.audioAssetService.getQuestionAsset({
-      voiceProfileId: examinerProfile.id,
-      part: 2,
-      topicId: normalizedTopicId,
-      promptIndex: 0,
-      text: part.question
-    });
     const storagePath = `questions/${examinerProfile.id}/part2/${normalizedTopicId}/cue-card.mp3`;
+    const asset = await this.ensureBaseSegmentAsset({
+      kind: 'cue_card',
+      existingAsset: await this.audioAssetService.getQuestionAsset({
+        voiceProfileId: examinerProfile.id,
+        part: 2,
+        topicId: normalizedTopicId,
+        promptIndex: 0,
+        text: part.question
+      }),
+      cacheKey,
+      storagePath,
+      text: part.question,
+      examinerProfile
+    });
 
     return {
       segmentId: `part2:${normalizedTopicId}:cue-card`,
@@ -172,7 +212,9 @@ export class SpeakingSessionPackageService {
       audioUrl: asset?.publicUrl || this.buildFallbackAudioUrl(storagePath),
       cacheKey,
       provider: asset?.provider || examinerProfile.provider,
-      durationSeconds: asset?.durationSeconds
+      durationSeconds: asset?.durationSeconds,
+      isReady: Boolean(asset?.publicUrl),
+      requiresGeneration: !asset?.publicUrl
     };
   }
 
@@ -191,8 +233,15 @@ export class SpeakingSessionPackageService {
       text
     } as const;
     const cacheKey = this.audioAssetService.buildQuestionCacheKey(assetLookup);
-    const asset = await this.audioAssetService.getQuestionAsset(assetLookup);
     const storagePath = `questions/${examinerProfile.id}/part${part.part}/${normalizedTopicId}/question-${promptIndex}.mp3`;
+    const asset = await this.ensureBaseSegmentAsset({
+      kind: 'bank_question',
+      existingAsset: await this.audioAssetService.getQuestionAsset(assetLookup),
+      cacheKey,
+      storagePath,
+      text,
+      examinerProfile
+    });
 
     return {
       segmentId: `part${part.part}:${normalizedTopicId}:question-${promptIndex}`,
@@ -207,7 +256,9 @@ export class SpeakingSessionPackageService {
       audioUrl: asset?.publicUrl || this.buildFallbackAudioUrl(storagePath),
       cacheKey,
       provider: asset?.provider || examinerProfile.provider,
-      durationSeconds: asset?.durationSeconds
+      durationSeconds: asset?.durationSeconds,
+      isReady: Boolean(asset?.publicUrl),
+      requiresGeneration: !asset?.publicUrl
     };
   }
 
@@ -241,5 +292,41 @@ export class SpeakingSessionPackageService {
     }
 
     return typeof asset._id === 'string' ? asset._id : asset._id.toString();
+  }
+
+  private toAssetKind(kind: SpeakingSessionSegmentDto['kind']) {
+    if (kind === 'transition') return 'transition' as const;
+    if (kind === 'cue_card') return 'cue_card' as const;
+    return 'fixed_phrase' as const;
+  }
+
+  private async ensureBaseSegmentAsset(params: {
+    kind: 'fixed_phrase' | 'transition' | 'cue_card' | 'bank_question';
+    existingAsset: Awaited<ReturnType<SpeakingAudioAssetService['getFixedPhraseAsset']>> | Awaited<ReturnType<SpeakingAudioAssetService['getQuestionAsset']>>;
+    cacheKey: string;
+    storagePath: string;
+    text: string;
+    examinerProfile: SpeakingExaminerProfile;
+  }) {
+    if (params.existingAsset?.publicUrl) {
+      return params.existingAsset;
+    }
+
+    const synthesized = await this.speechService.synthesize(params.text, {
+      voiceId: params.examinerProfile.voiceId,
+      cacheKey: params.cacheKey,
+      provider: params.examinerProfile.provider
+    });
+
+    return this.audioAssetService.storeBaseSegmentAsset({
+      kind: params.kind,
+      cacheKey: params.cacheKey,
+      text: params.text,
+      voiceProfileId: params.examinerProfile.id,
+      provider: params.examinerProfile.provider,
+      storagePath: params.storagePath,
+      audioBuffer: synthesized.buffer,
+      mimeType: 'audio/mpeg'
+    });
   }
 }

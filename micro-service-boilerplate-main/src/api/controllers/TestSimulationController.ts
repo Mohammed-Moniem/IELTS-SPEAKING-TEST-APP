@@ -16,6 +16,7 @@ import { buildRequestHeaders, ensureResponseHeaders } from '@api/utils/requestCo
 import {
   CompleteTestSimulationRequest,
   RuntimeAnswerRequest,
+  RuntimeTranscriptAttachmentRequest,
   TestSimulationParam,
   TestSimulationQuery
 } from '@dto/TestSimulationDto';
@@ -179,11 +180,44 @@ export class TestSimulationController {
         params.simulationId,
         {
           transcript: body.transcript,
-          durationSeconds: body.durationSeconds
+          durationSeconds: body.durationSeconds,
+          deferTranscript: body.deferTranscript
         },
         headers
       );
       return StandardResponse.success(res, runtime, 'Simulation answer accepted', HTTP_STATUS_CODES.SUCCESS, headers);
+    } catch (error) {
+      return StandardResponse.error(res, error as Error, headers);
+    }
+  }
+
+  @Post('/:simulationId/runtime/transcript')
+  @HttpCode(HTTP_STATUS_CODES.SUCCESS)
+  @UseBefore(aiRateLimiter)
+  public async attachRuntimeTranscript(
+    @Params() params: TestSimulationParam,
+    @Body() body: RuntimeTranscriptAttachmentRequest,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    const headers: IRequestHeaders = buildRequestHeaders(req, 'simulation-runtime-transcript');
+    ensureResponseHeaders(res, headers);
+
+    if (!req.currentUser) {
+      return StandardResponse.unauthorized(res, 'Authentication required', headers);
+    }
+
+    try {
+      const runtime = await this.testSimulationService.attachRuntimeTranscript(
+        req.currentUser.id,
+        params.simulationId,
+        {
+          transcript: body.transcript,
+          durationSeconds: body.durationSeconds
+        },
+        headers
+      );
+      return StandardResponse.success(res, runtime, 'Simulation transcript attached', HTTP_STATUS_CODES.SUCCESS, headers);
     } catch (error) {
       return StandardResponse.error(res, error as Error, headers);
     }

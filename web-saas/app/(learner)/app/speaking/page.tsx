@@ -6,7 +6,13 @@ import Link from 'next/link';
 import AuthenticSimulationStage from '@/components/speaking/AuthenticSimulationStage';
 import ActiveAttemptLeaveGuard from '@/components/session/ActiveAttemptLeaveGuard';
 import { ApiError, apiRequest, handleUsageLimitRedirect } from '@/lib/api/client';
-import { LiveSimulationSession, getSimulationRuntime, mergeRuntimeIntoSimulation, startSimulationRuntime } from '@/lib/speaking/simulationRuntime';
+import {
+  LiveSimulationSession,
+  getSimulationRuntime,
+  mergeRuntimeIntoSimulation,
+  prepareSimulationSessionPackageAudio,
+  startSimulationRuntime
+} from '@/lib/speaking/simulationRuntime';
 import { PageHeader, SectionCard, StatusBadge, SegmentedTabs, EmptyState } from '@/components/ui/v2';
 import {
   PracticeAudioUploadResult,
@@ -483,17 +489,19 @@ export default function SpeakingPage() {
     setSimulationStarting(true);
 
     try {
-      await ensureSimulationAudioContext();
+      const audioContext = await ensureSimulationAudioContext();
       await primeSimulationMicrophone();
 
-      const started = await startSimulationRuntime();
-      setSimulation(started);
-      startSimulationTimer();
+      let started = await startSimulationRuntime();
 
       if (!started.runtime) {
-        const hydrated = mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
-        setSimulation(hydrated);
+        started = mergeRuntimeIntoSimulation(started, await getSimulationRuntime(started.simulationId));
       }
+
+      await prepareSimulationSessionPackageAudio(started, audioContext);
+
+      setSimulation(started);
+      startSimulationTimer();
     } catch (error: any) {
       if (handleUsageLimitRedirect(error)) return;
       const message =

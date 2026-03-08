@@ -41,7 +41,8 @@ describe('TestSimulationService runtime contract', () => {
     generateBufferedExaminerFollowUp: jest.fn()
   };
   const sessionPackageService = {
-    buildSessionPackage: jest.fn()
+    buildSessionPackage: jest.fn(),
+    ensurePackageReady: jest.fn()
   };
 
   let savedSimulation: any;
@@ -136,6 +137,9 @@ describe('TestSimulationService runtime contract', () => {
     sessionPackageService.buildSessionPackage.mockResolvedValue({
       version: 1,
       preparedAt: new Date('2026-03-07T00:00:00.000Z'),
+      prepareStatus: 'ready',
+      requiredSegmentCount: 1,
+      readySegmentCount: 1,
       examinerProfile: {
         id: 'british',
         label: 'British Examiner',
@@ -157,10 +161,13 @@ describe('TestSimulationService runtime contract', () => {
           audioAssetId: 'asset-welcome',
           audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
           cacheKey: 'fixed:british:welcome_intro',
-          provider: 'openai'
+          provider: 'openai',
+          isReady: true,
+          requiresGeneration: false
         }
       ]
     });
+    sessionPackageService.ensurePackageReady.mockImplementation(async (sessionPackage: any) => sessionPackage);
   });
 
   it('starts a simulation with intro examiner runtime metadata', async () => {
@@ -171,6 +178,9 @@ describe('TestSimulationService runtime contract', () => {
     expect(result.parts).toHaveLength(3);
     expect(result.sessionPackage).toEqual(
       expect.objectContaining({
+        prepareStatus: 'ready',
+        requiredSegmentCount: 1,
+        readySegmentCount: 1,
         examinerProfile: expect.objectContaining({
           id: 'british',
           accent: 'British',
@@ -183,7 +193,9 @@ describe('TestSimulationService runtime contract', () => {
             turnType: 'examiner',
             canAutoAdvance: true,
             audioAssetId: 'asset-welcome',
-            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+            isReady: true,
+            requiresGeneration: false
           })
         ])
       })
@@ -222,6 +234,9 @@ describe('TestSimulationService runtime contract', () => {
           })
         }),
         sessionPackage: expect.objectContaining({
+          prepareStatus: 'ready',
+          requiredSegmentCount: 1,
+          readySegmentCount: 1,
           examinerProfile: expect.objectContaining({
             id: 'british',
             accent: 'British',
@@ -234,7 +249,9 @@ describe('TestSimulationService runtime contract', () => {
               turnType: 'examiner',
               canAutoAdvance: true,
               audioAssetId: 'asset-welcome',
-              audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+              audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+              isReady: true,
+              requiresGeneration: false
             })
           ])
         })
@@ -368,6 +385,157 @@ describe('TestSimulationService runtime contract', () => {
         examinerProfileId: 'british',
         followUpCacheHits: 1,
         followUpCacheMisses: 0
+      })
+    );
+  });
+
+  it('returns the next visible turn before a deferred transcript is attached', async () => {
+    const service = createService();
+    await startThroughFirstPart1CandidateTurn(service);
+
+    const nextTurn = await service.submitRuntimeAnswer(
+      'user-1',
+      'simulation-1',
+      { durationSeconds: 9, deferTranscript: true } as any,
+      { urc: 'answer-deferred' } as any
+    );
+
+    expect(nextTurn.runtime.state).toBe('part1-examiner');
+    expect(nextTurn.runtime.currentSegment.text).toContain('What do you like most about your home?');
+    expect(nextTurn.runtime.turnHistory?.at(-1)).toEqual(
+      expect.objectContaining({
+        part: 1,
+        prompt: 'Do you live in a house or an apartment?',
+        transcript: undefined,
+        durationSeconds: 9
+      })
+    );
+
+    const attached = await (service as any).attachRuntimeTranscript(
+      'user-1',
+      'simulation-1',
+      {
+        transcript: 'I live in a flat near the city centre.',
+        durationSeconds: 9
+      },
+      { urc: 'answer-attach' } as any
+    );
+
+    expect(attached.runtime.state).toBe('part1-examiner');
+    expect(attached.runtime.currentSegment.text).toContain('What do you like most about your home?');
+    expect(attached.runtime.turnHistory?.at(-1)).toEqual(
+      expect.objectContaining({
+        part: 1,
+        prompt: 'Do you live in a house or an apartment?',
+        transcript: 'I live in a flat near the city centre.',
+        durationSeconds: 9
+      })
+    );
+  });
+
+  it('marks the base session package as ready only when all required base segments are ready', async () => {
+    const preparingPackage = {
+      version: 1,
+      preparedAt: new Date('2026-03-07T00:00:00.000Z'),
+      prepareStatus: 'preparing',
+      requiredSegmentCount: 3,
+      readySegmentCount: 2,
+      examinerProfile: {
+        id: 'british',
+        label: 'British Examiner',
+        accent: 'British',
+        provider: 'openai',
+        voiceId: 'alloy',
+        autoAssigned: true
+      },
+      segments: [
+        {
+          segmentId: 'fixed:welcome_intro',
+          part: 0,
+          phase: 'check-in',
+          kind: 'fixed_phrase',
+          turnType: 'examiner',
+          canAutoAdvance: true,
+          phraseId: 'welcome_intro',
+          text: 'Good morning.',
+          audioAssetId: 'asset-welcome',
+          audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+          cacheKey: 'fixed:british:welcome_intro',
+          provider: 'openai',
+          isReady: true,
+          requiresGeneration: false
+        },
+        {
+          segmentId: 'fixed:id_check',
+          part: 0,
+          phase: 'check-in',
+          kind: 'fixed_phrase',
+          turnType: 'examiner',
+          canAutoAdvance: true,
+          phraseId: 'id_check',
+          text: 'Could you please show me your identification document?',
+          audioAssetId: 'asset-id-check',
+          audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/id_check.mp3',
+          cacheKey: 'fixed:british:id_check',
+          provider: 'openai',
+          isReady: true,
+          requiresGeneration: false
+        },
+        {
+          segmentId: 'part1:home-life:question-0',
+          part: 1,
+          phase: 'question-seed',
+          kind: 'seed_prompt',
+          turnType: 'examiner',
+          canAutoAdvance: true,
+          promptIndex: 0,
+          text: 'Do you live in a house or an apartment?',
+          audioAssetId: 'part1-home-life-question-0',
+          audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/home-life/question-0.mp3',
+          cacheKey: 'question:british:part1:home-life:0',
+          provider: 'openai',
+          isReady: false,
+          requiresGeneration: true
+        }
+      ]
+    };
+    sessionPackageService.buildSessionPackage.mockResolvedValueOnce(preparingPackage);
+    sessionPackageService.ensurePackageReady.mockResolvedValueOnce({
+      ...preparingPackage,
+      prepareStatus: 'ready',
+      readySegmentCount: 3,
+      segments: preparingPackage.segments.map((segment: any) => ({
+        ...segment,
+        isReady: true,
+        requiresGeneration: false
+      }))
+    });
+
+    const service = createService();
+    const result = await service.startSimulation('user-1', { urc: 'test-urc' } as any);
+
+    expect(result.sessionPackage).toEqual(
+      expect.objectContaining({
+        prepareStatus: 'ready',
+        requiredSegmentCount: 3,
+        readySegmentCount: 3,
+        segments: expect.arrayContaining([
+          expect.objectContaining({
+            segmentId: 'part1:home-life:question-0',
+            isReady: true,
+            requiresGeneration: false
+          })
+        ])
+      })
+    );
+    expect(sessionPackageService.ensurePackageReady).toHaveBeenCalledWith(
+      preparingPackage,
+      expect.objectContaining({
+        simulationParts: expect.arrayContaining([
+          expect.objectContaining({ part: 1 }),
+          expect.objectContaining({ part: 2 }),
+          expect.objectContaining({ part: 3 })
+        ])
       })
     );
   });

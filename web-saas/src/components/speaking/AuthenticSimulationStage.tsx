@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBadge } from '@/components/ui/v2';
 import { ApiError } from '@/lib/api/client';
 import {
+  attachSimulationRuntimeTranscript,
   LiveSimulationSession,
   advanceSimulationRuntime,
   completeSimulationRuntime,
   decodeAudioBase64,
+  getCachedSimulationPackageAudioBuffer,
   isCandidateRuntimeState,
   isExaminerRuntimeState,
   isRetryablePauseState,
@@ -112,6 +114,7 @@ export default function AuthenticSimulationStage({
   const pendingAudioBlobRef = useRef<Blob | null>(null);
   const pendingDurationRef = useRef<number>(0);
   const pendingTranscriptRef = useRef<string>('');
+  const latestSessionRef = useRef<LiveSimulationSession | null>(session);
   const turnStartedAtRef = useRef<number | null>(null);
   const speechDetectedRef = useRef(false);
   const lastSpeechAtRef = useRef<number | null>(null);
@@ -154,6 +157,10 @@ export default function AuthenticSimulationStage({
     Number.isFinite((window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs)
       ? Math.max(250, (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs || 7000)
       : 7000;
+
+  useEffect(() => {
+    latestSessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     turnStateRef.current = turnState;
@@ -332,6 +339,36 @@ export default function AuthenticSimulationStage({
     [audioContextRef, markPromptReady, schedulePromptCompletionFallback]
   );
 
+  const playDecodedPrompt = useCallback(
+    async (audioBuffer: AudioBuffer) => {
+      const audioContext = audioContextRef.current;
+      if (!audioContext) {
+        throw new Error('Audio context is not available for examiner playback.');
+      }
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      currentBufferSourceRef.current = source;
+      schedulePromptCompletionFallback(audioBuffer.duration);
+
+      source.onended = () => {
+        if (currentBufferSourceRef.current === source) {
+          currentBufferSourceRef.current = null;
+        }
+        markPromptReady();
+      };
+
+      setPlaybackState('playing');
+      source.start(0);
+    },
+    [audioContextRef, markPromptReady, schedulePromptCompletionFallback]
+  );
+
   const stopRecorder = useCallback(() => {
     clearSilenceMonitor();
 
@@ -384,11 +421,11 @@ export default function AuthenticSimulationStage({
     }
 
     if (turnState === 'transcribing') {
-      return 'Transcribing your response...';
+      return 'The examiner is preparing the next step...';
     }
 
     if (turnState === 'submitting') {
-      return 'Sending your answer to the examiner...';
+      return 'The examiner is preparing the next question...';
     }
 
     if (turnState === 'scoring') {
@@ -462,28 +499,35 @@ export default function AuthenticSimulationStage({
   );
 
   const hydrateRuntime = useCallback(
-    async (next: LiveSimulationSession) => {
+    async (next: LiveSimulationSession, options?: { preserveTurnState?: boolean }) => {
+      latestSessionRef.current = next;
       onSessionChange(next);
-      setTurnState('idle');
+      if (!options?.preserveTurnState) {
+        setTurnState('idle');
+      }
       setLocalPause(null);
     },
     [onSessionChange]
   );
 
   const submitTranscript = useCallback(
-    async (transcript: string, durationSeconds?: number) => {
-      if (!session) return;
+    async (transcript: string, durationSeconds?: number, options?: { deferTranscript?: boolean }) => {
+      const activeSession = latestSessionRef.current;
+      if (!activeSession) return;
 
-      setTurnState('submitting');
+      setTurnState(options?.deferTranscript ? 'submitting' : 'submitting');
       pendingTranscriptRef.current = transcript;
-      setLastTranscript(transcript);
+      if (transcript.trim()) {
+        setLastTranscript(transcript);
+      }
 
       try {
-        const response = await submitSimulationRuntimeAnswer(session.simulationId, {
+        const response = await submitSimulationRuntimeAnswer(activeSession.simulationId, {
           transcript,
-          durationSeconds
+          durationSeconds,
+          deferTranscript: options?.deferTranscript
         });
-        await hydrateRuntime(mergeRuntimeIntoSimulation(session, response));
+        await hydrateRuntime(mergeRuntimeIntoSimulation(activeSession, response));
       } catch (error: any) {
         const message = error instanceof ApiError ? error.message : error?.message || 'Failed to submit this speaking turn.';
         setTurnState('idle');
@@ -491,25 +535,37 @@ export default function AuthenticSimulationStage({
           step: 'submission',
           message
         });
+        throw error;
       }
     },
-    [hydrateRuntime, session]
+    [hydrateRuntime]
   );
 
-  const transcribeAndSubmitAudio = useCallback(
-    async (audioBlob: Blob, durationSeconds: number) => {
-      setTurnState('transcribing');
-      pendingAudioBlobRef.current = audioBlob;
-      pendingDurationRef.current = durationSeconds;
-
+  const attachTranscriptInBackground = useCallback(
+    async (transcriptPromise: Promise<{ text: string; confidence?: number; duration?: number }>, durationSeconds: number) => {
       try {
-        const transcription = await transcribeSimulationAudio(audioBlob);
+        const transcription = await transcriptPromise;
         const transcript = transcription.text?.trim();
         if (!transcript) {
           throw new Error('The recording finished, but no transcript was returned.');
         }
 
-        await submitTranscript(transcript, durationSeconds || transcription.duration);
+        pendingTranscriptRef.current = transcript;
+        setLastTranscript(transcript);
+
+        const activeSession = latestSessionRef.current;
+        if (!activeSession) {
+          return;
+        }
+
+        const response = await attachSimulationRuntimeTranscript(activeSession.simulationId, {
+          transcript,
+          durationSeconds: durationSeconds || transcription.duration
+        });
+
+        const merged = mergeRuntimeIntoSimulation(activeSession, response);
+        latestSessionRef.current = merged;
+        await hydrateRuntime(merged, { preserveTurnState: true });
       } catch (error: any) {
         const message =
           error instanceof ApiError ? error.message : error?.message || 'Transcription failed for the current speaking turn.';
@@ -520,14 +576,51 @@ export default function AuthenticSimulationStage({
         });
       }
     },
-    [submitTranscript]
+    [hydrateRuntime]
+  );
+
+  const processCandidateAudio = useCallback(
+    async (audioBlob: Blob, durationSeconds: number) => {
+      const activeSession = latestSessionRef.current;
+      if (!activeSession) {
+        return;
+      }
+
+      setTurnState('transcribing');
+      pendingAudioBlobRef.current = audioBlob;
+      pendingDurationRef.current = durationSeconds;
+
+      const transcriptionPromise = transcribeSimulationAudio(audioBlob);
+      const currentState = activeSession.runtime.state;
+
+      try {
+        if (currentState === 'part1-candidate-turn' || currentState === 'part3-candidate-turn') {
+          const fastTranscript = await Promise.race([
+            transcriptionPromise.then(result => result.text?.trim() ? result : null),
+            new Promise<null>(resolve => window.setTimeout(() => resolve(null), 1000))
+          ]);
+
+          if (fastTranscript?.text?.trim()) {
+            await submitTranscript(fastTranscript.text.trim(), durationSeconds || fastTranscript.duration);
+            return;
+          }
+        }
+
+        await submitTranscript('', durationSeconds, { deferTranscript: true });
+        void attachTranscriptInBackground(transcriptionPromise, durationSeconds);
+      } catch (error) {
+        if (!(error instanceof ApiError) && !(error instanceof Error)) {
+          setTurnState('idle');
+        }
+      }
+    },
+    [attachTranscriptInBackground, submitTranscript]
   );
 
   const startRecording = useCallback(async () => {
     if (!session || !isCandidateRuntimeState(session.runtime.state)) return;
 
     setLocalPause(null);
-    setLastTranscript('');
 
     try {
       const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
@@ -555,7 +648,7 @@ export default function AuthenticSimulationStage({
         const audioBlob = new Blob(chunksRef.current, { type: mimeType });
         chunksRef.current = [];
         stopRecorder();
-        void transcribeAndSubmitAudio(audioBlob, elapsedSeconds);
+        void processCandidateAudio(audioBlob, elapsedSeconds);
       };
 
       recorder.start();
@@ -574,7 +667,7 @@ export default function AuthenticSimulationStage({
         message: getMicErrorMessage(error)
       });
     }
-  }, [beginSilenceMonitor, deviceId, session, stopRecorder, transcribeAndSubmitAudio]);
+  }, [beginSilenceMonitor, deviceId, processCandidateAudio, session, stopRecorder]);
 
   const stopRecordingTurn = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -628,7 +721,7 @@ export default function AuthenticSimulationStage({
     }
 
     if (localPause.step === 'transcription' && pendingAudioBlobRef.current) {
-      await transcribeAndSubmitAudio(pendingAudioBlobRef.current, pendingDurationRef.current);
+      await processCandidateAudio(pendingAudioBlobRef.current, pendingDurationRef.current);
       return;
     }
 
@@ -641,7 +734,7 @@ export default function AuthenticSimulationStage({
       lastAutoAdvanceKeyRef.current = '';
       await continueAfterPrompt();
     }
-  }, [continueAfterPrompt, hydrateRuntime, isBackendPause, localPause, session, submitTranscript, transcribeAndSubmitAudio]);
+  }, [continueAfterPrompt, hydrateRuntime, isBackendPause, localPause, processCandidateAudio, session, submitTranscript]);
 
   const replayPrompt = useCallback(() => {
     lastSegmentKeyRef.current = '';
@@ -690,15 +783,35 @@ export default function AuthenticSimulationStage({
         };
 
         let blob: Blob | null;
+        const basePackageTurn = !activePackageSegment || activePackageSegment.kind !== 'dynamic_follow_up';
 
         if (activePackageSegment?.audioUrl) {
           setPlaybackState('loading-package');
           try {
-            blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl);
+            const cachedAudioBuffer = getCachedSimulationPackageAudioBuffer(activePackageSegment.audioUrl);
+            blob = await preloadSimulationPackageAudio(activePackageSegment.audioUrl, audioContextRef.current);
+            const resolvedAudioBuffer = cachedAudioBuffer
+              ? await cachedAudioBuffer
+              : (getCachedSimulationPackageAudioBuffer(activePackageSegment.audioUrl)
+                ? await getCachedSimulationPackageAudioBuffer(activePackageSegment.audioUrl)!
+                : null);
+
+            if (cancelled || !blob) return;
+
+            if (resolvedAudioBuffer && audioContextRef.current) {
+              await playDecodedPrompt(resolvedAudioBuffer);
+              return;
+            }
           } catch {
+            if (basePackageTurn) {
+              throw new Error('The preloaded examiner audio for this turn is unavailable. Restart the simulation and try again.');
+            }
             blob = await synthesizePrompt();
           }
         } else {
+          if (basePackageTurn) {
+            throw new Error('The examiner prompt was not preloaded for this turn. Restart the simulation and try again.');
+          }
           blob = await synthesizePrompt();
         }
 
@@ -729,6 +842,7 @@ export default function AuthenticSimulationStage({
     isExaminerTurn,
     localPause,
     playSynthesizedPrompt,
+    playDecodedPrompt,
     runtime,
     schedulePromptCompletionFallback,
     segment,

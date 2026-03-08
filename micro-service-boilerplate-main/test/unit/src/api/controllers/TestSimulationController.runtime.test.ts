@@ -39,6 +39,9 @@ describe('TestSimulationController runtime contract', () => {
       status: 'in_progress',
       sessionPackage: {
         version: 1,
+        prepareStatus: 'ready',
+        requiredSegmentCount: 1,
+        readySegmentCount: 1,
         examinerProfile: {
           id: 'british',
           accent: 'British'
@@ -46,7 +49,9 @@ describe('TestSimulationController runtime contract', () => {
         segments: [
           {
             segmentId: 'fixed:welcome_intro',
-            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3'
+            audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/welcome_intro.mp3',
+            isReady: true,
+            requiresGeneration: false
           }
         ]
       },
@@ -106,13 +111,18 @@ describe('TestSimulationController runtime contract', () => {
     expect(getRuntimeResponse.body.data).toMatchObject({
       simulationId: '507f1f77bcf86cd799439013',
       sessionPackage: expect.objectContaining({
+        prepareStatus: 'ready',
+        requiredSegmentCount: 1,
+        readySegmentCount: 1,
         examinerProfile: expect.objectContaining({
           id: 'british'
         }),
         segments: expect.arrayContaining([
           expect.objectContaining({
             segmentId: 'fixed:welcome_intro',
-            audioUrl: expect.any(String)
+            audioUrl: expect.any(String),
+            isReady: true,
+            requiresGeneration: false
           })
         ])
       }),

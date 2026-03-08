@@ -7,8 +7,27 @@ jest.mock('@models/SpeakingAudioAssetModel', () => ({
 }));
 
 import { SpeakingSessionPackageService } from '@services/SpeakingSessionPackageService';
+import { SpeakingAudioAssetService } from '@services/SpeakingAudioAssetService';
 
 describe('SpeakingSessionPackageService', () => {
+  const buildStubAudioAssetService = () => {
+    const audioAssetService = new SpeakingAudioAssetService();
+
+    return {
+      buildFixedPhraseCacheKey: audioAssetService.buildFixedPhraseCacheKey.bind(audioAssetService),
+      buildQuestionCacheKey: audioAssetService.buildQuestionCacheKey.bind(audioAssetService),
+      normalizeText: audioAssetService.normalizeText.bind(audioAssetService),
+      getFixedPhraseAsset: audioAssetService.getFixedPhraseAsset.bind(audioAssetService),
+      getQuestionAsset: audioAssetService.getQuestionAsset.bind(audioAssetService),
+      storeBaseSegmentAsset: jest.fn().mockImplementation(async ({ cacheKey, storagePath, provider }: any) => ({
+        _id: `stored-${cacheKey}`,
+        publicUrl: `https://cdn.spokio.com/${storagePath}`,
+        provider,
+        durationSeconds: 4
+      }))
+    };
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -34,7 +53,21 @@ describe('SpeakingSessionPackageService', () => {
   });
 
   it('builds a preloaded session package with resolved assets and bounded seed prompts', async () => {
-    const service = new SpeakingSessionPackageService();
+    const audioAssetService = buildStubAudioAssetService();
+
+    const service = new SpeakingSessionPackageService(
+      undefined,
+      undefined,
+      audioAssetService as any,
+      {
+        synthesize: jest.fn().mockResolvedValue({
+          buffer: Buffer.from('mock-audio'),
+          cacheHit: false,
+          voiceId: 'openai:alloy',
+          cacheExpiresAt: null,
+        }),
+      } as any
+    );
 
     const sessionPackage = await service.buildSessionPackage([
       {
@@ -98,7 +131,7 @@ describe('SpeakingSessionPackageService', () => {
         expect.objectContaining({
           segmentId: 'part2:travel:cue-card',
           kind: 'cue_card',
-          audioUrl: expect.stringContaining('/speaking/questions/british/part2/travel/cue-card.mp3'),
+          audioUrl: expect.stringContaining('/part2/travel/cue-card.mp3'),
         }),
       ])
     );
@@ -109,5 +142,53 @@ describe('SpeakingSessionPackageService', () => {
     expect(
       sessionPackage.segments.filter(segment => segment.part === 3 && segment.kind === 'seed_prompt')
     ).toHaveLength(3);
+  });
+
+  it('prebuilds missing base examiner audio before returning package segments', async () => {
+    const audioAssetService = buildStubAudioAssetService();
+    const synthesize = jest.fn().mockResolvedValue({
+      buffer: Buffer.from('mock-audio'),
+      cacheHit: false,
+      voiceId: 'openai:alloy',
+      cacheExpiresAt: null
+    });
+
+    mockAssetFindOne.mockResolvedValue(null);
+
+    const service = new SpeakingSessionPackageService(
+      undefined,
+      undefined,
+      audioAssetService as any,
+      {
+        synthesize
+      } as any
+    );
+
+    const sessionPackage = await service.buildSessionPackage([
+      {
+        part: 1,
+        topicId: 'weather',
+        topicTitle: 'Weather',
+        question: 'What kind of weather do you enjoy most?\nHow does the weather change during the year where you live?',
+        timeLimit: 240,
+        tips: []
+      },
+      {
+        part: 2,
+        topicId: 'workshop',
+        topicTitle: 'Workshop',
+        question: 'Describe a challenging workshop you attended.\n\nYou should say:\n• what it was about\n• why it was challenging',
+        timeLimit: 180,
+        tips: []
+      }
+    ]);
+
+    expect(synthesize).toHaveBeenCalled();
+    expect(audioAssetService.storeBaseSegmentAsset).toHaveBeenCalled();
+
+    const requiredSegments = sessionPackage.segments.filter(segment => segment.kind !== 'dynamic_follow_up');
+    expect(requiredSegments.every(segment => segment.isReady)).toBe(true);
+    expect(requiredSegments.every(segment => !segment.requiresGeneration)).toBe(true);
+    expect(requiredSegments.every(segment => segment.audioUrl.startsWith('https://cdn.spokio.com/'))).toBe(true);
   });
 });

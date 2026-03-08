@@ -1,5 +1,6 @@
 export type SpeakingTtsProvider = 'openai' | 'elevenlabs' | 'edge-tts';
 export type SpeakingSessionTurnType = 'examiner' | 'candidate' | 'system';
+export type SpeakingSessionPrepareStatus = 'ready' | 'preparing' | 'failed';
 export type SpeakingSessionSegmentKind =
   | 'fixed_phrase'
   | 'seed_prompt'
@@ -31,6 +32,8 @@ export interface SpeakingSessionSegmentDto extends SpeakingAudioAssetRefDto {
   kind: SpeakingSessionSegmentKind;
   turnType: SpeakingSessionTurnType;
   canAutoAdvance: boolean;
+  isReady: boolean;
+  requiresGeneration: boolean;
   phraseId?: string;
   promptIndex?: number;
   text: string;
@@ -39,6 +42,9 @@ export interface SpeakingSessionSegmentDto extends SpeakingAudioAssetRefDto {
 export interface SpeakingSessionPackageDto {
   version: number;
   preparedAt: Date;
+  prepareStatus: SpeakingSessionPrepareStatus;
+  requiredSegmentCount: number;
+  readySegmentCount: number;
   examinerProfile: SpeakingExaminerProfileDto;
   segments: SpeakingSessionSegmentDto[];
 }

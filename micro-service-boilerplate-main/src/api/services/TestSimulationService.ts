@@ -32,6 +32,12 @@ interface SimulationListOptions {
 }
 
 interface RuntimeAnswerPayload {
+  transcript?: string;
+  deferTranscript?: boolean;
+  durationSeconds?: number;
+}
+
+interface RuntimeTranscriptPayload {
   transcript: string;
   durationSeconds?: number;
 }
@@ -76,9 +82,19 @@ export class TestSimulationService {
     const parts = await this.buildSimulationParts(userId, headers);
     const runtime = this.buildInitialRuntime();
     const packageBuildStartedAt = Date.now();
-    const sessionPackage = await this.sessionPackageService.buildSessionPackage(parts, {
+    const baseSessionPackage = await this.sessionPackageService.buildSessionPackage(parts, {
       selectionSeed: this.buildExaminerSelectionSeed(userId, headers?.urc)
     });
+    const sessionPackage = await this.sessionPackageService.ensurePackageReady(baseSessionPackage, {
+      simulationParts: parts
+    });
+    if (sessionPackage.prepareStatus !== 'ready') {
+      throw new CSError(
+        HTTP_STATUS_CODES.SERVICE_UNAVAILABLE,
+        CODES.GenericErrorMessage,
+        'Speaking session audio is still preparing. Please retry starting the simulation.'
+      );
+    }
     const packageBuildDurationMs = Date.now() - packageBuildStartedAt;
     const simulation = (await TestSimulationModel.create({
       user: userId,
@@ -256,6 +272,10 @@ export class TestSimulationService {
     const runtime = simulation.runtime || this.buildInitialRuntime();
     simulation.runtime = runtime;
 
+    if (payload.deferTranscript) {
+      return this.deferRuntimeAnswer(simulation, payload);
+    }
+
     const transcript = payload.transcript?.trim();
     if (!transcript) {
       throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, 'Transcript is required');
@@ -309,11 +329,18 @@ export class TestSimulationService {
       const seedPrompt = this.getSeedPrompt(simulation, partNumber, runtime.seedQuestionIndex || 0);
 
       try {
-        const followUp = await this.speechService.generateBufferedExaminerFollowUp(baseConversation, partNumber, {
-          seedPrompt,
-          followUpMode: 'single_narrow',
-          voiceProfileId: simulation.sessionPackage?.examinerProfile.id || 'british'
-        });
+        const followUp = await this.resolveAdaptiveFollowUpWithDeadline(
+          simulation,
+          baseConversation,
+          partNumber,
+          seedPrompt
+        );
+
+        if (!followUp) {
+          this.moveToNextSeedPrompt(simulation, partNumber);
+          await simulation.save();
+          return this.buildRuntimeResponse(simulation);
+        }
 
         runtime.state = partNumber === 1 ? 'part1-examiner' : 'part3-examiner';
         runtime.retryCount = 0;
@@ -342,6 +369,71 @@ export class TestSimulationService {
       }
     }
 
+    this.moveToNextSeedPrompt(simulation, partNumber);
+    await simulation.save();
+    return this.buildRuntimeResponse(simulation);
+  }
+
+  public async attachRuntimeTranscript(
+    userId: string,
+    simulationId: string,
+    payload: RuntimeTranscriptPayload,
+    headers: IRequestHeaders
+  ) {
+    const simulation = await this.getOwnedSimulation(userId, simulationId);
+    const transcript = payload.transcript?.trim();
+    if (!transcript) {
+      throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, 'Transcript is required');
+    }
+
+    this.attachTranscriptToLatestPendingTurn(simulation.runtime || this.buildInitialRuntime(), transcript, payload.durationSeconds);
+    await simulation.save();
+    return this.buildRuntimeResponse(simulation);
+  }
+
+  private async deferRuntimeAnswer(
+    simulation: TestSimulationDocument,
+    payload: RuntimeAnswerPayload
+  ) {
+    const runtime = simulation.runtime || this.buildInitialRuntime();
+    simulation.runtime = runtime;
+    const promptText = runtime.currentSegment.text || this.getPartPromptText(simulation, runtime.currentPart);
+
+    if (runtime.state === 'intro-candidate-turn') {
+      this.appendTurnRecord(runtime, 0, promptText, undefined, payload.durationSeconds);
+
+      const idCheck = this.examinerPhraseService.getPhrase('id_check');
+      runtime.state = 'intro-examiner';
+      runtime.introStep = 'id_check';
+      runtime.retryCount = 0;
+      runtime.retryBudgetRemaining = 1;
+      runtime.currentSegment = {
+        kind: 'cached_phrase',
+        phraseId: idCheck.id,
+        text: idCheck.text
+      };
+
+      await simulation.save();
+      return this.buildRuntimeResponse(simulation);
+    }
+
+    if (runtime.state === 'part2-candidate-turn') {
+      this.appendTurnRecord(runtime, 2, this.getPartPromptText(simulation, 2), undefined, payload.durationSeconds);
+      this.moveToCachedPhrase(simulation, 2, 'part2_transition', 'part2-transition');
+      await simulation.save();
+      return this.buildRuntimeResponse(simulation);
+    }
+
+    if (runtime.state !== 'part1-candidate-turn' && runtime.state !== 'part3-candidate-turn') {
+      throw new CSError(
+        HTTP_STATUS_CODES.BAD_REQUEST,
+        CODES.InvalidBody,
+        `Runtime cannot accept an answer in state ${runtime.state}`
+      );
+    }
+
+    const partNumber = runtime.currentPart as 1 | 3;
+    this.appendTurnRecord(runtime, partNumber, promptText, undefined, payload.durationSeconds);
     this.moveToNextSeedPrompt(simulation, partNumber);
     await simulation.save();
     return this.buildRuntimeResponse(simulation);
@@ -397,6 +489,7 @@ export class TestSimulationService {
     const preferences = await TestPreferenceModel.findOne({ user: userId }).lean();
 
     const partMap = new Map<number, any>((simulation.parts as any[]).map(part => [part.part, part] as const));
+    const runtimeTurnHistory = simulation.runtime?.turnHistory || [];
 
     const feedbackResults: IPracticeFeedback[] = [];
     for (const payload of partsPayload) {
@@ -405,12 +498,21 @@ export class TestSimulationService {
         throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, `Unknown part ${payload.part}`);
       }
 
-      part.response = payload.response;
-      part.timeSpent = payload.timeSpent;
+       const runtimePartTurns = runtimeTurnHistory.filter(turn => turn.part === payload.part);
+       const derivedResponse = runtimePartTurns
+        .map(turn => turn.transcript?.trim())
+        .filter((value): value is string => Boolean(value))
+        .join('\n\n');
+      const derivedTimeSpent = runtimePartTurns.reduce((total, turn) => total + (turn.durationSeconds || 0), 0);
+      const effectiveResponse = derivedResponse || payload.response || '';
+      const effectiveTimeSpent = derivedTimeSpent || payload.timeSpent;
+
+      part.response = effectiveResponse;
+      part.timeSpent = effectiveTimeSpent;
 
       const feedback = await this.feedbackService.generatePracticeFeedback(
         part.question,
-        payload.response || '',
+        effectiveResponse,
         preferences?.targetBand,
         headers
       );
@@ -758,7 +860,9 @@ export class TestSimulationService {
       audioUrl: followUp.audioUrl,
       cacheKey: followUp.cacheKey,
       provider: followUp.provider,
-      durationSeconds: followUp.durationSeconds
+      durationSeconds: followUp.durationSeconds,
+      isReady: true,
+      requiresGeneration: false
     };
 
     const segments = simulation.sessionPackage.segments || [];
@@ -787,7 +891,7 @@ export class TestSimulationService {
     runtime: TestSimulationRuntimeDto,
     part: number,
     prompt: string,
-    transcript: string,
+    transcript?: string,
     durationSeconds?: number
   ) {
     runtime.turnHistory = [
@@ -799,6 +903,47 @@ export class TestSimulationService {
         durationSeconds
       }
     ];
+  }
+
+  private attachTranscriptToLatestPendingTurn(
+    runtime: TestSimulationRuntimeDto,
+    transcript: string,
+    durationSeconds?: number
+  ) {
+    const turnHistory = runtime.turnHistory || [];
+
+    for (let index = turnHistory.length - 1; index >= 0; index -= 1) {
+      const turn = turnHistory[index];
+      if (turn.part > 0 && !turn.transcript?.trim()) {
+        turn.transcript = transcript;
+        if (typeof durationSeconds === 'number') {
+          turn.durationSeconds = durationSeconds;
+        }
+        runtime.turnHistory = [...turnHistory];
+        return;
+      }
+    }
+
+    throw new CSError(HTTP_STATUS_CODES.BAD_REQUEST, CODES.InvalidBody, 'No pending speaking turn is available for transcript attachment');
+  }
+
+  private async resolveAdaptiveFollowUpWithDeadline(
+    simulation: TestSimulationDocument,
+    baseConversation: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+    partNumber: 1 | 3,
+    seedPrompt: string
+  ) {
+    const followUpPromise = this.speechService.generateBufferedExaminerFollowUp(baseConversation, partNumber, {
+      seedPrompt,
+      followUpMode: 'single_narrow',
+      voiceProfileId: simulation.sessionPackage?.examinerProfile.id || 'british'
+    });
+
+    const timeoutPromise = new Promise<null>(resolve => {
+      setTimeout(() => resolve(null), 750);
+    });
+
+    return Promise.race([followUpPromise, timeoutPromise]);
   }
 
   private getSeedPrompts(simulation: TestSimulationDocument, partNumber: 1 | 3) {

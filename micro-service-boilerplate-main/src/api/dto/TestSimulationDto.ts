@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsMongoId,
   IsNumber,
   IsOptional,
@@ -141,6 +142,22 @@ export class TestSimulationQuery {
 }
 
 export class RuntimeAnswerRequest {
+  @IsOptional()
+  @IsString()
+  transcript?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(3600)
+  durationSeconds?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  deferTranscript?: boolean;
+}
+
+export class RuntimeTranscriptAttachmentRequest {
   @IsString()
   transcript!: string;
 

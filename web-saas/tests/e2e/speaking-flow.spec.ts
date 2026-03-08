@@ -1041,6 +1041,190 @@ test.describe('Speaking flow', () => {
     await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
   });
 
+  test('keeps the full simulation in upfront preparation until the base examiner package has preloaded', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page);
+
+    let releaseAudioFetch: () => void = () => {};
+    const audioFetchGate = new Promise<void>(resolve => {
+      releaseAudioFetch = resolve;
+    });
+    let synthesizeCalls = 0;
+
+    await page.route('https://cdn.spokio.com/**', async route => {
+      await audioFetchGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        headers: {
+          'access-control-allow-origin': '*'
+        },
+        body: 'mock-audio'
+      });
+    });
+
+    await page.route('**/api/v1/speech/synthesize', async route => {
+      synthesizeCalls += 1;
+      return route.fulfill(
+        mockJsonSuccess({
+          audioBase64: 'bW9jay1hdWRpbw==',
+          mimeType: 'audio/mpeg'
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-package-prepare-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              },
+              {
+                part: 2,
+                topicId: 'workshop',
+                topicTitle: 'Workshop',
+                question: 'Describe a challenging workshop you attended.',
+                timeLimit: 180,
+                tips: ['Use the full preparation time']
+              }
+            ],
+            runtime: {
+              state: 'intro-examiner',
+              currentPart: 0,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              introStep: 'welcome',
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'cached_phrase',
+                phraseId: 'welcome_intro',
+                text: 'Good morning. My name is Anna. I will be your examiner today.'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage({
+              extraSegments: [
+                {
+                  segmentId: 'fixed:id_check',
+                  part: 0,
+                  phase: 'check-in',
+                  kind: 'fixed_phrase',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  phraseId: 'id_check',
+                  text: 'Thank you. Could you please show me your identification document?',
+                  audioAssetId: 'asset-id-check',
+                  audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/id_check.mp3',
+                  cacheKey: 'fixed:british:id_check',
+                  provider: 'openai'
+                },
+                {
+                  segmentId: 'fixed:part2_intro',
+                  part: 2,
+                  phase: 'transition',
+                  kind: 'transition',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  phraseId: 'part2_intro',
+                  text: 'Now I am going to give you a topic and I would like you to talk about it for one to two minutes.',
+                  audioAssetId: 'asset-part2-intro',
+                  audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/part2_intro.mp3',
+                  cacheKey: 'fixed:british:part2_intro',
+                  provider: 'openai'
+                }
+              ]
+            })
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-package-prepare-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-package-prepare-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'intro-candidate-turn',
+            currentPart: 0,
+            currentTurnIndex: 0,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            introStep: 'welcome',
+            seedQuestionIndex: 0,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'cached_phrase',
+              phraseId: 'welcome_intro',
+              text: 'Good morning. My name is Anna. I will be your examiner today.'
+            }
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            extraSegments: [
+              {
+                segmentId: 'fixed:id_check',
+                part: 0,
+                phase: 'check-in',
+                kind: 'fixed_phrase',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                phraseId: 'id_check',
+                text: 'Thank you. Could you please show me your identification document?',
+                audioAssetId: 'asset-id-check',
+                audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/id_check.mp3',
+                cacheKey: 'fixed:british:id_check',
+                provider: 'openai'
+              },
+              {
+                segmentId: 'fixed:part2_intro',
+                part: 2,
+                phase: 'transition',
+                kind: 'transition',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                phraseId: 'part2_intro',
+                text: 'Now I am going to give you a topic and I would like you to talk about it for one to two minutes.',
+                audioAssetId: 'asset-part2-intro',
+                audioUrl: 'https://cdn.spokio.com/speaking/fixed/british/part2_intro.mp3',
+                cacheKey: 'fixed:british:part2_intro',
+                provider: 'openai'
+              }
+            ]
+          })
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Preparing your full simulation' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toHaveCount(0);
+    await expect.poll(() => synthesizeCalls).toBe(0);
+
+    releaseAudioFetch();
+
+    await expect(page.getByRole('heading', { name: 'Simulation in Progress' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Preparing your full simulation' })).toHaveCount(0);
+  });
+
   test('preloaded speaking package avoids live synthesis for package-backed base prompts', async ({ page }) => {
     await installMockMediaStack(page);
     await installMockAudioContextPlayback(page);
@@ -1144,10 +1328,9 @@ test.describe('Speaking flow', () => {
     await page.getByRole('tab', { name: 'Simulation' }).click();
     await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
 
-    await expect(page.getByRole('heading', { name: 'Examiner speaking' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Preparing your full simulation' })).toBeVisible();
     await expect(page.getByText('Loading examiner prompt.')).toHaveCount(0);
     await expect(page.getByText('Preparing examiner audio...')).toHaveCount(0);
-    await expect(page.getByText('Please listen to the examiner.')).toBeVisible();
     await expect.poll(() => synthesizeCalls).toBe(0);
 
     releaseAudioFetch();
@@ -2057,6 +2240,286 @@ test.describe('Speaking flow', () => {
     await expect(page.getByText('Why do you like that kind of weather?')).toBeVisible();
     await expect.poll(() => answerCalls).toBe(1);
     await expect.poll(() => submittedTranscript).toBe('I enjoy cool weather because it is easier to walk outside.');
+  });
+
+  test('does not block the next speaking turn on transcript processing', async ({ page }) => {
+    await installMockMediaStack(page);
+    await installMockAudioContextPlayback(page, { analyserSpeechReads: 4 });
+    await page.addInitScript(() => {
+      (window as typeof window & { __spokioSimulationSilenceMs?: number }).__spokioSimulationSilenceMs = 250;
+    });
+
+    let releaseTranscript: () => void = () => {};
+    const transcriptGate = new Promise<void>(resolve => {
+      releaseTranscript = resolve;
+    });
+    let deferredAnswerCalls = 0;
+    let transcriptAttachmentCalls = 0;
+    let runtimeAnswerCalls = 0;
+
+    await page.route('https://cdn.spokio.com/**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        headers: {
+          'access-control-allow-origin': '*'
+        },
+        body: 'mock-audio'
+      })
+    );
+
+    await page.route('**/api/v1/test-simulations', async route => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      return route.fulfill(
+        mockJsonSuccess(
+          {
+            simulationId: 'simulation-nonblocking-123',
+            parts: [
+              {
+                part: 1,
+                topicId: 'weather',
+                topicTitle: 'Weather',
+                question: 'What kind of weather do you enjoy most?',
+                timeLimit: 60,
+                tips: ['Keep answers brief']
+              }
+            ],
+            runtime: {
+              state: 'part1-candidate-turn',
+              currentPart: 1,
+              currentTurnIndex: 0,
+              retryCount: 0,
+              retryBudgetRemaining: 1,
+              seedQuestionIndex: 0,
+              followUpCount: 0,
+              currentSegment: {
+                kind: 'dynamic_prompt',
+                text: 'What kind of weather do you enjoy most?'
+              }
+            },
+            sessionPackage: buildSpeakingSessionPackage({
+              firstQuestionText: 'What kind of weather do you enjoy most?',
+              extraSegments: [
+                {
+                  segmentId: 'part1:weather:question-1',
+                  part: 1,
+                  phase: 'question-seed',
+                  kind: 'seed_prompt',
+                  turnType: 'examiner',
+                  canAutoAdvance: true,
+                  promptIndex: 1,
+                  text: 'What do you like most about your home?',
+                  audioAssetId: 'part1-home-life-question-1',
+                  audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/home-life/question-1.mp3',
+                  cacheKey: 'question:british:part1:home-life:1',
+                  provider: 'openai'
+                }
+              ]
+            })
+          },
+          201,
+          'Simulation started'
+        )
+      );
+    });
+
+    await page.route('**/api/v1/speech/transcribe', async route => {
+      await transcriptGate;
+      return route.fulfill(
+        mockJsonSuccess({
+          text: 'I enjoy cool weather because it is easier to walk outside.',
+          duration: 8
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-nonblocking-123/runtime/answer', async route => {
+      runtimeAnswerCalls += 1;
+      const body = JSON.parse(route.request().postData() || '{}');
+      if (runtimeAnswerCalls === 1 && !body.deferTranscript) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 400,
+            success: false,
+            error: {
+              code: 'EXPECTED_DEFERRED_RUNTIME_ANSWER',
+              message: 'Expected deferred runtime answer payload'
+            },
+            timestamp: new Date().toISOString()
+          })
+        });
+      }
+
+      if (runtimeAnswerCalls === 1) {
+        deferredAnswerCalls += 1;
+      }
+      return route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-nonblocking-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-examiner',
+            currentPart: 1,
+            currentTurnIndex: 1,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 1,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'What do you like most about your home?'
+            },
+            turnHistory: [
+              {
+                part: 1,
+                prompt: 'What kind of weather do you enjoy most?',
+                durationSeconds: 8
+              }
+            ]
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            firstQuestionText: 'What kind of weather do you enjoy most?',
+            extraSegments: [
+              {
+                segmentId: 'part1:weather:question-1',
+                part: 1,
+                phase: 'question-seed',
+                kind: 'seed_prompt',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                promptIndex: 1,
+                text: 'What do you like most about your home?',
+                audioAssetId: 'part1-home-life-question-1',
+                audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/home-life/question-1.mp3',
+                cacheKey: 'question:british:part1:home-life:1',
+                provider: 'openai'
+              }
+            ]
+          })
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-nonblocking-123/runtime/transcript', async route => {
+      transcriptAttachmentCalls += 1;
+      return route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-nonblocking-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-candidate-turn',
+            currentPart: 1,
+            currentTurnIndex: 1,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 1,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'What do you like most about your home?'
+            },
+            turnHistory: [
+              {
+                part: 1,
+                prompt: 'What kind of weather do you enjoy most?',
+                transcript: 'I enjoy cool weather because it is easier to walk outside.',
+                durationSeconds: 8
+              }
+            ]
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            firstQuestionText: 'What kind of weather do you enjoy most?',
+            extraSegments: [
+              {
+                segmentId: 'part1:weather:question-1',
+                part: 1,
+                phase: 'question-seed',
+                kind: 'seed_prompt',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                promptIndex: 1,
+                text: 'What do you like most about your home?',
+                audioAssetId: 'part1-home-life-question-1',
+                audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/home-life/question-1.mp3',
+                cacheKey: 'question:british:part1:home-life:1',
+                provider: 'openai'
+              }
+            ]
+          })
+        })
+      );
+    });
+
+    await page.route('**/api/v1/test-simulations/simulation-nonblocking-123/runtime/advance', async route =>
+      route.fulfill(
+        mockJsonSuccess({
+          simulationId: 'simulation-nonblocking-123',
+          status: 'in_progress',
+          runtime: {
+            state: 'part1-candidate-turn',
+            currentPart: 1,
+            currentTurnIndex: 1,
+            retryCount: 0,
+            retryBudgetRemaining: 1,
+            seedQuestionIndex: 1,
+            followUpCount: 0,
+            currentSegment: {
+              kind: 'dynamic_prompt',
+              text: 'What do you like most about your home?'
+            },
+            turnHistory: [
+              {
+                part: 1,
+                prompt: 'What kind of weather do you enjoy most?',
+                durationSeconds: 8
+              }
+            ]
+          },
+          sessionPackage: buildSpeakingSessionPackage({
+            firstQuestionText: 'What kind of weather do you enjoy most?',
+            extraSegments: [
+              {
+                segmentId: 'part1:weather:question-1',
+                part: 1,
+                phase: 'question-seed',
+                kind: 'seed_prompt',
+                turnType: 'examiner',
+                canAutoAdvance: true,
+                promptIndex: 1,
+                text: 'What do you like most about your home?',
+                audioAssetId: 'part1-home-life-question-1',
+                audioUrl: 'https://cdn.spokio.com/speaking/questions/british/part1/home-life/question-1.mp3',
+                cacheKey: 'question:british:part1:home-life:1',
+                provider: 'openai'
+              }
+            ]
+          })
+        })
+      )
+    );
+
+    await page.goto('/app/speaking');
+    await page.getByRole('tab', { name: 'Simulation' }).click();
+    await page.getByRole('button', { name: 'Start Full Simulation' }).first().click();
+
+    await expect(page.getByRole('heading', { name: 'Your turn' })).toBeVisible();
+    await expect(page.getByText('What kind of weather do you enjoy most?')).toBeVisible();
+
+    await expect(page.getByText('Sending your answer to the examiner...')).toHaveCount(0);
+    await expect(page.getByText('Transcribing your response...')).toHaveCount(0);
+    await expect(page.getByText('What do you like most about your home?')).toBeVisible({ timeout: 5000 });
+    await expect.poll(() => deferredAnswerCalls).toBe(1);
+
+    releaseTranscript();
+
+    await expect.poll(() => transcriptAttachmentCalls).toBe(1);
+    await expect(page.getByText('Simulation paused')).toHaveCount(0);
+    await expect(page.getByText('What do you like most about your home?')).toBeVisible();
   });
 
   test('auto-starts part 2 recording after the examiner tells the candidate to begin', async ({ page }) => {

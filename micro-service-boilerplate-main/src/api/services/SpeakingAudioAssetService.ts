@@ -1,4 +1,4 @@
-import { SpeakingAudioAssetModel } from '@models/SpeakingAudioAssetModel';
+import { SpeakingAudioAssetKind, SpeakingAudioAssetModel, SpeakingAudioAssetProvider } from '@models/SpeakingAudioAssetModel';
 import { uploadToSupabaseStorage } from '@lib/db/supabaseStorage';
 import { Service } from 'typedi';
 
@@ -16,6 +16,18 @@ interface DynamicFollowUpAssetInput {
   voiceProfileId: string;
   provider: 'openai' | 'elevenlabs' | 'edge-tts';
   text: string;
+  audioBuffer: Buffer;
+  mimeType?: string;
+  durationSeconds?: number;
+}
+
+interface BaseSegmentAssetInput {
+  kind: Exclude<SpeakingAudioAssetKind, 'dynamic_follow_up'>;
+  cacheKey: string;
+  text: string;
+  voiceProfileId: string;
+  provider: SpeakingAudioAssetProvider;
+  storagePath: string;
   audioBuffer: Buffer;
   mimeType?: string;
   durationSeconds?: number;
@@ -80,6 +92,38 @@ export class SpeakingAudioAssetService {
           voiceProfileId: input.voiceProfileId,
           provider: input.provider,
           storagePath,
+          publicUrl: upload.signedUrl,
+          mimeType: input.mimeType || 'audio/mpeg',
+          durationSeconds: input.durationSeconds,
+          status: 'ready',
+          lastUsedAt: new Date()
+        }
+      },
+      {
+        new: true,
+        upsert: true
+      }
+    );
+  }
+
+  public async storeBaseSegmentAsset(input: BaseSegmentAssetInput) {
+    const upload = await uploadToSupabaseStorage(
+      env.storage.supabase.audioBucket,
+      input.storagePath,
+      input.audioBuffer,
+      input.mimeType || 'audio/mpeg'
+    );
+
+    return SpeakingAudioAssetModel.findOneAndUpdate(
+      { cacheKey: input.cacheKey },
+      {
+        $set: {
+          kind: input.kind,
+          cacheKey: input.cacheKey,
+          text: input.text,
+          voiceProfileId: input.voiceProfileId,
+          provider: input.provider,
+          storagePath: input.storagePath,
           publicUrl: upload.signedUrl,
           mimeType: input.mimeType || 'audio/mpeg',
           durationSeconds: input.durationSeconds,
